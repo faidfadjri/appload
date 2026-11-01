@@ -2387,3 +2387,76 @@ use super::*;
             }
         }
     }
+
+    #[test]
+    fn test_add_and_edit_project_modal_full_height_and_centered_position() {
+        let ctx = egui::Context::default();
+        ShiplyApp::configure_light_workspace_style(&ctx);
+
+        let mut storage = crate::storage::AppStorage::default();
+        storage.projects.push(Project {
+            id: "proj-edit".to_string(),
+            name: "Existing Project".to_string(),
+            description: "Desc".to_string(),
+            local_path: ".".to_string(),
+            environments: Vec::new(),
+            group: None,
+            sort_order: Some(0),
+        });
+
+        let mut app = ShiplyApp::new(storage);
+        app.open_new_project_modal();
+
+        let screen_size = egui::vec2(1280.0, 800.0);
+        // Run two frames so egui settles the auto-sized window rect
+        for _ in 0..2 {
+            let raw_input = egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, screen_size)),
+                ..Default::default()
+            };
+            let _ = ctx.run(raw_input, |ctx| {
+                app.render_new_project_modal(ctx);
+            });
+        }
+
+        let add_area = ctx.memory(|mem| mem.area_rect(egui::Id::new("Add Project")));
+        assert!(add_area.is_some(), "Add Project modal area should exist");
+        let add_rect = add_area.unwrap();
+        assert!(
+            add_rect.height() > 500.0,
+            "Add Project modal must not shrink vertically (got height {})",
+            add_rect.height()
+        );
+        assert!(
+            add_rect.top() < 200.0,
+            "Add Project modal must be vertically centered, not sunk too low (got top {})",
+            add_rect.top()
+        );
+
+        // Now test Edit Project modal
+        app.show_new_project_modal = false;
+        app.open_edit_project_modal(0);
+        for _ in 0..2 {
+            let raw_input = egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, screen_size)),
+                ..Default::default()
+            };
+            let _ = ctx.run(raw_input, |ctx| {
+                app.render_edit_project_modal(ctx);
+            });
+        }
+
+        let edit_area = ctx.memory(|mem| mem.area_rect(egui::Id::new("Edit Project")));
+        assert!(edit_area.is_some(), "Edit Project modal area should exist");
+        let edit_rect = edit_area.unwrap();
+        assert!(
+            edit_rect.height() > 500.0,
+            "Edit Project modal must not shrink vertically (got height {})",
+            edit_rect.height()
+        );
+        assert!(
+            edit_rect.top() < 200.0,
+            "Edit Project modal must be vertically centered, not sunk too low (got top {})",
+            edit_rect.top()
+        );
+    }

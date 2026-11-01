@@ -47,16 +47,16 @@ pub(crate) fn animated_modal_window(
     let (modal_w, inner_w) = modal_width_and_inner(ctx);
     let slide_y = (1.0 - anim_t) * -18.0;
     let frame = frame_override.unwrap_or_else(|| modal_dialog_frame_for(ctx));
-    let max_h = (ctx.screen_rect().height() - 48.0).max(240.0);
     let window = egui::Window::new(title.to_string())
         .order(egui::Order::Foreground)
         .title_bar(false)
         .collapsible(false)
         .resizable(false)
+        .auto_sized()
+        .default_width(modal_w)
+        .min_width(modal_w)
+        .max_width(modal_w)
         .anchor(Align2::CENTER_CENTER, Vec2::new(0.0, slide_y))
-        .fixed_size(Vec2::new(modal_w, 0.0))
-        .max_height(max_h)
-        .vscroll(true)
         .frame(frame);
     (window, inner_w)
 }
@@ -105,12 +105,13 @@ impl ShiplyApp {
                                 .color(ACCENT),
                         );
                         ui.add_space(SP_8);
+                        let ps1_input_w = (inner_w - 32.0 - 216.0).max(120.0);
                         horizontal_row(ui, 40.0, |ui| {
                             modal_text_input(
                                 ui,
                                 "new_project_ps1_path",
                                 &mut self.new_project_ps1_path,
-                                264.0,
+                                ps1_input_w,
                                 Some(r"e.g. C:\Projects\my-app\deploy-dev.ps1"),
                             );
                             ui.add_space(SP_8);
@@ -177,7 +178,7 @@ impl ShiplyApp {
                     ui,
                     "new_project_name",
                     &mut self.new_project_name,
-                    512.0,
+                    inner_w,
                     Some("e.g. my-web-service"),
                 );
 
@@ -189,12 +190,13 @@ impl ShiplyApp {
                         .color(MD_TEXT),
                 );
                 ui.add_space(SP_8);
+                let dir_input_w = (inner_w - 152.0).max(140.0);
                 horizontal_row(ui, 40.0, |ui| {
                     modal_text_input(
                         ui,
                         "new_project_path",
                         &mut self.new_project_path,
-                        360.0,
+                        dir_input_w,
                         Some(r"e.g. C:\Projects\my-web-service"),
                     );
                     ui.add_space(SP_8);
@@ -221,7 +223,7 @@ impl ShiplyApp {
                     ui,
                     "new_project_desc",
                     &mut self.new_project_desc,
-                    512.0,
+                    inner_w,
                     Some("e.g. Backend API service (Node.js / PM2)"),
                 );
 
@@ -237,7 +239,7 @@ impl ShiplyApp {
                     ui,
                     "new_project_group",
                     &mut self.new_project_group,
-                    512.0,
+                    inner_w,
                     Some("e.g. Backend, Frontend, Microservices..."),
                 );
                 let existing_groups = self.storage.existing_project_groups();
@@ -403,12 +405,13 @@ impl ShiplyApp {
                                 .color(ACCENT),
                         );
                         ui.add_space(SP_8);
+                        let ps1_input_w = (inner_w - 32.0 - 208.0).max(120.0);
                         horizontal_row(ui, 40.0, |ui| {
                             modal_text_input(
                                 ui,
                                 "edit_project_ps1_path",
                                 &mut self.edit_project_ps1_path,
-                                272.0,
+                                ps1_input_w,
                                 Some(r"e.g. C:\Projects\my-app\deploy-prod.ps1"),
                             );
                             ui.add_space(SP_8);
@@ -476,7 +479,7 @@ impl ShiplyApp {
                     ui,
                     "edit_project_name",
                     &mut self.edit_project_name,
-                    512.0,
+                    inner_w,
                     Some("e.g. my-web-service"),
                 );
 
@@ -488,12 +491,13 @@ impl ShiplyApp {
                         .color(MD_TEXT),
                 );
                 ui.add_space(SP_8);
+                let dir_input_w = (inner_w - 152.0).max(140.0);
                 horizontal_row(ui, 40.0, |ui| {
                     modal_text_input(
                         ui,
                         "edit_project_path",
                         &mut self.edit_project_path,
-                        360.0,
+                        dir_input_w,
                         Some(r"e.g. C:\Projects\my-web-service"),
                     );
                     ui.add_space(SP_8);
@@ -517,7 +521,7 @@ impl ShiplyApp {
                     ui,
                     "edit_project_desc",
                     &mut self.edit_project_desc,
-                    512.0,
+                    inner_w,
                     Some("e.g. Backend API service (Node.js / PM2)"),
                 );
 
@@ -533,7 +537,7 @@ impl ShiplyApp {
                     ui,
                     "edit_project_group",
                     &mut self.edit_project_group,
-                    512.0,
+                    inner_w,
                     Some("e.g. Backend, Frontend, Microservices..."),
                 );
                 let existing_groups = self.storage.existing_project_groups();
@@ -666,12 +670,13 @@ impl ShiplyApp {
                                 .color(ACCENT),
                         );
                         ui.add_space(SP_8);
+                        let env_ps1_w = (inner_w - 32.0 - 208.0).max(120.0);
                         horizontal_row(ui, 40.0, |ui| {
                             modal_text_input(
                                 ui,
                                 "new_env_ps1_path",
                                 &mut self.new_env_ps1_path,
-                                272.0,
+                                env_ps1_w,
                                 Some(r"e.g. C:\Projects\my-app\deploy-staging.ps1"),
                             );
                             ui.add_space(SP_8);
@@ -733,7 +738,7 @@ impl ShiplyApp {
                     ui,
                     "new_env_name",
                     &mut self.new_env_name,
-                    512.0,
+                    inner_w,
                     Some("e.g. Development, Staging, Production, UAT, QA"),
                 );
 
