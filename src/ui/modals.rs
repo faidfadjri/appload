@@ -47,6 +47,7 @@ pub(crate) fn animated_modal_window(
     let (modal_w, inner_w) = modal_width_and_inner(ctx);
     let slide_y = (1.0 - anim_t) * -18.0;
     let frame = frame_override.unwrap_or_else(|| modal_dialog_frame_for(ctx));
+    let max_h = (ctx.screen_rect().height() - 48.0).max(240.0);
     let window = egui::Window::new(title.to_string())
         .order(egui::Order::Foreground)
         .title_bar(false)
@@ -54,6 +55,8 @@ pub(crate) fn animated_modal_window(
         .resizable(false)
         .anchor(Align2::CENTER_CENTER, Vec2::new(0.0, slide_y))
         .fixed_size(Vec2::new(modal_w, 0.0))
+        .max_height(max_h)
+        .vscroll(true)
         .frame(frame);
     (window, inner_w)
 }

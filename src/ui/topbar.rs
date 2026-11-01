@@ -56,7 +56,7 @@ impl ShiplyApp {
                 }
                 if menu_resp.on_hover_text("Toggle Navigation").clicked() {
                     let screen_w = ctx.screen_rect().width();
-                    if screen_w < 900.0 {
+                    if screen_w < 760.0 {
                         self.sidebar_drawer_open = !self.sidebar_drawer_open;
                     } else {
                         self.sidebar_collapsed = !self.sidebar_collapsed;

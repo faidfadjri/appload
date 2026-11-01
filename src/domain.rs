@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Local, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -413,6 +413,29 @@ pub struct DeploymentRecord {
     pub executed_steps: Vec<PipelineStep>,
 }
 
+impl DeploymentRecord {
+    /// Returns `started_at` converted to the desktop's local timezone.
+    pub fn started_at_local(&self) -> DateTime<Local> {
+        self.started_at.with_timezone(&Local)
+    }
+
+    /// Returns `finished_at` converted to the desktop's local timezone.
+    pub fn finished_at_local(&self) -> Option<DateTime<Local>> {
+        self.finished_at.map(|dt| dt.with_timezone(&Local))
+    }
+
+    /// Formats `started_at` in the desktop's local timezone using the given `strftime` format.
+    pub fn format_started_at_local(&self, fmt: &str) -> String {
+        self.started_at_local().format(fmt).to_string()
+    }
+
+    /// Formats `finished_at` in the desktop's local timezone using the given `strftime` format.
+    pub fn format_finished_at_local(&self, fmt: &str) -> Option<String> {
+        self.finished_at_local()
+            .map(|dt| dt.format(fmt).to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -590,5 +613,48 @@ mod tests {
         assert_eq!(step.summary(), "[Local [PowerShell]] echo test");
         let step_no_shell = PipelineStep::new("Test", StepKind::local_command("echo 1", false));
         assert_eq!(step_no_shell.summary(), "[Local] echo 1");
+    }
+
+    #[test]
+    fn test_deployment_record_local_timezone_formatting() {
+        let utc_time = DateTime::parse_from_rfc3339("2026-11-01T13:32:03Z")
+            .expect("valid rfc3339")
+            .with_timezone(&Utc);
+        let expected_local = utc_time.with_timezone(&Local);
+
+        let rec = DeploymentRecord {
+            id: "dep-tz-1".to_string(),
+            project_id: "proj-1".to_string(),
+            project_name: "Project 1".to_string(),
+            environment: "dev".to_string(),
+            app_name: "app-dev".to_string(),
+            version: "1.0.0".to_string(),
+            git_branch: Some("main".to_string()),
+            git_commit: Some("a1b2c3d".to_string()),
+            git_changes: Vec::new(),
+            is_rollback: false,
+            servers: Vec::new(),
+            status: DeploymentStatus::Succeeded,
+            started_at: utc_time,
+            finished_at: Some(utc_time),
+            duration_ms: Some(1200),
+            step_logs: Vec::new(),
+            executed_steps: Vec::new(),
+        };
+
+        assert_eq!(rec.started_at_local(), expected_local);
+        assert_eq!(rec.finished_at_local(), Some(expected_local));
+        assert_eq!(
+            rec.format_started_at_local("%Y-%m-%d %H:%M:%S"),
+            expected_local.format("%Y-%m-%d %H:%M:%S").to_string()
+        );
+        assert_eq!(
+            rec.format_started_at_local("%Y-%m-%d %H:%M"),
+            expected_local.format("%Y-%m-%d %H:%M").to_string()
+        );
+        assert_eq!(
+            rec.format_finished_at_local("%Y-%m-%d %H:%M:%S"),
+            Some(expected_local.format("%Y-%m-%d %H:%M:%S").to_string())
+        );
     }
 }

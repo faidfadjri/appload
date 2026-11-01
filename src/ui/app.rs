@@ -1191,16 +1191,15 @@ impl eframe::App for ShiplyApp {
 
         self.render_termius_topbar(ctx);
         let screen_width = ctx.screen_rect().width();
-        let is_narrow = screen_width < 900.0;
-        let is_rail_breakpoint = (900.0..1200.0).contains(&screen_width);
+        let is_narrow = screen_width < 760.0;
 
         if !is_narrow {
             self.sidebar_drawer_open = false;
             let sidebar_anim_t =
-                ctx.animate_bool(egui::Id::new("sidebar_smooth_anim"), !self.sidebar_collapsed && !is_rail_breakpoint);
+                ctx.animate_bool(egui::Id::new("sidebar_smooth_anim"), !self.sidebar_collapsed);
             self.render_sidebar(
                 ctx,
-                if is_rail_breakpoint || self.sidebar_collapsed {
+                if self.sidebar_collapsed {
                     0.25
                 } else {
                     sidebar_anim_t.max(0.25)
@@ -1257,19 +1256,13 @@ impl eframe::App for ShiplyApp {
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
                         let avail_w = ui.available_width();
-                        let page_pad = (avail_w * 0.03).clamp(16.0, 32.0);
-                        let content_w = avail_w.min(1200.0) - (page_pad * 2.0);
-                        let margin_x = ((avail_w - content_w) / 2.0).max(page_pad) as i8;
+                        let page_pad = (avail_w * 0.025).clamp(12.0, 28.0);
                         let pad_i = page_pad as i8;
 
                         egui::Frame::new()
-                            .inner_margin(Margin {
-                                left: margin_x,
-                                right: margin_x,
-                                top: pad_i,
-                                bottom: pad_i,
-                            })
+                            .inner_margin(Margin::symmetric(pad_i, pad_i))
                             .show(ui, |ui| {
+                                ui.set_width((avail_w - page_pad * 2.0).max(280.0));
                                 if let Some((msg, is_ok)) = &self.status_banner.clone() {
                                     let (bg, fg, border) = if *is_ok {
                                         (
@@ -1285,7 +1278,7 @@ impl eframe::App for ShiplyApp {
                                         )
                                     };
                                     let banner_w = ui.available_width();
-                                    let (b_rect, _) = ui.allocate_exact_size(
+                                    let (b_rect, b_resp) = ui.allocate_exact_size(
                                         Vec2::new(banner_w, 40.0),
                                         Sense::hover(),
                                     );
@@ -1297,13 +1290,26 @@ impl eframe::App for ShiplyApp {
                                         Stroke::new(1.0_f32, border),
                                         StrokeKind::Inside,
                                     );
-                                    ui.painter().text(
+                                    let right_reserve = if self.pending_update_restart.is_some() {
+                                        176.0
+                                    } else {
+                                        68.0
+                                    };
+                                    let text_clip = Rect::from_min_max(
+                                        Pos2::new(b_rect.left() + 10.0, b_rect.top()),
+                                        Pos2::new(
+                                            (b_rect.right() - right_reserve).max(b_rect.left() + 40.0),
+                                            b_rect.bottom(),
+                                        ),
+                                    );
+                                    ui.painter().with_clip_rect(text_clip).text(
                                         Pos2::new(b_rect.left() + 14.0, b_rect.center().y),
                                         Align2::LEFT_CENTER,
                                         msg,
                                         FontId::proportional(FONT_MD),
                                         fg,
                                     );
+                                    b_resp.on_hover_text(msg);
                                     let close_rect = Rect::from_center_size(
                                         Pos2::new(b_rect.right() - 36.0, b_rect.center().y),
                                         Vec2::new(48.0, 24.0),

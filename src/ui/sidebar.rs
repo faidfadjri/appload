@@ -47,11 +47,19 @@ impl ShiplyApp {
 
     pub(crate) fn render_sidebar(&mut self, ctx: &egui::Context, anim_t: f32) {
         let is_rail = anim_t < 0.35;
+        let screen_w = ctx.screen_rect().width();
+        let target_expanded_w = if screen_w >= 1150.0 {
+            SIDEBAR_EXPANDED_WIDTH
+        } else if screen_w >= 920.0 {
+            224.0
+        } else {
+            200.0
+        };
         let width = if is_rail {
             SIDEBAR_COLLAPSED_WIDTH
         } else {
             SIDEBAR_COLLAPSED_WIDTH
-                + (SIDEBAR_EXPANDED_WIDTH - SIDEBAR_COLLAPSED_WIDTH)
+                + (target_expanded_w - SIDEBAR_COLLAPSED_WIDTH)
                     * ((anim_t - 0.35) / 0.65).clamp(0.0, 1.0)
         };
         let pad_x = if is_rail { 4.0 } else { 10.0 };

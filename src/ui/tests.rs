@@ -2261,3 +2261,129 @@ use super::*;
             });
         });
     }
+
+    #[test]
+    fn test_responsive_window_resizing_and_local_timezone_history() {
+        let ctx = egui::Context::default();
+        ShiplyApp::configure_light_workspace_style(&ctx);
+
+        let mut storage = crate::storage::AppStorage::default();
+        let proj = Project {
+            id: "proj-resp".to_string(),
+            name: "Responsive Desktop App".to_string(),
+            description: "Testing responsive layout across window sizes".to_string(),
+            local_path: "D:/NTI/Projects/responsive-app".to_string(),
+            environments: vec![EnvironmentConfig {
+                key: "dev".to_string(),
+                name: "Development".to_string(),
+                app_name: "resp-dev".to_string(),
+                servers: vec!["10.0.0.10".to_string()],
+                remote_user: "deploy".to_string(),
+                vault_target: "vault-resp".to_string(),
+                remote_dir: "/var/www/resp".to_string(),
+                env_source: Some(".env.dev".to_string()),
+                http_proxy: None,
+                steps: vec![PipelineStep::new(
+                    "Build Project",
+                    StepKind::LocalCommand {
+                        command: "npm run build".to_string(),
+                        allow_failure: false,
+                        shell: None,
+                    },
+                )],
+            }],
+            group: Some("Core".to_string()),
+            sort_order: Some(0),
+        };
+        storage.projects.push(proj);
+
+        let fixed_utc = chrono::DateTime::parse_from_rfc3339("2026-10-30T10:15:30Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        let finished_utc = chrono::DateTime::parse_from_rfc3339("2026-10-30T10:16:05Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+
+        let dep = DeploymentRecord {
+            id: "dep-tz-1".to_string(),
+            project_id: "proj-resp".to_string(),
+            project_name: "Responsive Desktop App".to_string(),
+            environment: "dev".to_string(),
+            app_name: "resp-dev".to_string(),
+            version: "1.4.2".to_string(),
+            git_branch: Some("main".to_string()),
+            git_commit: Some("a1b2c3d".to_string()),
+            git_changes: vec!["feat: responsive layout and local timezone".to_string()],
+            is_rollback: false,
+            servers: vec!["10.0.0.10".to_string()],
+            status: DeploymentStatus::Succeeded,
+            started_at: fixed_utc,
+            finished_at: Some(finished_utc),
+            duration_ms: Some(35_000),
+            step_logs: vec![],
+            executed_steps: vec![],
+        };
+
+        // Verify local timezone conversion matches chrono::Local
+        let expected_local_full = fixed_utc
+            .with_timezone(&chrono::Local)
+            .format("%Y-%m-%d %H:%M:%S")
+            .to_string();
+        let expected_local_short = fixed_utc
+            .with_timezone(&chrono::Local)
+            .format("%Y-%m-%d %H:%M")
+            .to_string();
+        assert_eq!(
+            dep.format_started_at_local("%Y-%m-%d %H:%M:%S"),
+            expected_local_full
+        );
+        assert_eq!(
+            dep.format_started_at_local("%Y-%m-%d %H:%M"),
+            expected_local_short
+        );
+
+        storage.deployments.push(dep);
+        let mut app = ShiplyApp::new(storage);
+
+        // Render across multiple window sizes (from compact 540x440 up to 1920x1080)
+        let window_sizes = [
+            egui::vec2(540.0, 440.0),
+            egui::vec2(720.0, 520.0),
+            egui::vec2(960.0, 640.0),
+            egui::vec2(1440.0, 900.0),
+            egui::vec2(1920.0, 1080.0),
+        ];
+
+        for size in window_sizes {
+            let mut raw_input = egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, size)),
+                ..Default::default()
+            };
+
+            // 1. All Deployments Overview
+            app.selection = SidebarSelection::AllDeployments;
+            let _ = ctx.run(raw_input.clone(), |ctx| {
+                app.render_termius_topbar(ctx);
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    app.render_all_deployments_overview(ui);
+                });
+            });
+
+            // 2. Project Workspace across all 3 tabs
+            app.selection = SidebarSelection::Project("proj-resp".to_string());
+            app.selected_env_key = "dev".to_string();
+            for tab in [
+                WorkspaceTab::PipelineSteps,
+                WorkspaceTab::HistoryAndLogs,
+                WorkspaceTab::ServerSettings,
+            ] {
+                app.active_tab = tab;
+                raw_input.screen_rect = Some(egui::Rect::from_min_size(egui::Pos2::ZERO, size));
+                let _ = ctx.run(raw_input.clone(), |ctx| {
+                    egui::CentralPanel::default().show(ctx, |ui| {
+                        app.render_project_workspace(ui, "proj-resp");
+                    });
+                });
+            }
+        }
+    }

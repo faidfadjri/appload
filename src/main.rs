@@ -81,7 +81,7 @@ fn main() -> eframe::Result<()> {
             .with_icon(app_icon)
             .with_decorations(false)
             .with_inner_size([1280.0, 800.0])
-            .with_min_inner_size([800.0, 560.0]),
+            .with_min_inner_size([520.0, 420.0]),
         ..Default::default()
     };
 

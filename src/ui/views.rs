@@ -39,10 +39,12 @@ impl ShiplyApp {
                     );
                     ui.add_space(22.0);
 
-                    ui.horizontal(|ui| {
+                    ui.horizontal_wrapped(|ui| {
                         let total_btns_w = 510.0;
                         let pad = ((ui.available_width() - total_btns_w) / 2.0).max(0.0);
-                        ui.add_space(pad);
+                        if pad > 4.0 {
+                            ui.add_space(pad);
+                        }
 
                         let import_btn = egui::Button::new(
                             RichText::new("Auto-Import deploy.ps1 Script")
@@ -124,6 +126,9 @@ impl ShiplyApp {
             .filter(|id| self.bulk_selected_projects.contains(*id))
             .count();
 
+        let overview_avail_w = ui.available_width();
+        let is_compact_overview_hdr = overview_avail_w < 580.0;
+
         horizontal_row(ui, 38.0, |ui| {
             ui.label(
                 RichText::new("All Deployments")
@@ -131,7 +136,7 @@ impl ShiplyApp {
                     .strong()
                     .color(TEXT_PRIMARY),
             );
-            if selected_count > 0 {
+            if selected_count > 0 && !is_compact_overview_hdr {
                 render_pill(
                     ui,
                     &format!("{selected_count} SELECTED"),
@@ -143,20 +148,26 @@ impl ShiplyApp {
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 ui.spacing_mut().item_spacing = Vec2::new(8.0, 0.0);
 
-                let bulk_label = if selected_count > 0 {
+                let bulk_label = if is_compact_overview_hdr {
+                    if selected_count > 0 {
+                        format!("Bulk Deploy ({selected_count})...")
+                    } else {
+                        "Bulk Deploy...".to_string()
+                    }
+                } else if selected_count > 0 {
                     format!("Bulk Deploy ({selected_count} Selected)...")
                 } else {
                     "Bulk Deploy Projects...".to_string()
                 };
                 let bulk_btn = egui::Button::new(
                     RichText::new(bulk_label)
-                        .size(FONT_MD)
+                        .size(if is_compact_overview_hdr { FONT_SM } else { FONT_MD })
                         .strong()
                         .color(Color32::WHITE),
                 )
                 .fill(PRIMARY_BLUE)
                 .corner_radius(7.0)
-                .min_size(Vec2::new(190.0, 34.0));
+                .min_size(Vec2::new(if is_compact_overview_hdr { 120.0 } else { 190.0 }, 34.0));
 
                 if ui
                     .add(bulk_btn)
@@ -166,7 +177,9 @@ impl ShiplyApp {
                     open_bulk_modal = true;
                 }
 
-                let sel_btn_label = if all_selected {
+                let sel_btn_label = if is_compact_overview_hdr {
+                    if all_selected { "Clear" } else { "Select All" }
+                } else if all_selected {
                     "Clear Selection"
                 } else {
                     "Select All Projects"
@@ -180,7 +193,7 @@ impl ShiplyApp {
                 .fill(CARD_BG)
                 .stroke(Stroke::new(1.0_f32, CARD_BORDER))
                 .corner_radius(7.0)
-                .min_size(Vec2::new(128.0, 34.0));
+                .min_size(Vec2::new(if is_compact_overview_hdr { 80.0 } else { 128.0 }, 34.0));
 
                 if ui.add(sel_btn).clicked() {
                     toggle_select_all = true;
@@ -279,9 +292,20 @@ impl ShiplyApp {
 
         let proj_count = self.storage.projects.len().max(1);
         let spacing = 14.0;
-        let card_w = ((ui.available_width() - spacing * (proj_count.saturating_sub(1) as f32))
-            / (proj_count as f32))
-            .max(240.0);
+        let grid_avail_w = ui.available_width();
+        let max_cols = if grid_avail_w >= 760.0 {
+            3
+        } else if grid_avail_w >= 480.0 {
+            2
+        } else {
+            1
+        };
+        let cols = proj_count.min(max_cols).max(1);
+        let card_w = if cols == 1 {
+            grid_avail_w
+        } else {
+            ((grid_avail_w - spacing * (cols - 1) as f32) / cols as f32).floor()
+        };
 
         let mut clicked_proj = None;
         let mut toggled_bulk_proj = None;
@@ -349,14 +373,19 @@ impl ShiplyApp {
                     draw_icon_check(ui.painter(), chk_rect.center(), Color32::WHITE);
                 }
 
-                ui.painter().text(
+                let text_clip = Rect::from_min_max(
+                    Pos2::new(rect.left() + 14.0, rect.top() + 8.0),
+                    Pos2::new((chk_rect.left() - 8.0).max(rect.left() + 40.0), rect.top() + 62.0),
+                );
+                let clipped_painter = ui.painter().with_clip_rect(text_clip);
+                clipped_painter.text(
                     Pos2::new(rect.left() + 18.0, rect.top() + 24.0),
                     Align2::LEFT_CENTER,
                     &project.name,
                     FontId::proportional(FONT_LG),
                     TEXT_PRIMARY,
                 );
-                ui.painter().text(
+                clipped_painter.text(
                     Pos2::new(rect.left() + 18.0, rect.top() + 46.0),
                     Align2::LEFT_CENTER,
                     &project.local_path,
@@ -511,7 +540,19 @@ impl ShiplyApp {
                 ];
 
                 let spacing = 12.0;
-                let step_w = ((ui.available_width() - spacing * 3.0) / 4.0).max(185.0);
+                let onboard_avail = ui.available_width();
+                let onboard_cols = if onboard_avail >= 860.0 {
+                    4
+                } else if onboard_avail >= 460.0 {
+                    2
+                } else {
+                    1
+                };
+                let step_w = if onboard_cols == 1 {
+                    onboard_avail
+                } else {
+                    ((onboard_avail - spacing * (onboard_cols - 1) as f32) / onboard_cols as f32).floor()
+                };
                 const ONBOARDING_CARD_HEIGHT: f32 = 138.0;
                 ui.horizontal_wrapped(|ui| {
                     ui.spacing_mut().item_spacing = Vec2::new(spacing, 10.0);
@@ -561,17 +602,23 @@ impl ShiplyApp {
             .corner_radius(10.0)
             .inner_margin(Margin::symmetric(20, 14))
             .show(ui, |ui| {
+                let cred_avail_w = ui.available_width();
                 horizontal_row(ui, 32.0, |ui| {
                     let (ic_r, _) =
                         ui.allocate_exact_size(Vec2::new(20.0, 20.0), Sense::hover());
                     draw_outline_icon(ui.painter(), ic_r.center(), OutlineIcon::Key, PRIMARY_BLUE);
+                    let cred_title = if cred_avail_w < 580.0 {
+                        "OS CREDENTIALS SETUP GUIDELINE"
+                    } else {
+                        "OS CREDENTIALS SETUP GUIDELINE (WINDOWS | LINUX | MAC)"
+                    };
                     ui.label(
-                        RichText::new("OS CREDENTIALS SETUP GUIDELINE (WINDOWS | LINUX | MAC)")
+                        RichText::new(cred_title)
                             .size(FONT_MD)
                             .strong()
                             .color(PRIMARY_BLUE),
                     );
-                    if vault_ready {
+                    if vault_ready && cred_avail_w >= 640.0 {
                         render_pill(
                             ui,
                             "TARGET FOUND IN VAULT",
@@ -617,7 +664,8 @@ impl ShiplyApp {
                 ui.add_space(10.0);
 
                 // Interactive Target & Username customizer + Verify button
-                horizontal_row(ui, 34.0, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing = Vec2::new(6.0, 6.0);
                     ui.label(
                         RichText::new("Vault Target:")
                             .size(FONT_SM)
@@ -631,7 +679,7 @@ impl ShiplyApp {
                         170.0,
                         Some("e.g. prod-ssh-server"),
                     );
-                    ui.add_space(8.0);
+                    ui.add_space(4.0);
                     ui.label(
                         RichText::new("SSH User:")
                             .size(FONT_SM)
@@ -645,7 +693,6 @@ impl ShiplyApp {
                         130.0,
                         Some("e.g. deploy"),
                     );
-                    ui.add_space(6.0);
                     if outline_icon_button(
                         ui,
                         "verify_cred_guide_target_btn",
@@ -676,27 +723,32 @@ impl ShiplyApp {
                 ui.add_space(10.0);
 
                 // Platform Tab Bar: Windows | Linux | Mac (uniform gap & styling)
-                horizontal_row(ui, 34.0, |ui| {
-                    ui.spacing_mut().item_spacing = Vec2::new(8.0, 0.0);
-                    for (tab, label) in [
-                        (CredentialOsTab::Windows, "Windows (Credential Manager)"),
-                        (CredentialOsTab::Linux, "Linux (libsecret / secret-tool)"),
-                        (CredentialOsTab::Mac, "Mac (macOS Keychain)"),
-                    ] {
-                        let is_active = self.cred_guide_os_tab == tab;
-                        if render_uniform_tab_button(
-                            ui,
-                            ("cred_os_tab", label),
-                            label,
-                            is_active,
-                            32.0,
-                        )
-                        .clicked()
-                        {
-                            self.cred_guide_os_tab = tab;
-                        }
-                    }
-                });
+                egui::ScrollArea::horizontal()
+                    .id_salt("cred_guide_os_tabs_scroll")
+                    .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
+                    .show(ui, |ui| {
+                        horizontal_row(ui, 34.0, |ui| {
+                            ui.spacing_mut().item_spacing = Vec2::new(8.0, 0.0);
+                            for (tab, label) in [
+                                (CredentialOsTab::Windows, "Windows (Credential Manager)"),
+                                (CredentialOsTab::Linux, "Linux (libsecret / secret-tool)"),
+                                (CredentialOsTab::Mac, "Mac (macOS Keychain)"),
+                            ] {
+                                let is_active = self.cred_guide_os_tab == tab;
+                                if render_uniform_tab_button(
+                                    ui,
+                                    ("cred_os_tab", label),
+                                    label,
+                                    is_active,
+                                    32.0,
+                                )
+                                .clicked()
+                                {
+                                    self.cred_guide_os_tab = tab;
+                                }
+                            }
+                        });
+                    });
 
                 ui.add_space(10.0);
 
@@ -1012,7 +1064,8 @@ impl ShiplyApp {
 
             let right_w = ui.available_width();
             let screen_w = ui.ctx().screen_rect().width();
-            let is_narrow_header = screen_w < 720.0 || right_w < 340.0;
+            let is_narrow_header = screen_w < 720.0 || right_w < 320.0;
+            let is_icon_only_header = !is_narrow_header && right_w < 560.0;
 
             ui.allocate_ui_with_layout(
                 Vec2::new(right_w, 36.0),
@@ -1109,7 +1162,7 @@ impl ShiplyApp {
                             ui,
                             ("hdr_delete_proj", project_id),
                             OutlineIcon::Trash,
-                            Some("Delete"),
+                            if is_icon_only_header { None } else { Some("Delete") },
                             theme.danger,
                             theme.danger_soft,
                             theme.danger_soft,
@@ -1126,7 +1179,7 @@ impl ShiplyApp {
                             ui,
                             ("hdr_refresh_proj", project_id),
                             OutlineIcon::Refresh,
-                            Some("Refresh"),
+                            if is_icon_only_header { None } else { Some("Refresh") },
                             theme.text_muted,
                             theme.surface,
                             theme.surface_2,
@@ -1143,7 +1196,7 @@ impl ShiplyApp {
                             ui,
                             ("hdr_dup_proj", project_id),
                             OutlineIcon::Copy,
-                            Some("Duplicate"),
+                            if is_icon_only_header { None } else { Some("Duplicate") },
                             theme.text,
                             theme.surface,
                             theme.surface_2,
@@ -1160,7 +1213,7 @@ impl ShiplyApp {
                             ui,
                             ("hdr_edit_proj", project_id),
                             OutlineIcon::Edit,
-                            Some("Edit Project"),
+                            if is_icon_only_header { None } else { Some("Edit Project") },
                             theme.text,
                             theme.surface,
                             theme.surface_2,
@@ -1188,6 +1241,13 @@ impl ShiplyApp {
                             .map(|c| format!(" @ {c}"))
                             .unwrap_or_default();
 
+                        let branch_combo_w = if is_narrow_header {
+                            (right_w - 44.0).clamp(95.0, 130.0)
+                        } else if is_icon_only_header {
+                            (right_w - 164.0).clamp(115.0, 155.0)
+                        } else {
+                            185.0
+                        };
                         ui.scope(|ui| {
                             ui.spacing_mut().interact_size.y = 32.0;
                             ui.spacing_mut().button_padding = Vec2::new(10.0, 6.0);
@@ -1198,7 +1258,7 @@ impl ShiplyApp {
                                         .strong()
                                         .color(theme.text),
                                 )
-                                .width(if is_narrow_header { 130.0 } else { 185.0 })
+                                .width(branch_combo_w)
                                 .show_ui(ui, |ui| {
                                     for branch in self.cached_git_branches.clone() {
                                         let is_sel = self.selected_git_branch == branch;
@@ -1257,48 +1317,77 @@ impl ShiplyApp {
         draw_divider(ui, CARD_BORDER);
         ui.add_space(6.0);
 
-        // 2. Sub-header description & folder path row (Fixed 24px height)
-        let (sub_rect, _) = ui.allocate_exact_size(Vec2::new(avail_w, 24.0), Sense::hover());
-        draw_icon_server(
-            ui.painter(),
-            Pos2::new(sub_rect.left() + 8.0, sub_rect.center().y),
-            TEXT_MUTED,
-        );
+        // 2. Sub-header description & folder path row (Responsive single or two-row layout)
         let desc_galley = ui.painter().layout_no_wrap(
             proj_desc,
             FontId::proportional(FONT_SM),
             TEXT_SECONDARY,
         );
-        let desc_w = desc_galley.size().x;
-        ui.painter().galley(
-            Pos2::new(
-                sub_rect.left() + 22.0,
-                sub_rect.center().y - desc_galley.size().y / 2.0,
-            ),
-            desc_galley,
-            TEXT_SECONDARY,
-        );
-
-        let sep_x = sub_rect.left() + 22.0 + desc_w + 14.0;
-        ui.painter().line_segment(
-            [
-                Pos2::new(sep_x, sub_rect.top() + 5.0),
-                Pos2::new(sep_x, sub_rect.bottom() - 5.0),
-            ],
-            Stroke::new(1.0_f32, CARD_BORDER),
-        );
-        draw_icon_folder(
-            ui.painter(),
-            Pos2::new(sep_x + 16.0, sub_rect.center().y),
-            TEXT_MUTED,
-        );
-        ui.painter().text(
-            Pos2::new(sep_x + 30.0, sub_rect.center().y),
-            Align2::LEFT_CENTER,
-            &proj_path,
+        let path_galley = ui.painter().layout_no_wrap(
+            proj_path.clone(),
             FontId::proportional(FONT_SM),
             TEXT_SECONDARY,
         );
+        let desc_w = desc_galley.size().x;
+        let path_w = path_galley.size().x;
+        let stack_subheader = 22.0 + desc_w + 46.0 + path_w > avail_w;
+
+        if stack_subheader {
+            let (sub_rect, _) = ui.allocate_exact_size(Vec2::new(avail_w, 44.0), Sense::hover());
+            let clip = ui.painter().with_clip_rect(sub_rect);
+            let y1 = sub_rect.top() + 11.0;
+            let y2 = sub_rect.top() + 33.0;
+            draw_icon_server(&clip, Pos2::new(sub_rect.left() + 8.0, y1), TEXT_MUTED);
+            clip.galley(
+                Pos2::new(sub_rect.left() + 22.0, y1 - desc_galley.size().y / 2.0),
+                desc_galley,
+                TEXT_SECONDARY,
+            );
+            draw_icon_folder(&clip, Pos2::new(sub_rect.left() + 8.0, y2), TEXT_MUTED);
+            clip.galley(
+                Pos2::new(sub_rect.left() + 22.0, y2 - path_galley.size().y / 2.0),
+                path_galley,
+                TEXT_SECONDARY,
+            );
+        } else {
+            let (sub_rect, _) = ui.allocate_exact_size(Vec2::new(avail_w, 24.0), Sense::hover());
+            let clip = ui.painter().with_clip_rect(sub_rect);
+            draw_icon_server(
+                &clip,
+                Pos2::new(sub_rect.left() + 8.0, sub_rect.center().y),
+                TEXT_MUTED,
+            );
+            clip.galley(
+                Pos2::new(
+                    sub_rect.left() + 22.0,
+                    sub_rect.center().y - desc_galley.size().y / 2.0,
+                ),
+                desc_galley,
+                TEXT_SECONDARY,
+            );
+
+            let sep_x = sub_rect.left() + 22.0 + desc_w + 14.0;
+            clip.line_segment(
+                [
+                    Pos2::new(sep_x, sub_rect.top() + 5.0),
+                    Pos2::new(sep_x, sub_rect.bottom() - 5.0),
+                ],
+                Stroke::new(1.0_f32, CARD_BORDER),
+            );
+            draw_icon_folder(
+                &clip,
+                Pos2::new(sep_x + 16.0, sub_rect.center().y),
+                TEXT_MUTED,
+            );
+            clip.galley(
+                Pos2::new(
+                    sep_x + 30.0,
+                    sub_rect.center().y - path_galley.size().y / 2.0,
+                ),
+                path_galley,
+                TEXT_SECONDARY,
+            );
+        }
 
         ui.add_space(14.0);
 
@@ -1923,9 +2012,65 @@ impl ShiplyApp {
         let screen_w = ui.ctx().screen_rect().width();
         let theme = self.theme();
 
-        let is_two_rows = screen_w < 900.0 || avail_w < 700.0;
+        let project_id_owned = match &self.selection {
+            SidebarSelection::Project(pid) => pid.clone(),
+            SidebarSelection::AllDeployments => String::new(),
+        };
+        let project_id = project_id_owned.as_str();
+
+        let is_busy = self.is_env_deploying(project_id, &self.selected_env_key);
+        let btn_text = if is_busy {
+            "Deploying...".to_string()
+        } else {
+            let ver = self.deploy_version_input.trim();
+            if ver.is_empty() {
+                format!("Deploy to {env_display_name}")
+            } else {
+                format!("Deploy to {env_display_name} (v{ver})")
+            }
+        };
+
+        let deploy_galley = ui.painter().layout_no_wrap(
+            btn_text,
+            FontId::proportional(FS_BASE),
+            Color32::WHITE,
+        );
+        let deploy_icon_w = 14.0;
+        let deploy_gap = 8.0;
+        let deploy_pad_x = 16.0;
+        let deploy_content_w = deploy_icon_w + deploy_gap + deploy_galley.size().x;
+        let btn_h = BTN_PRIMARY_HEIGHT; // 36px
+
+        let rollback_info = rollback_candidate.as_ref().map(|prev_dep| {
+            let rb_text = format!("Rollback v{}", prev_dep.version);
+            let rb_galley = ui.painter().layout_no_wrap(
+                rb_text,
+                FontId::proportional(FONT_SM),
+                theme.warning,
+            );
+            let rb_icon_w = 14.0;
+            let rb_gap = 6.0;
+            let rb_pad_x = 12.0;
+            let rb_content_w = rb_icon_w + rb_gap + rb_galley.size().x;
+            let rb_w = (rb_content_w + rb_pad_x * 2.0).max(120.0);
+            (rb_galley, rb_icon_w, rb_gap, rb_content_w, rb_w)
+        });
+
+        let natural_deploy_w = (deploy_content_w + deploy_pad_x * 2.0).max(180.0);
+        let natural_rb_w = rollback_info.as_ref().map(|(_, _, _, _, w)| *w).unwrap_or(0.0);
+        let right_btns_w = natural_deploy_w + if natural_rb_w > 0.0 { natural_rb_w + 10.0 } else { 0.0 };
+        let left_controls_w = 575.0;
+
+        let is_two_rows = screen_w < 900.0 || avail_w < (left_controls_w + right_btns_w + 48.0);
+        let is_compact_controls = is_two_rows && avail_w < 600.0;
         let is_mobile_deploy = screen_w < 600.0 || avail_w < 480.0;
-        let bar_h = if is_two_rows { 122.0 } else { 78.0 };
+        let bar_h = if is_compact_controls {
+            154.0
+        } else if is_two_rows {
+            122.0
+        } else {
+            78.0
+        };
 
         let (bar_rect, _) = ui.allocate_exact_size(Vec2::new(avail_w, bar_h), Sense::hover());
         draw_elevated_card(
@@ -1946,7 +2091,11 @@ impl ShiplyApp {
         let row1_rect = Rect::from_min_max(
             Pos2::new(bar_rect.left() + 20.0, bar_rect.top() + 28.0),
             Pos2::new(
-                if is_two_rows { bar_rect.right() - 20.0 } else { bar_rect.right() - 280.0 },
+                if is_two_rows {
+                    bar_rect.right() - 20.0
+                } else {
+                    bar_rect.right() - 24.0 - right_btns_w
+                },
                 bar_rect.top() + 66.0,
             ),
         );
@@ -1962,7 +2111,7 @@ impl ShiplyApp {
             &mut child,
             "deploy_version_input",
             &mut self.deploy_version_input,
-            92.0,
+            if is_compact_controls { 78.0 } else { 92.0 },
             Some("1.0.0"),
         );
         let ver_id = child.make_persistent_id("deploy_version_input");
@@ -1983,18 +2132,13 @@ impl ShiplyApp {
             .fill(theme.surface)
             .stroke(Stroke::new(1.0_f32, theme.border_strong))
             .corner_radius(R_MD as u8)
-            .min_size(Vec2::new(54.0, BTN_HEIGHT));
+            .min_size(Vec2::new(if is_compact_controls { 48.0 } else { 54.0 }, BTN_HEIGHT));
             if child.add(b).clicked() {
                 self.deploy_version_input = bump_semver(&self.deploy_version_input, bump);
             }
         }
 
         child.add_space(4.0);
-        let project_id_owned = match &self.selection {
-            SidebarSelection::Project(pid) => pid.clone(),
-            SidebarSelection::AllDeployments => String::new(),
-        };
-        let project_id = project_id_owned.as_str();
         let sync_candidates = self.sync_version_candidates(project_id);
         let sync_btn_text = "Sync";
         let sync_tooltip = if sync_candidates.is_empty() {
@@ -2044,83 +2188,76 @@ impl ShiplyApp {
             }
         }
 
-        child.add_space(10.0);
-        let sep_x = child.cursor().min.x;
-        child.painter().line_segment(
-            [
-                Pos2::new(sep_x, row1_rect.top() + 4.0),
-                Pos2::new(sep_x, row1_rect.bottom() - 4.0),
-            ],
-            Stroke::new(1.0_f32, theme.border),
-        );
-        child.add_space(10.0);
-
-        child.checkbox(
-            &mut self.bump_package_json,
-            RichText::new("Bump package.json")
-                .size(FONT_SM)
-                .strong()
-                .color(theme.text),
-        );
-        child.add_space(8.0);
-        child.checkbox(
-            &mut self.create_git_tag,
-            RichText::new("Git Tag")
-                .size(FONT_SM)
-                .strong()
-                .color(theme.text_muted),
-        );
-
-        // Deploy Button + Rollback Button
-        let is_busy = self.is_env_deploying(project_id, &self.selected_env_key);
-        let btn_text = if is_busy {
-            "Deploying...".to_string()
-        } else {
-            let ver = self.deploy_version_input.trim();
-            if ver.is_empty() {
-                format!("Deploy to {env_display_name}")
-            } else {
-                format!("Deploy to {env_display_name} (v{ver})")
-            }
-        };
-
-        let deploy_galley = ui.painter().layout_no_wrap(
-            btn_text,
-            FontId::proportional(FS_BASE),
-            Color32::WHITE,
-        );
-        let deploy_icon_w = 14.0;
-        let deploy_gap = 8.0;
-        let deploy_pad_x = 16.0;
-        let deploy_content_w = deploy_icon_w + deploy_gap + deploy_galley.size().x;
-        let btn_h = BTN_PRIMARY_HEIGHT; // 36px
-
-        let rollback_info = rollback_candidate.as_ref().map(|prev_dep| {
-            let rb_text = format!("Rollback v{}", prev_dep.version);
-            let rb_galley = ui.painter().layout_no_wrap(
-                rb_text,
-                FontId::proportional(FONT_SM),
-                theme.warning,
+        if is_compact_controls {
+            let row_chk_rect = Rect::from_min_max(
+                Pos2::new(bar_rect.left() + 20.0, bar_rect.top() + 68.0),
+                Pos2::new(bar_rect.right() - 20.0, bar_rect.top() + 98.0),
             );
-            let rb_icon_w = 14.0;
-            let rb_gap = 6.0;
-            let rb_pad_x = 12.0;
-            let rb_content_w = rb_icon_w + rb_gap + rb_galley.size().x;
-            let rb_w = (rb_content_w + rb_pad_x * 2.0).max(120.0);
-            (rb_galley, rb_icon_w, rb_gap, rb_content_w, rb_w)
-        });
+            let mut chk_ui = ui.new_child(
+                egui::UiBuilder::new()
+                    .id_salt("deploy_bar_checkboxes_compact")
+                    .max_rect(row_chk_rect)
+                    .layout(Layout::left_to_right(Align::Center)),
+            );
+            chk_ui.checkbox(
+                &mut self.bump_package_json,
+                RichText::new("Bump package.json")
+                    .size(FONT_SM)
+                    .strong()
+                    .color(theme.text),
+            );
+            chk_ui.add_space(12.0);
+            chk_ui.checkbox(
+                &mut self.create_git_tag,
+                RichText::new("Git Tag")
+                    .size(FONT_SM)
+                    .strong()
+                    .color(theme.text_muted),
+            );
+        } else {
+            child.add_space(10.0);
+            let sep_x = child.cursor().min.x;
+            child.painter().line_segment(
+                [
+                    Pos2::new(sep_x, row1_rect.top() + 4.0),
+                    Pos2::new(sep_x, row1_rect.bottom() - 4.0),
+                ],
+                Stroke::new(1.0_f32, theme.border),
+            );
+            child.add_space(10.0);
+
+            child.checkbox(
+                &mut self.bump_package_json,
+                RichText::new("Bump package.json")
+                    .size(FONT_SM)
+                    .strong()
+                    .color(theme.text),
+            );
+            child.add_space(8.0);
+            child.checkbox(
+                &mut self.create_git_tag,
+                RichText::new("Git Tag")
+                    .size(FONT_SM)
+                    .strong()
+                    .color(theme.text_muted),
+            );
+        }
 
         let (btn_rect, rb_rect_opt) = if is_two_rows {
-            // Row 2 below controls
-            let row2_y = bar_rect.top() + 74.0;
+            // Row 2 (or Row 3 when compact) below controls
+            let row2_y = if is_compact_controls {
+                bar_rect.top() + 104.0
+            } else {
+                bar_rect.top() + 74.0
+            };
             if is_mobile_deploy {
                 // Full width deploy button below 600px
                 let w = bar_rect.width() - 40.0;
                 let b_rect = Rect::from_min_size(Pos2::new(bar_rect.left() + 20.0, row2_y), Vec2::new(w, btn_h));
                 (b_rect, None)
             } else {
-                let b_w = (deploy_content_w + deploy_pad_x * 2.0).max(180.0);
-                let rb_w = rollback_info.as_ref().map(|(_, _, _, _, w)| *w).unwrap_or(0.0);
+                let b_w = natural_deploy_w;
+                let rb_w = natural_rb_w;
                 let b_rect = Rect::from_min_size(
                     Pos2::new(bar_rect.right() - 20.0 - b_w, row2_y),
                     Vec2::new(b_w, btn_h),
@@ -2137,8 +2274,8 @@ impl ShiplyApp {
             }
         } else {
             // Single row: right-aligned
-            let mut b_w = (deploy_content_w + deploy_pad_x * 2.0).max(180.0);
-            let rb_w = rollback_info.as_ref().map(|(_, _, _, _, w)| *w).unwrap_or(0.0);
+            let mut b_w = natural_deploy_w;
+            let rb_w = natural_rb_w;
             let total_needed = b_w + if rb_w > 0.0 { rb_w + 10.0 } else { 0.0 };
             let max_r_w = (bar_rect.right() - 20.0 - (child.cursor().min.x + 16.0)).max(180.0);
             if total_needed > max_r_w {
@@ -2271,23 +2408,131 @@ impl ShiplyApp {
             .map(|e| e.name.clone())
             .unwrap_or_else(|| env_key.clone());
 
-        horizontal_row(ui, 36.0, |ui| {
-            ui.label(
-                RichText::new(format!("{} PIPELINE STEPS", env_name.to_uppercase()))
-                    .size(FONT_MD)
-                    .strong()
-                    .color(TEXT_PRIMARY),
-            );
-            ui.label(
-                RichText::new("— Add or customize any step type:")
-                    .size(FONT_SM)
-                    .color(TEXT_MUTED),
-            );
+        let header_avail_w = ui.available_width();
+        let stack_step_buttons = header_avail_w < 680.0;
+        let show_step_subtitle = header_avail_w >= 880.0;
 
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                ui.spacing_mut().item_spacing = Vec2::new(6.0, 0.0);
-                let project = &mut self.storage.projects[proj_idx];
-                if let Some(env_cfg) = project.get_env_mut(&env_key) {
+        let mut add_local = false;
+        let mut add_verify = false;
+        let mut add_scp = false;
+        let mut add_remote = false;
+
+        let render_add_step_buttons = |ui: &mut egui::Ui,
+                                       add_local: &mut bool,
+                                       add_verify: &mut bool,
+                                       add_scp: &mut bool,
+                                       add_remote: &mut bool| {
+            let local_btn = egui::Button::new(
+                RichText::new("+ Local Command")
+                    .size(FONT_SM)
+                    .strong()
+                    .color(BLUE_PILL_TEXT),
+            )
+            .fill(BLUE_PILL_BG)
+            .stroke(Stroke::new(1.0_f32, BLUE_PILL_TEXT))
+            .corner_radius(6.0);
+            if ui
+                .add(local_btn)
+                .on_hover_text("Add a local shell command step (e.g. npm run build)")
+                .clicked()
+            {
+                *add_local = true;
+            }
+
+            let verify_btn = egui::Button::new(
+                RichText::new("+ Verify Path")
+                    .size(FONT_SM)
+                    .strong()
+                    .color(WARN_PILL_TEXT),
+            )
+            .fill(WARN_PILL_BG)
+            .stroke(Stroke::new(1.0_f32, WARN_PILL_TEXT))
+            .corner_radius(6.0);
+            if ui
+                .add(verify_btn)
+                .on_hover_text(
+                    "Add a local file/folder verification guard (e.g. ./dist/server.js)",
+                )
+                .clicked()
+            {
+                *add_verify = true;
+            }
+
+            let scp_btn = egui::Button::new(
+                RichText::new("+ SCP Upload")
+                    .size(FONT_SM)
+                    .strong()
+                    .color(PURPLE_PILL_TEXT),
+            )
+            .fill(PURPLE_PILL_BG)
+            .stroke(Stroke::new(1.0_f32, PURPLE_PILL_TEXT))
+            .corner_radius(6.0);
+            if ui
+                .add(scp_btn)
+                .on_hover_text(
+                    "Add an SCP file upload step (transfers local files & optional staged .env to {remote_dir})",
+                )
+                .clicked()
+            {
+                *add_scp = true;
+            }
+
+            let remote_btn = egui::Button::new(
+                RichText::new("+ Remote SSH")
+                    .size(FONT_SM)
+                    .strong()
+                    .color(TEAL_PILL_TEXT),
+            )
+            .fill(TEAL_PILL_BG)
+            .stroke(Stroke::new(1.0_f32, TEAL_PILL_TEXT))
+            .corner_radius(6.0);
+            if ui
+                .add(remote_btn)
+                .on_hover_text("Add a Remote SSH command step executed on target servers")
+                .clicked()
+            {
+                *add_remote = true;
+            }
+        };
+
+        if stack_step_buttons {
+            horizontal_row(ui, 28.0, |ui| {
+                ui.label(
+                    RichText::new(format!("{} PIPELINE STEPS", env_name.to_uppercase()))
+                        .size(FONT_MD)
+                        .strong()
+                        .color(TEXT_PRIMARY),
+                );
+            });
+            ui.add_space(4.0);
+            ui.horizontal_wrapped(|ui| {
+                ui.spacing_mut().item_spacing = Vec2::new(6.0, 6.0);
+                render_add_step_buttons(
+                    ui,
+                    &mut add_local,
+                    &mut add_verify,
+                    &mut add_scp,
+                    &mut add_remote,
+                );
+            });
+        } else {
+            horizontal_row(ui, 36.0, |ui| {
+                ui.label(
+                    RichText::new(format!("{} PIPELINE STEPS", env_name.to_uppercase()))
+                        .size(FONT_MD)
+                        .strong()
+                        .color(TEXT_PRIMARY),
+                );
+                if show_step_subtitle {
+                    ui.label(
+                        RichText::new("— Add or customize any step type:")
+                            .size(FONT_SM)
+                            .color(TEXT_MUTED),
+                    );
+                }
+
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    ui.spacing_mut().item_spacing = Vec2::new(6.0, 0.0);
                     let remote_btn = egui::Button::new(
                         RichText::new("+ Remote SSH")
                             .size(FONT_SM)
@@ -2302,13 +2547,7 @@ impl ShiplyApp {
                         .on_hover_text("Add a Remote SSH command step executed on target servers")
                         .clicked()
                     {
-                        env_cfg.steps.push(PipelineStep::new(
-                            "Remote SSH Command",
-                            StepKind::RemoteCommand {
-                                command: "pm2 restart {app_name} --update-env".to_string(),
-                            },
-                        ));
-                        config_changed = true;
+                        add_remote = true;
                     }
 
                     let scp_btn = egui::Button::new(
@@ -2327,18 +2566,7 @@ impl ShiplyApp {
                         )
                         .clicked()
                     {
-                        env_cfg.steps.push(PipelineStep::new(
-                            "Upload Artifacts via SCP",
-                            StepKind::TransferFiles {
-                                sources: vec![
-                                    "./dist".to_string(),
-                                    "./package.json".to_string(),
-                                    "./package-lock.json".to_string(),
-                                ],
-                                stage_env_file: true,
-                            },
-                        ));
-                        config_changed = true;
+                        add_scp = true;
                     }
 
                     let verify_btn = egui::Button::new(
@@ -2357,13 +2585,7 @@ impl ShiplyApp {
                         )
                         .clicked()
                     {
-                        env_cfg.steps.push(PipelineStep::new(
-                            "Verify Build Output",
-                            StepKind::VerifyLocalPath {
-                                path: "./dist/server.js".to_string(),
-                            },
-                        ));
-                        config_changed = true;
+                        add_verify = true;
                     }
 
                     let local_btn = egui::Button::new(
@@ -2380,19 +2602,57 @@ impl ShiplyApp {
                         .on_hover_text("Add a local shell command step (e.g. npm run build)")
                         .clicked()
                     {
-                        env_cfg.steps.push(PipelineStep::new(
-                            "Build Application",
-                            StepKind::LocalCommand {
-                                command: "npm run build".to_string(),
-                                allow_failure: false,
-                                shell: None,
-                            },
-                        ));
-                        config_changed = true;
+                        add_local = true;
                     }
-                }
+                });
             });
-        });
+        }
+
+        if add_local || add_verify || add_scp || add_remote {
+            let project = &mut self.storage.projects[proj_idx];
+            if let Some(env_cfg) = project.get_env_mut(&env_key) {
+                if add_local {
+                    env_cfg.steps.push(PipelineStep::new(
+                        "Build Application",
+                        StepKind::LocalCommand {
+                            command: "npm run build".to_string(),
+                            allow_failure: false,
+                            shell: None,
+                        },
+                    ));
+                }
+                if add_verify {
+                    env_cfg.steps.push(PipelineStep::new(
+                        "Verify Build Output",
+                        StepKind::VerifyLocalPath {
+                            path: "./dist/server.js".to_string(),
+                        },
+                    ));
+                }
+                if add_scp {
+                    env_cfg.steps.push(PipelineStep::new(
+                        "Upload Artifacts via SCP",
+                        StepKind::TransferFiles {
+                            sources: vec![
+                                "./dist".to_string(),
+                                "./package.json".to_string(),
+                                "./package-lock.json".to_string(),
+                            ],
+                            stage_env_file: true,
+                        },
+                    ));
+                }
+                if add_remote {
+                    env_cfg.steps.push(PipelineStep::new(
+                        "Remote SSH Command",
+                        StepKind::RemoteCommand {
+                            command: "pm2 restart {app_name} --update-env".to_string(),
+                        },
+                    ));
+                }
+                config_changed = true;
+            }
+        }
 
         ui.add_space(4.0);
         ui.label(
@@ -2577,17 +2837,31 @@ impl ShiplyApp {
                                 }
                             });
 
+                        let rem_w = ui.available_width();
+                        let reserved_for_opts_and_actions = match &step.kind {
+                            StepKind::LocalCommand { .. } => {
+                                if rem_w < 460.0 {
+                                    300.0
+                                } else {
+                                    365.0
+                                }
+                            }
+                            StepKind::TransferFiles { .. } => 235.0,
+                            _ => 120.0,
+                        };
+                        let name_input_w = (rem_w - reserved_for_opts_and_actions).clamp(96.0, 320.0);
+
                         if styled_text_edit(
                             ui,
                             ("step_name", &step.id),
                             &mut step.name,
-                            210.0,
+                            name_input_w,
                             Some("Step name (e.g. Build Application)"),
                         ) {
                             config_changed = true;
                         }
 
-                        // Step-type specific toggle placed cleanly in Row 1 with plenty of space
+                        // Step-type specific toggle placed cleanly in Row 1 with responsive sizing
                         match &mut step.kind {
                             StepKind::LocalCommand {
                                 allow_failure,
@@ -2618,10 +2892,15 @@ impl ShiplyApp {
                                     });
 
                                 ui.add_space(6.0);
+                                let allow_fail_lbl = if rem_w < 460.0 {
+                                    "Allow failure"
+                                } else {
+                                    "Continue on non-zero exit"
+                                };
                                 if ui
                                     .checkbox(
                                         allow_failure,
-                                        RichText::new("Continue on non-zero exit")
+                                        RichText::new(allow_fail_lbl)
                                             .size(FONT_SM)
                                             .color(TEXT_SECONDARY),
                                     )
@@ -2906,11 +3185,11 @@ impl ShiplyApp {
         let mut delete_current_env = false;
         let mut verify_vault_clicked = false;
         let mut open_cred_guide_on_overview = false;
-        let is_two_col = ui.ctx().screen_rect().width() >= 800.0 && ui.available_width() >= 550.0;
+        let is_two_col = ui.ctx().screen_rect().width() >= 760.0 && ui.available_width() >= 540.0;
         let field_width = if is_two_col {
-            (ui.available_width() - 280.0).clamp(240.0, 520.0)
+            (ui.available_width() - 260.0).max(200.0)
         } else {
-            (ui.available_width() - 36.0).max(200.0)
+            (ui.available_width() - 36.0).max(160.0)
         };
 
         let current_env_name = self.storage.projects[proj_idx]
@@ -2918,17 +3197,12 @@ impl ShiplyApp {
             .map(|e| e.name.clone())
             .unwrap_or_else(|| env_key.clone());
 
-        horizontal_row(ui, 34.0, |ui| {
-            ui.label(
-                RichText::new(format!(
-                    "{} — ENVIRONMENT & SSH SETTINGS",
-                    current_env_name.to_uppercase()
-                ))
-                .size(FONT_MD)
-                .strong()
-                .color(TEXT_PRIMARY),
-            );
-            if self.cached_vault_found {
+        let srv_avail_w = ui.available_width();
+        let stack_srv_header = srv_avail_w < 640.0;
+        let compact_srv_btns = srv_avail_w < 880.0;
+
+        let render_vault_badge = |ui: &mut egui::Ui, found: bool| {
+            if found {
                 render_pill(
                     ui,
                     "OS CREDENTIAL VAULT READY",
@@ -2943,32 +3217,29 @@ impl ShiplyApp {
                     WARN_PILL_TEXT,
                 );
             }
+        };
 
-            // Feature #5: Always allow deleting the environment + quick toggle for Credential Setup Guide
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                ui.spacing_mut().item_spacing = Vec2::new(8.0, 0.0);
-                if outline_icon_button(
-                    ui,
-                    ("del_env_settings_btn", &env_key),
-                    OutlineIcon::Trash,
-                    Some("Delete Environment"),
-                    FAIL_PILL_TEXT,
-                    FAIL_PILL_BG,
-                    Color32::from_rgb(254, 202, 202),
-                    Color32::from_rgb(252, 165, 165),
-                    true,
-                )
-                .on_hover_text("Delete this environment")
-                .clicked()
-                {
-                    delete_current_env = true;
-                }
-
+        if stack_srv_header {
+            horizontal_row(ui, 30.0, |ui| {
+                ui.label(
+                    RichText::new(format!(
+                        "{} — ENVIRONMENT & SSH SETTINGS",
+                        current_env_name.to_uppercase()
+                    ))
+                    .size(FONT_MD)
+                    .strong()
+                    .color(TEXT_PRIMARY),
+                );
+            });
+            ui.add_space(4.0);
+            ui.horizontal_wrapped(|ui| {
+                ui.spacing_mut().item_spacing = Vec2::new(8.0, 6.0);
+                render_vault_badge(ui, self.cached_vault_found);
                 if outline_icon_button(
                     ui,
                     ("toggle_cred_guide_btn", &env_key),
                     OutlineIcon::Key,
-                    Some("OS Credential Guide (Win / Linux / Mac)"),
+                    Some("Credential Guide"),
                     PRIMARY_BLUE,
                     BLUE_PILL_BG,
                     Color32::from_rgb(191, 219, 254),
@@ -2980,8 +3251,85 @@ impl ShiplyApp {
                 {
                     open_cred_guide_on_overview = true;
                 }
+                if outline_icon_button(
+                    ui,
+                    ("del_env_settings_btn", &env_key),
+                    OutlineIcon::Trash,
+                    Some("Delete"),
+                    FAIL_PILL_TEXT,
+                    FAIL_PILL_BG,
+                    Color32::from_rgb(254, 202, 202),
+                    Color32::from_rgb(252, 165, 165),
+                    true,
+                )
+                .on_hover_text("Delete this environment")
+                .clicked()
+                {
+                    delete_current_env = true;
+                }
             });
-        });
+        } else {
+            horizontal_row(ui, 34.0, |ui| {
+                ui.label(
+                    RichText::new(format!(
+                        "{} — ENVIRONMENT & SSH SETTINGS",
+                        current_env_name.to_uppercase()
+                    ))
+                    .size(FONT_MD)
+                    .strong()
+                    .color(TEXT_PRIMARY),
+                );
+                render_vault_badge(ui, self.cached_vault_found);
+
+                // Feature #5: Always allow deleting the environment + quick toggle for Credential Setup Guide
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    ui.spacing_mut().item_spacing = Vec2::new(8.0, 0.0);
+                    let del_lbl = if compact_srv_btns {
+                        "Delete"
+                    } else {
+                        "Delete Environment"
+                    };
+                    if outline_icon_button(
+                        ui,
+                        ("del_env_settings_btn", &env_key),
+                        OutlineIcon::Trash,
+                        Some(del_lbl),
+                        FAIL_PILL_TEXT,
+                        FAIL_PILL_BG,
+                        Color32::from_rgb(254, 202, 202),
+                        Color32::from_rgb(252, 165, 165),
+                        true,
+                    )
+                    .on_hover_text("Delete this environment")
+                    .clicked()
+                    {
+                        delete_current_env = true;
+                    }
+
+                    let guide_lbl = if compact_srv_btns {
+                        "Credential Guide"
+                    } else {
+                        "OS Credential Guide (Win / Linux / Mac)"
+                    };
+                    if outline_icon_button(
+                        ui,
+                        ("toggle_cred_guide_btn", &env_key),
+                        OutlineIcon::Key,
+                        Some(guide_lbl),
+                        PRIMARY_BLUE,
+                        BLUE_PILL_BG,
+                        Color32::from_rgb(191, 219, 254),
+                        PRIMARY_BLUE,
+                        true,
+                    )
+                    .on_hover_text("Open the multi-platform OS Credentials setup guideline on the All Deployments page")
+                    .clicked()
+                    {
+                        open_cred_guide_on_overview = true;
+                    }
+                });
+            });
+        }
 
         ui.add_space(10.0);
 
@@ -3483,7 +3831,7 @@ impl ShiplyApp {
 
         let mut redeploy_target: Option<(DeploymentRecord, bool)> = None;
 
-        let is_stacked_view = ui.ctx().screen_rect().width() < 900.0 || ui.available_width() < 640.0;
+        let is_stacked_view = ui.ctx().screen_rect().width() < 860.0 || ui.available_width() < 640.0;
         let total_count = filtered.len();
         let visible_count = total_count.min(self.history_visible_limit.max(5));
 
@@ -3494,6 +3842,10 @@ impl ShiplyApp {
             .corner_radius(10.0)
             .inner_margin(Margin::symmetric(20, 14))
             .show(ui, |ui| {
+                let table_avail_w = ui.available_width();
+                // Fixed columns: STATUS (110) + ENV (80) + VERSION (95) + TIMESTAMP (155) + ACTIONS (~215)
+                let details_col_w = (table_avail_w - (110.0 + 80.0 + 95.0 + 155.0 + 215.0)).max(150.0);
+
                 if !is_stacked_view {
                     horizontal_row(ui, 22.0, |ui| {
                         ui.add_sized(
@@ -3524,7 +3876,7 @@ impl ShiplyApp {
                             ),
                         );
                         ui.add_sized(
-                            [280.0, 20.0],
+                            [details_col_w, 20.0],
                             egui::Label::new(
                                 RichText::new("DETAILS & GIT CHANGES")
                                     .size(FONT_XS)
@@ -3533,9 +3885,9 @@ impl ShiplyApp {
                             ),
                         );
                         ui.add_sized(
-                            [150.0, 20.0],
+                            [155.0, 20.0],
                             egui::Label::new(
-                                RichText::new("TIMESTAMP")
+                                RichText::new("TIMESTAMP (LOCAL)")
                                     .size(FONT_XS)
                                     .strong()
                                     .color(TEXT_MUTED),
@@ -3573,7 +3925,7 @@ impl ShiplyApp {
                 }
 
                 if is_stacked_view {
-                    // Mobile / narrow stacked card view (< 900px)
+                    // Mobile / narrow stacked card view (< 860px)
                     for (idx, dep) in filtered.iter().take(visible_count).enumerate() {
                         if idx > 0 {
                             draw_divider(ui, SUBTLE_BG);
@@ -3632,13 +3984,19 @@ impl ShiplyApp {
                             }
 
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                ui.label(
-                                    RichText::new(
-                                        dep.started_at.format("%Y-%m-%d %H:%M").to_string(),
-                                    )
-                                    .size(FONT_SM)
-                                    .color(TEXT_MUTED),
+                                let ts_resp = ui.label(
+                                    RichText::new(dep.format_started_at_local("%Y-%m-%d %H:%M"))
+                                        .size(FONT_SM)
+                                        .color(TEXT_MUTED),
                                 );
+                                let mut hover_msg = format!(
+                                    "Started (Local): {}",
+                                    dep.format_started_at_local("%Y-%m-%d %H:%M:%S %:z")
+                                );
+                                if let Some(fin) = dep.format_finished_at_local("%Y-%m-%d %H:%M:%S %:z") {
+                                    hover_msg.push_str(&format!("\nFinished (Local): {fin}"));
+                                }
+                                ts_resp.on_hover_text(hover_msg);
                             });
                         });
 
@@ -3668,8 +4026,9 @@ impl ShiplyApp {
                                 .first()
                                 .cloned()
                                 .unwrap_or_else(|| dep.servers.join(", "));
-                            let truncated = if sub_detail.chars().count() > 36 {
-                                let s: String = sub_detail.chars().take(34).collect();
+                            let max_chars = ((table_avail_w - 180.0) / 7.2).max(18.0) as usize;
+                            let truncated = if sub_detail.chars().count() > max_chars {
+                                let s: String = sub_detail.chars().take(max_chars.saturating_sub(2)).collect();
                                 format!("{s}…")
                             } else {
                                 sub_detail
@@ -3774,7 +4133,7 @@ impl ShiplyApp {
                         ui.add_space(6.0);
                     }
                 } else {
-                    // Desktop normal table (>= 900px, 48px row height)
+                    // Desktop normal table (>= 860px, 48px row height)
                     for (idx, dep) in filtered.iter().take(visible_count).enumerate() {
                         if idx > 0 {
                             draw_divider(ui, SUBTLE_BG);
@@ -3848,9 +4207,9 @@ impl ShiplyApp {
                                 );
                             }
 
-                            // DETAILS & GIT CHANGES column (Feature #10)
+                            // DETAILS & GIT CHANGES column (Feature #10, responsive width)
                             let (d_rect, d_resp) =
-                                ui.allocate_exact_size(Vec2::new(280.0, row_h), Sense::hover());
+                                ui.allocate_exact_size(Vec2::new(details_col_w, row_h), Sense::hover());
                             draw_icon_git_branch(
                                 ui.painter(),
                                 Pos2::new(d_rect.left() + 6.0, d_rect.top() + 14.0),
@@ -3860,7 +4219,7 @@ impl ShiplyApp {
                                 (Some(b), Some(c)) => format!("{b} @ {c}"),
                                 _ => dep.project_name.clone(),
                             };
-                            ui.painter().text(
+                            ui.painter().with_clip_rect(d_rect).text(
                                 Pos2::new(d_rect.left() + 18.0, d_rect.top() + 14.0),
                                 Align2::LEFT_CENTER,
                                 git_line,
@@ -3874,13 +4233,14 @@ impl ShiplyApp {
                                 .first()
                                 .cloned()
                                 .unwrap_or_else(|| dep.servers.join(", "));
-                            let truncated_detail = if sub_detail.chars().count() > 38 {
-                                let s: String = sub_detail.chars().take(36).collect();
+                            let max_detail_chars = ((details_col_w - 16.0) / 6.8).max(18.0) as usize;
+                            let truncated_detail = if sub_detail.chars().count() > max_detail_chars {
+                                let s: String = sub_detail.chars().take(max_detail_chars.saturating_sub(2)).collect();
                                 format!("{s}…")
                             } else {
                                 sub_detail
                             };
-                            ui.painter().text(
+                            ui.painter().with_clip_rect(d_rect).text(
                                 Pos2::new(d_rect.left() + 6.0, d_rect.top() + 33.0),
                                 Align2::LEFT_CENTER,
                                 truncated_detail,
@@ -3895,13 +4255,13 @@ impl ShiplyApp {
                                 ));
                             }
 
-                            // TIMESTAMP column
-                            let (t_rect, _) =
-                                ui.allocate_exact_size(Vec2::new(150.0, row_h), Sense::hover());
+                            // TIMESTAMP column (Local Desktop Timezone)
+                            let (t_rect, t_resp) =
+                                ui.allocate_exact_size(Vec2::new(155.0, row_h), Sense::hover());
                             ui.painter().text(
                                 Pos2::new(t_rect.left(), t_rect.top() + 14.0),
                                 Align2::LEFT_CENTER,
-                                dep.started_at.format("%Y-%m-%d %H:%M:%S").to_string(),
+                                dep.format_started_at_local("%Y-%m-%d %H:%M:%S"),
                                 FontId::proportional(FONT_SM),
                                 TEXT_PRIMARY,
                             );
@@ -3916,6 +4276,14 @@ impl ShiplyApp {
                                 FontId::proportional(FONT_SM),
                                 TEXT_MUTED,
                             );
+                            let mut hover_msg = format!(
+                                "Started (Local): {}",
+                                dep.format_started_at_local("%Y-%m-%d %H:%M:%S %:z")
+                            );
+                            if let Some(fin) = dep.format_finished_at_local("%Y-%m-%d %H:%M:%S %:z") {
+                                hover_msg.push_str(&format!("\nFinished (Local): {fin}"));
+                            }
+                            t_resp.on_hover_text(hover_msg);
 
                             // ACTIONS column (Rollback + Re-run + View Logs) using outline icons
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -4178,7 +4546,9 @@ impl ShiplyApp {
         }
 
         if let Some(dep) = selected_dep {
-            // Collapsible CONSOLE OUTPUT Section (Fixed 32px header row)
+            // Collapsible CONSOLE OUTPUT Section (Fixed 32px header row, responsive to width)
+            let console_hdr_w = ui.available_width();
+            let compact_console_hdr = console_hdr_w < 680.0;
             horizontal_row(ui, 32.0, |ui| {
                 let (chev_r, chev_resp) =
                     ui.allocate_exact_size(Vec2::new(18.0, 18.0), Sense::click());
@@ -4203,17 +4573,26 @@ impl ShiplyApp {
                     self.console_collapsed = !self.console_collapsed;
                 }
 
-                ui.label(
-                    RichText::new(format!(
-                        "— {} ({}) v{}",
-                        dep.project_name,
-                        format_env_badge(&dep.environment),
-                        dep.version
-                    ))
-                    .size(FONT_SM)
-                    .strong()
-                    .color(TEXT_MUTED),
-                );
+                if !compact_console_hdr {
+                    ui.label(
+                        RichText::new(format!(
+                            "— {} ({}) v{}",
+                            dep.project_name,
+                            format_env_badge(&dep.environment),
+                            dep.version
+                        ))
+                        .size(FONT_SM)
+                        .strong()
+                        .color(TEXT_MUTED),
+                    );
+                } else {
+                    ui.label(
+                        RichText::new(format!("v{}", dep.version))
+                            .size(FONT_SM)
+                            .strong()
+                            .color(TEXT_MUTED),
+                    );
+                }
                 render_light_status_badge(ui, dep.status);
 
                 if dep.status == DeploymentStatus::Running
@@ -4231,16 +4610,24 @@ impl ShiplyApp {
                         PRIMARY_BLUE,
                         time,
                     );
-                    ui.label(
-                        RichText::new("Pipeline running...")
-                            .size(FONT_SM)
-                            .strong()
-                            .color(PRIMARY_BLUE),
-                    );
+                    if !compact_console_hdr {
+                        ui.label(
+                            RichText::new("Pipeline running...")
+                                .size(FONT_SM)
+                                .strong()
+                                .color(PRIMARY_BLUE),
+                        );
+                    }
                 }
 
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    let toggle_lbl = if self.console_collapsed {
+                    let toggle_lbl = if compact_console_hdr {
+                        if self.console_collapsed {
+                            "Expand"
+                        } else {
+                            "Collapse"
+                        }
+                    } else if self.console_collapsed {
                         "Expand Console"
                     } else {
                         "Collapse Console"
@@ -4260,7 +4647,13 @@ impl ShiplyApp {
                     if !self.console_collapsed && !dep.step_logs.is_empty() {
                         let all_steps_collapsed =
                             self.collapsed_step_indices.len() >= dep.step_logs.len();
-                        let steps_btn_lbl = if all_steps_collapsed {
+                        let steps_btn_lbl = if compact_console_hdr {
+                            if all_steps_collapsed {
+                                "Expand Steps"
+                            } else {
+                                "Collapse Steps"
+                            }
+                        } else if all_steps_collapsed {
                             "Expand All Steps"
                         } else {
                             "Collapse All Steps"
