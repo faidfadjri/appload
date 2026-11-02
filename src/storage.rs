@@ -1,9 +1,9 @@
-use crate::domain::{DeploymentRecord, DeploymentStatus, Project};
+use crate::domain::{DeploymentRecord, DeploymentStatus, Project, StepExecutionLog};
 use crate::ps1_importer::import_project_from_path;
 use crate::version::{bump_semver, VersionBump};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -473,6 +473,10 @@ impl AppStorage {
             state.projects = db_projects;
             state.deployments = db_deployments;
 
+            if state.reconcile_orphaned_running_deployments(&HashSet::new()) > 0 {
+                needs_save = true;
+            }
+
             if needs_save || !db_path.exists() {
                 let _ = save_all_to_db(&mut conn, &state.projects, &state.deployments);
             }
@@ -546,7 +550,10 @@ impl AppStorage {
                     ) {
                         self.projects = p;
                         self.deployments = d;
-                        self.last_state_mtime = Some(disk_mtime);
+                        if self.reconcile_orphaned_running_deployments(&HashSet::new()) > 0 {
+                            let _ = self.save();
+                        }
+                        self.last_state_mtime = file_mtime(&state_path).or(Some(disk_mtime));
                         notifications.push(format!(
                             "Loaded {} project(s) and {} deployment(s) from SQLite database ({})",
                             self.projects.len(),
@@ -847,6 +854,49 @@ impl AppStorage {
                 let _ = self.save();
             }
         }
+    }
+
+    /// Reconciles any deployment record marked `Running` that does not belong to `active_ids`
+    /// (e.g. when the application or desktop was closed/restarted while a deployment was in progress).
+    /// Marks orphaned records and their running step logs as `Failed`, records `finished_at` and `duration_ms`,
+    /// and returns the number of reconciled records.
+    pub fn reconcile_orphaned_running_deployments(&mut self, active_ids: &HashSet<String>) -> usize {
+        let now = chrono::Utc::now();
+        let mut reconciled = 0;
+        for dep in &mut self.deployments {
+            if dep.status == DeploymentStatus::Running && !active_ids.contains(&dep.id) {
+                dep.status = DeploymentStatus::Failed;
+                dep.finished_at = Some(now);
+                let elapsed = (now - dep.started_at).num_milliseconds().max(0) as u64;
+                dep.duration_ms = Some(elapsed);
+
+                let mut marked_step = false;
+                for step_log in &mut dep.step_logs {
+                    if step_log.status == DeploymentStatus::Running {
+                        step_log.status = DeploymentStatus::Failed;
+                        if !step_log.output.is_empty() && !step_log.output.ends_with('\n') {
+                            step_log.output.push('\n');
+                        }
+                        step_log.output.push_str(
+                            "[FAILED] Deployment was interrupted because the application or desktop restarted before completion.",
+                        );
+                        marked_step = true;
+                    }
+                }
+
+                if !marked_step {
+                    dep.step_logs.push(StepExecutionLog {
+                        step_name: "Interrupted Session".to_string(),
+                        command_summary: "session interrupted".to_string(),
+                        status: DeploymentStatus::Failed,
+                        output: "[FAILED] Deployment was interrupted because the application or desktop restarted before completion.".to_string(),
+                        duration_ms: 0,
+                    });
+                }
+                reconciled += 1;
+            }
+        }
+        reconciled
     }
 
     pub fn merge_deployments(&mut self, incoming: Vec<DeploymentRecord>) -> usize {
@@ -1390,5 +1440,56 @@ mod tests {
         let reloaded = AppStorage::load_or_default(&db_path);
         assert_eq!(reloaded.projects.iter().find(|p| p.id == "p3").unwrap().group.as_deref(), Some("Backend"));
         assert_eq!(reloaded.projects.iter().find(|p| p.id == "p1").unwrap().group, None);
+    }
+
+    #[test]
+    fn test_reconcile_orphaned_running_deployments_on_load() {
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("shiply_state.db");
+
+        // 1. Create a deployment that is left in Running state (simulating crash or desktop restart)
+        let mut storage = AppStorage::load_or_default(&db_path);
+        let started_at = chrono::Utc::now() - chrono::Duration::seconds(45);
+        let running_dep = DeploymentRecord {
+            id: "dep-orphaned-1".to_string(),
+            project_id: "backend-cdo".to_string(),
+            project_name: "Backend Customer Data Ops".to_string(),
+            environment: "production".to_string(),
+            app_name: "backend-cdo".to_string(),
+            version: "1.1.22".to_string(),
+            git_branch: Some("main".to_string()),
+            git_commit: Some("70c0d68".to_string()),
+            git_changes: vec![],
+            is_rollback: false,
+            servers: vec!["10.0.0.1".to_string()],
+            status: DeploymentStatus::Running,
+            started_at,
+            finished_at: None,
+            duration_ms: None,
+            step_logs: vec![StepExecutionLog {
+                step_name: "Upload Artifacts via SCP".to_string(),
+                command_summary: "[SCP Upload] ./dist -> {remote_dir}".to_string(),
+                status: DeploymentStatus::Running,
+                output: "Uploading files...".to_string(),
+                duration_ms: 0,
+            }],
+            executed_steps: vec![],
+        };
+        storage.upsert_deployment(running_dep);
+
+        // 2. Reload storage from disk (as happens on app startup after desktop restart)
+        let reloaded = AppStorage::load_or_default(&db_path);
+        assert_eq!(reloaded.deployments.len(), 1);
+        let rec = &reloaded.deployments[0];
+        assert_eq!(rec.id, "dep-orphaned-1");
+        assert_eq!(
+            rec.status,
+            DeploymentStatus::Failed,
+            "Orphaned Running deployment must be reconciled to Failed on startup"
+        );
+        assert!(rec.finished_at.is_some());
+        assert!(rec.duration_ms.is_some());
+        assert_eq!(rec.step_logs[0].status, DeploymentStatus::Failed);
+        assert!(rec.step_logs[0].output.contains("interrupted"));
     }
 }

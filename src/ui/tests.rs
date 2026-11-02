@@ -2460,3 +2460,63 @@ use super::*;
             edit_rect.top()
         );
     }
+
+    #[test]
+    fn test_cancel_running_deployment_clears_busy_state() {
+        let mut storage = crate::storage::AppStorage::default();
+        storage.projects.push(Project {
+            id: "backend-cdo".to_string(),
+            name: "Backend Customer Data Ops".to_string(),
+            description: "REST API service".to_string(),
+            local_path: ".".to_string(),
+            environments: vec![EnvironmentConfig {
+                key: "production".to_string(),
+                name: "Production".to_string(),
+                app_name: "backend-cdo".to_string(),
+                servers: vec!["10.0.0.1".to_string()],
+                remote_user: "deploy".to_string(),
+                vault_target: "vault".to_string(),
+                remote_dir: "/app".to_string(),
+                env_source: None,
+                http_proxy: None,
+                steps: Vec::new(),
+            }],
+            group: None,
+            sort_order: Some(0),
+        });
+        storage.deployments.push(DeploymentRecord {
+            id: "dep-stuck-1".to_string(),
+            project_id: "backend-cdo".to_string(),
+            project_name: "Backend Customer Data Ops".to_string(),
+            environment: "production".to_string(),
+            app_name: "backend-cdo".to_string(),
+            version: "1.1.22".to_string(),
+            git_branch: Some("main".to_string()),
+            git_commit: Some("70c0d68".to_string()),
+            git_changes: vec![],
+            is_rollback: false,
+            servers: vec!["10.0.0.1".to_string()],
+            status: DeploymentStatus::Running,
+            started_at: chrono::Utc::now() - chrono::Duration::seconds(30),
+            finished_at: None,
+            duration_ms: None,
+            step_logs: vec![],
+            executed_steps: vec![],
+        });
+
+        let mut app = ShiplyApp::new(storage);
+        app.active_deployments
+            .insert(("backend-cdo".to_string(), "production".to_string()), "dep-stuck-1".to_string());
+        app.active_deployment_id = Some("dep-stuck-1".to_string());
+
+        assert!(app.is_env_deploying("backend-cdo", "production"));
+        assert!(app.is_project_deploying("backend-cdo"));
+
+        app.cancel_deployment("dep-stuck-1");
+
+        assert!(!app.is_env_deploying("backend-cdo", "production"));
+        assert!(!app.is_project_deploying("backend-cdo"));
+        assert_eq!(app.storage.deployments[0].status, DeploymentStatus::Cancelled);
+        assert!(app.storage.deployments[0].finished_at.is_some());
+        assert!(app.storage.deployments[0].duration_ms.is_some());
+    }

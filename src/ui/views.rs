@@ -3830,6 +3830,7 @@ impl ShiplyApp {
             .collect();
 
         let mut redeploy_target: Option<(DeploymentRecord, bool)> = None;
+        let mut cancel_target: Option<String> = None;
 
         let is_stacked_view = ui.ctx().screen_rect().width() < 860.0 || ui.available_width() < 640.0;
         let total_count = filtered.len();
@@ -4084,6 +4085,24 @@ impl ShiplyApp {
                                     redeploy_target = Some((dep.clone(), false));
                                 }
 
+                                if dep.status == DeploymentStatus::Running
+                                    && outline_icon_button(
+                                        ui,
+                                        ("stacked_cancel_btn", &dep.id),
+                                        OutlineIcon::X,
+                                        Some("Cancel"),
+                                        FAIL_PILL_TEXT,
+                                        FAIL_PILL_BG,
+                                        Color32::from_rgb(254, 202, 202),
+                                        Color32::from_rgb(252, 165, 165),
+                                        true,
+                                    )
+                                    .on_hover_text("Cancel this running deployment")
+                                    .clicked()
+                                {
+                                    cancel_target = Some(dep.id.clone());
+                                }
+
                                 if dep.status == DeploymentStatus::Succeeded
                                     && outline_icon_button(
                                         ui,
@@ -4309,6 +4328,24 @@ impl ShiplyApp {
                                     redeploy_target = Some((dep.clone(), false));
                                 }
 
+                                if dep.status == DeploymentStatus::Running
+                                    && outline_icon_button(
+                                        ui,
+                                        ("hist_cancel_btn", &dep.id),
+                                        OutlineIcon::X,
+                                        Some("Cancel"),
+                                        FAIL_PILL_TEXT,
+                                        FAIL_PILL_BG,
+                                        Color32::from_rgb(254, 202, 202),
+                                        Color32::from_rgb(252, 165, 165),
+                                        true,
+                                    )
+                                    .on_hover_text("Cancel this running deployment")
+                                    .clicked()
+                                {
+                                    cancel_target = Some(dep.id.clone());
+                                }
+
                                 if dep.status == DeploymentStatus::Succeeded
                                     && outline_icon_button(
                                         ui,
@@ -4418,7 +4455,9 @@ impl ShiplyApp {
                 }
             });
 
-        if let Some((target, is_rb)) = redeploy_target {
+        if let Some(cancel_id) = cancel_target {
+            self.cancel_deployment(&cancel_id);
+        } else if let Some((target, is_rb)) = redeploy_target {
             self.trigger_redeploy_from_record(&target, is_rb);
         }
 

@@ -355,6 +355,44 @@ impl ShiplyApp {
                 .any(|d| d.status == DeploymentStatus::Running)
     }
 
+    pub fn cancel_deployment(&mut self, dep_id: &str) {
+        self.active_deployments.retain(|_, id| id != dep_id);
+        if self.active_deployment_id.as_deref() == Some(dep_id) {
+            self.active_deployment_id = self.active_deployments.values().next().cloned();
+        }
+
+        let now = chrono::Utc::now();
+        let mut updated_record = None;
+        if let Some(dep) = self.storage.deployments.iter_mut().find(|d| d.id == dep_id) {
+            dep.status = DeploymentStatus::Cancelled;
+            dep.finished_at = Some(now);
+            dep.duration_ms = Some((now - dep.started_at).num_milliseconds().max(0) as u64);
+            for step_log in &mut dep.step_logs {
+                if step_log.status == DeploymentStatus::Running {
+                    step_log.status = DeploymentStatus::Cancelled;
+                    if !step_log.output.is_empty() && !step_log.output.ends_with('\n') {
+                        step_log.output.push('\n');
+                    }
+                    step_log
+                        .output
+                        .push_str("[CANCELLED] Deployment was cancelled by user.");
+                }
+            }
+            updated_record = Some(dep.clone());
+        }
+
+        if let Some(rec) = updated_record {
+            let proj_name = rec.project_name.clone();
+            let env_badge = format_env_badge(&rec.environment);
+            self.storage.upsert_deployment(rec);
+            self.refresh_selected_project_metadata(true);
+            self.status_banner = Some((
+                format!("Cancelled deployment of {proj_name} ({env_badge})."),
+                false,
+            ));
+        }
+    }
+
     /// Configures system fonts: proportional UI text (`Segoe UI`) and monospace (`Consolas`) on Windows.
     pub(crate) fn install_system_fonts(ctx: &egui::Context) {
         #[allow(unused_mut)]
@@ -540,6 +578,14 @@ impl ShiplyApp {
             received = true;
             match event {
                 ExecutorEvent::Updated(record) => {
+                    if self
+                        .storage
+                        .deployments
+                        .iter()
+                        .any(|d| d.id == record.id && d.status == DeploymentStatus::Cancelled)
+                    {
+                        continue;
+                    }
                     let is_current = match &self.selection {
                         SidebarSelection::Project(pid) => {
                             if pid != &record.project_id {
@@ -564,6 +610,14 @@ impl ShiplyApp {
                     self.storage.upsert_deployment(record);
                 }
                 ExecutorEvent::Finished(record) => {
+                    if self
+                        .storage
+                        .deployments
+                        .iter()
+                        .any(|d| d.id == record.id && d.status == DeploymentStatus::Cancelled)
+                    {
+                        continue;
+                    }
                     let ok = record.status == DeploymentStatus::Succeeded;
                     let action_prefix = if record.is_rollback {
                         "Rollback"
