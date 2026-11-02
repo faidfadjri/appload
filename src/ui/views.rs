@@ -3741,8 +3741,29 @@ impl ShiplyApp {
         let mut switched_env_key = None;
         let mut switched_history_filter = None;
 
-        // Section Header + Filter Pills (Fixed 34px height)
+        let effective_env_filter_preview = if is_project_view {
+            if self.selected_env_key.is_empty() {
+                None
+            } else {
+                Some(self.selected_env_key.clone())
+            }
+        } else {
+            self.history_env_filter.clone()
+        };
+        let deletable_count = self
+            .storage
+            .filter_deployments(
+                project_filter,
+                effective_env_filter_preview.as_deref(),
+                None,
+            )
+            .into_iter()
+            .filter(|d| d.status != DeploymentStatus::Running)
+            .count();
+
+        // Section Header + Filter Pills + Clear History Button (Fixed 34px height)
         let theme = self.theme();
+        let mut trigger_clear_history = false;
         horizontal_row(ui, 34.0, |ui| {
             ui.label(
                 RichText::new("DEPLOYMENT HISTORY")
@@ -3754,7 +3775,28 @@ impl ShiplyApp {
             if is_project_view {
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     ui.spacing_mut().item_spacing = Vec2::new(6.0, 0.0);
-                    for (env_name, env_key) in project_envs.into_iter().rev() {
+                    if deletable_count > 0 {
+                        let show_label = ui.available_width() > 380.0;
+                        if outline_icon_button(
+                            ui,
+                            ("clear_proj_history_btn", project_filter.unwrap_or("all")),
+                            OutlineIcon::Trash,
+                            if show_label { Some("Clear History") } else { None },
+                            FAIL_PILL_TEXT,
+                            FAIL_PILL_BG,
+                            Color32::from_rgb(254, 202, 202),
+                            Color32::from_rgb(252, 165, 165),
+                            true,
+                        )
+                        .on_hover_text(format!(
+                            "Clear {deletable_count} completed/failed deployment record(s) for this environment"
+                        ))
+                        .clicked()
+                        {
+                            trigger_clear_history = true;
+                        }
+                    }
+                    for (env_name, env_key) in project_envs.iter().cloned().rev() {
                         let is_active = self.selected_env_key == env_key;
                         let btn = egui::Button::new(
                             RichText::new(env_name).size(FONT_SM).strong().color(if is_active {
@@ -3777,6 +3819,27 @@ impl ShiplyApp {
             } else {
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     ui.spacing_mut().item_spacing = Vec2::new(6.0, 0.0);
+                    if deletable_count > 0 {
+                        let show_label = ui.available_width() > 380.0;
+                        if outline_icon_button(
+                            ui,
+                            "clear_all_history_btn",
+                            OutlineIcon::Trash,
+                            if show_label { Some("Clear History") } else { None },
+                            FAIL_PILL_TEXT,
+                            FAIL_PILL_BG,
+                            Color32::from_rgb(254, 202, 202),
+                            Color32::from_rgb(252, 165, 165),
+                            true,
+                        )
+                        .on_hover_text(format!(
+                            "Clear {deletable_count} completed/failed deployment record(s) in current filter"
+                        ))
+                        .clicked()
+                        {
+                            trigger_clear_history = true;
+                        }
+                    }
                     for (label, filter_val) in filter_options.into_iter().rev() {
                         let is_active = self.history_env_filter == filter_val;
                         let btn = egui::Button::new(
@@ -3799,6 +3862,38 @@ impl ShiplyApp {
                 });
             }
         });
+
+        if trigger_clear_history && deletable_count > 0 {
+            let proj_name = project_filter.and_then(|pid| {
+                self.storage
+                    .projects
+                    .iter()
+                    .find(|p| p.id == pid)
+                    .map(|p| p.name.clone())
+            });
+            let env_name = if is_project_view {
+                project_envs
+                    .iter()
+                    .find(|(_, k)| k == &self.selected_env_key)
+                    .map(|(n, _)| n.clone())
+                    .or_else(|| {
+                        if self.selected_env_key.is_empty() {
+                            None
+                        } else {
+                            Some(self.selected_env_key.clone())
+                        }
+                    })
+            } else {
+                self.history_env_filter.clone()
+            };
+            self.pending_delete_confirm = Some(ConfirmDeleteAction::ClearDeploymentHistory {
+                project_id: project_filter.map(str::to_string),
+                project_name: proj_name,
+                env_key: effective_env_filter_preview,
+                env_name,
+                count: deletable_count,
+            });
+        }
 
         if let Some(env_key) = switched_env_key {
             self.selected_env_key = env_key;
@@ -3831,6 +3926,7 @@ impl ShiplyApp {
 
         let mut redeploy_target: Option<(DeploymentRecord, bool)> = None;
         let mut cancel_target: Option<String> = None;
+        let mut delete_target: Option<DeploymentRecord> = None;
 
         let is_stacked_view = ui.ctx().screen_rect().width() < 860.0 || ui.available_width() < 640.0;
         let total_count = filtered.len();
@@ -3844,8 +3940,8 @@ impl ShiplyApp {
             .inner_margin(Margin::symmetric(20, 14))
             .show(ui, |ui| {
                 let table_avail_w = ui.available_width();
-                // Fixed columns: STATUS (110) + ENV (80) + VERSION (95) + TIMESTAMP (155) + ACTIONS (~215)
-                let details_col_w = (table_avail_w - (110.0 + 80.0 + 95.0 + 155.0 + 215.0)).max(150.0);
+                // Fixed columns: STATUS (110) + ENV (80) + VERSION (95) + TIMESTAMP (155) + ACTIONS (~250)
+                let details_col_w = (table_avail_w - (110.0 + 80.0 + 95.0 + 155.0 + 250.0)).max(140.0);
 
                 if !is_stacked_view {
                     horizontal_row(ui, 22.0, |ui| {
@@ -4066,6 +4162,29 @@ impl ShiplyApp {
                                 ui.spacing_mut().item_spacing = Vec2::new(6.0, 0.0);
                                 let is_busy =
                                     self.is_env_deploying(&dep.project_id, &dep.environment);
+                                let can_delete = dep.status != DeploymentStatus::Running;
+
+                                if outline_icon_button(
+                                    ui,
+                                    ("stacked_del_dep_btn", &dep.id),
+                                    OutlineIcon::Trash,
+                                    None,
+                                    FAIL_PILL_TEXT,
+                                    SUBTLE_BG,
+                                    FAIL_PILL_BG,
+                                    CARD_BORDER,
+                                    can_delete,
+                                )
+                                .on_hover_text(if can_delete {
+                                    "Delete this deployment history record"
+                                } else {
+                                    "Cancel running deployment before deleting"
+                                })
+                                .clicked()
+                                    && can_delete
+                                {
+                                    delete_target = Some(dep.clone());
+                                }
 
                                 if outline_icon_button(
                                     ui,
@@ -4304,11 +4423,34 @@ impl ShiplyApp {
                             }
                             t_resp.on_hover_text(hover_msg);
 
-                            // ACTIONS column (Rollback + Re-run + View Logs) using outline icons
+                            // ACTIONS column (Delete + Rollback + Re-run + View Logs) using outline icons
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                                 ui.spacing_mut().item_spacing = Vec2::new(6.0, 0.0);
                                 let is_busy =
                                     self.is_env_deploying(&dep.project_id, &dep.environment);
+                                let can_delete = dep.status != DeploymentStatus::Running;
+
+                                if outline_icon_button(
+                                    ui,
+                                    ("hist_del_dep_btn", &dep.id),
+                                    OutlineIcon::Trash,
+                                    None,
+                                    FAIL_PILL_TEXT,
+                                    SUBTLE_BG,
+                                    FAIL_PILL_BG,
+                                    CARD_BORDER,
+                                    can_delete,
+                                )
+                                .on_hover_text(if can_delete {
+                                    "Delete this deployment history record"
+                                } else {
+                                    "Cancel running deployment before deleting"
+                                })
+                                .clicked()
+                                    && can_delete
+                                {
+                                    delete_target = Some(dep.clone());
+                                }
 
                                 if outline_icon_button(
                                     ui,
@@ -4457,6 +4599,13 @@ impl ShiplyApp {
 
         if let Some(cancel_id) = cancel_target {
             self.cancel_deployment(&cancel_id);
+        } else if let Some(dep) = delete_target {
+            self.pending_delete_confirm = Some(ConfirmDeleteAction::DeploymentRecord {
+                deployment_id: dep.id,
+                project_name: dep.project_name,
+                env_name: dep.environment,
+                version: dep.version,
+            });
         } else if let Some((target, is_rb)) = redeploy_target {
             self.trigger_redeploy_from_record(&target, is_rb);
         }

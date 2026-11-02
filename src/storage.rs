@@ -929,6 +929,49 @@ impl AppStorage {
         }
     }
 
+    /// Removes a single deployment record by ID (if it is not currently Running) and persists to SQLite.
+    pub fn remove_deployment(&mut self, deployment_id: &str) -> Option<DeploymentRecord> {
+        let pos = self
+            .deployments
+            .iter()
+            .position(|d| d.id == deployment_id && d.status != DeploymentStatus::Running)?;
+        let removed = self.deployments.remove(pos);
+
+        if let Some(path) = &self.storage_path {
+            if let Ok(conn) = Connection::open(path) {
+                let _ = conn.execute(
+                    "DELETE FROM deployments WHERE id = ?1",
+                    params![deployment_id],
+                );
+                self.last_state_mtime = file_mtime(path);
+            }
+        }
+        Some(removed)
+    }
+
+    /// Clears non-running deployment history matching the optional `project_id` and `env_key` filters,
+    /// persisting to SQLite and returning the number of deleted records.
+    pub fn clear_deployment_history(
+        &mut self,
+        project_id: Option<&str>,
+        env_key: Option<&str>,
+    ) -> usize {
+        let before = self.deployments.len();
+        self.deployments.retain(|d| {
+            if d.status == DeploymentStatus::Running {
+                return true;
+            }
+            let matches_proj = project_id.is_none_or(|pid| d.project_id == pid);
+            let matches_env = env_key.is_none_or(|ek| d.environment == ek);
+            !(matches_proj && matches_env)
+        });
+        let removed_count = before.saturating_sub(self.deployments.len());
+        if removed_count > 0 {
+            let _ = self.save();
+        }
+        removed_count
+    }
+
     /// Returns the most recent successful deployment for a given project and environment key.
     pub fn last_succeeded_deployment(
         &self,
@@ -1491,5 +1534,71 @@ mod tests {
         assert!(rec.duration_ms.is_some());
         assert_eq!(rec.step_logs[0].status, DeploymentStatus::Failed);
         assert!(rec.step_logs[0].output.contains("interrupted"));
+    }
+
+    #[test]
+    fn test_remove_deployment_and_clear_deployment_history() {
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("shiply_state.db");
+
+        let mut storage = AppStorage::load_or_default(&db_path);
+        let now = chrono::Utc::now();
+
+        let make_dep = |id: &str, proj: &str, env: &str, status: DeploymentStatus| DeploymentRecord {
+            id: id.to_string(),
+            project_id: proj.to_string(),
+            project_name: format!("Project {proj}"),
+            environment: env.to_string(),
+            app_name: format!("{proj}-{env}"),
+            version: "1.0.0".to_string(),
+            git_branch: Some("main".to_string()),
+            git_commit: Some("abc1234".to_string()),
+            git_changes: vec![],
+            is_rollback: false,
+            servers: vec!["10.0.0.1".to_string()],
+            status,
+            started_at: now,
+            finished_at: if status == DeploymentStatus::Running {
+                None
+            } else {
+                Some(now)
+            },
+            duration_ms: if status == DeploymentStatus::Running {
+                None
+            } else {
+                Some(1200)
+            },
+            step_logs: vec![],
+            executed_steps: vec![],
+        };
+
+        storage.upsert_deployment(make_dep("dep-1", "p1", "dev", DeploymentStatus::Succeeded));
+        storage.upsert_deployment(make_dep("dep-2", "p1", "dev", DeploymentStatus::Failed));
+        storage.upsert_deployment(make_dep("dep-3", "p1", "prod", DeploymentStatus::Succeeded));
+        storage.upsert_deployment(make_dep("dep-running", "p1", "dev", DeploymentStatus::Running));
+        storage.upsert_deployment(make_dep("dep-4", "p2", "prod", DeploymentStatus::Cancelled));
+
+        // 1. Running deployments cannot be removed while running
+        assert!(storage.remove_deployment("dep-running").is_none());
+
+        // 2. Remove a single completed deployment record and verify SQLite persistence
+        let removed = storage.remove_deployment("dep-1");
+        assert!(removed.is_some());
+        assert_eq!(removed.unwrap().id, "dep-1");
+        assert_eq!(storage.deployments.len(), 4);
+
+        // 3. Clear history for p1 + dev (should remove dep-2, keep dep-running, dep-3, dep-4)
+        let cleared_dev = storage.clear_deployment_history(Some("p1"), Some("dev"));
+        assert_eq!(cleared_dev, 1);
+        assert!(storage.deployments.iter().any(|d| d.id == "dep-running"));
+        assert!(!storage.deployments.iter().any(|d| d.id == "dep-2"));
+        assert!(storage.deployments.iter().any(|d| d.id == "dep-3"));
+        assert!(storage.deployments.iter().any(|d| d.id == "dep-4"));
+
+        // 4. Clear all remaining non-running history across all projects/environments
+        let cleared_all = storage.clear_deployment_history(None, None);
+        assert_eq!(cleared_all, 2);
+        assert_eq!(storage.deployments.len(), 1);
+        assert_eq!(storage.deployments[0].id, "dep-running");
     }
 }

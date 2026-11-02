@@ -1193,19 +1193,56 @@ impl ShiplyApp {
         window.show(ctx, |ui| {
             ui.set_width(inner_w);
 
-                let (modal_title, modal_subtitle, item_name, warning_text) = match &action {
+                let (modal_title, modal_subtitle, item_name, warning_text): (
+                    &str,
+                    &str,
+                    String,
+                    String,
+                ) = match &action {
                     ConfirmDeleteAction::Project { project_name, .. } => (
                         "Delete Project",
                         "This will permanently delete the project from Shiply.",
-                        project_name.as_str(),
-                        "Are you sure you want to delete this project? All associated environments, pipeline configurations, and settings for this project will be removed.",
+                        project_name.clone(),
+                        "Are you sure you want to delete this project? All associated environments, pipeline configurations, and settings for this project will be removed.".to_string(),
                     ),
                     ConfirmDeleteAction::Environment { env_name, .. } => (
                         "Delete Environment",
                         "This will permanently remove this environment from the project.",
-                        env_name.as_str(),
-                        "Are you sure you want to delete this environment? Its pipeline steps and SSH credentials mapping will be deleted.",
+                        env_name.clone(),
+                        "Are you sure you want to delete this environment? Its pipeline steps and SSH credentials mapping will be deleted.".to_string(),
                     ),
+                    ConfirmDeleteAction::DeploymentRecord {
+                        project_name,
+                        env_name,
+                        version,
+                        ..
+                    } => (
+                        "Delete Deployment Record",
+                        "This will permanently remove this deployment entry and its console logs.",
+                        format!("{project_name} ({env_name} v{version})"),
+                        "Are you sure you want to delete this deployment history record? Its execution logs and timestamp record will be permanently removed.".to_string(),
+                    ),
+                    ConfirmDeleteAction::ClearDeploymentHistory {
+                        project_name,
+                        env_name,
+                        count,
+                        ..
+                    } => {
+                        let scope_desc = match (project_name.as_deref(), env_name.as_deref()) {
+                            (Some(p), Some(e)) => format!("{p} — {e} ({count} records)"),
+                            (Some(p), None) => format!("{p} — All Environments ({count} records)"),
+                            (None, Some(e)) => format!("All Projects — {e} ({count} records)"),
+                            (None, None) => format!("All Deployments ({count} records)"),
+                        };
+                        (
+                            "Clear Deployment History",
+                            "This will permanently delete completed and failed deployment history records.",
+                            scope_desc,
+                            format!(
+                                "Are you sure you want to clear {count} deployment history record(s)? Active running deployments will not be affected, but all completed/failed logs in this view will be permanently removed."
+                            ),
+                        )
+                    }
                 };
 
                 if render_modal_header(
@@ -1346,6 +1383,53 @@ impl ShiplyApp {
                         }
                         None => {}
                     }
+                }
+                ConfirmDeleteAction::DeploymentRecord {
+                    deployment_id,
+                    project_name,
+                    env_name,
+                    version,
+                } => {
+                    if self.storage.remove_deployment(&deployment_id).is_some() {
+                        if self.selected_deployment_id.as_deref() == Some(deployment_id.as_str()) {
+                            self.selected_deployment_id = self
+                                .storage
+                                .deployments
+                                .first()
+                                .map(|d| d.id.clone());
+                        }
+                        self.refresh_selected_project_metadata(false);
+                        self.status_banner = Some((
+                            format!(
+                                "Deleted deployment record v{version} ({project_name} - {env_name})."
+                            ),
+                            true,
+                        ));
+                    }
+                }
+                ConfirmDeleteAction::ClearDeploymentHistory {
+                    project_id,
+                    env_key,
+                    ..
+                } => {
+                    let removed = self.storage.clear_deployment_history(
+                        project_id.as_deref(),
+                        env_key.as_deref(),
+                    );
+                    if let Some(sel_id) = &self.selected_deployment_id {
+                        if !self.storage.deployments.iter().any(|d| &d.id == sel_id) {
+                            self.selected_deployment_id = self
+                                .storage
+                                .deployments
+                                .first()
+                                .map(|d| d.id.clone());
+                        }
+                    }
+                    self.refresh_selected_project_metadata(false);
+                    self.status_banner = Some((
+                        format!("Cleared {removed} deployment history record(s)."),
+                        true,
+                    ));
                 }
             }
             self.pending_delete_confirm = None;

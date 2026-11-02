@@ -2520,3 +2520,66 @@ use super::*;
         assert!(app.storage.deployments[0].finished_at.is_some());
         assert!(app.storage.deployments[0].duration_ms.is_some());
     }
+
+    #[test]
+    fn test_delete_single_deployment_and_clear_history_modal() {
+        let ctx = egui::Context::default();
+        ShiplyApp::configure_light_workspace_style(&ctx);
+
+        let mut storage = crate::storage::AppStorage::default();
+        let now = chrono::Utc::now();
+        for (id, status) in [
+            ("dep-a", DeploymentStatus::Succeeded),
+            ("dep-b", DeploymentStatus::Failed),
+            ("dep-c", DeploymentStatus::Cancelled),
+        ] {
+            storage.deployments.push(DeploymentRecord {
+                id: id.to_string(),
+                project_id: "backend-cdo".to_string(),
+                project_name: "Backend Customer Data Ops".to_string(),
+                environment: "production".to_string(),
+                app_name: "backend-cdo".to_string(),
+                version: "1.1.22".to_string(),
+                git_branch: Some("main".to_string()),
+                git_commit: Some("70c0d68".to_string()),
+                git_changes: vec![],
+                is_rollback: false,
+                servers: vec!["10.0.0.1".to_string()],
+                status,
+                started_at: now,
+                finished_at: Some(now),
+                duration_ms: Some(1500),
+                step_logs: vec![],
+                executed_steps: vec![],
+            });
+        }
+
+        let mut app = ShiplyApp::new(storage);
+        app.selected_deployment_id = Some("dep-a".to_string());
+        app.pending_delete_confirm = Some(ConfirmDeleteAction::DeploymentRecord {
+            deployment_id: "dep-a".to_string(),
+            project_name: "Backend Customer Data Ops".to_string(),
+            env_name: "production".to_string(),
+            version: "1.1.22".to_string(),
+        });
+
+        // Render history and delete confirmation modal to verify no panics or layout issues
+        let _ = ctx.run(Default::default(), |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                app.render_history_and_logs_view(ui, None);
+            });
+            app.render_delete_confirmation_modal(ctx);
+        });
+
+        // Verify ClearDeploymentHistory modal variant renders cleanly as well
+        app.pending_delete_confirm = Some(ConfirmDeleteAction::ClearDeploymentHistory {
+            project_id: Some("backend-cdo".to_string()),
+            project_name: Some("Backend Customer Data Ops".to_string()),
+            env_key: Some("production".to_string()),
+            env_name: Some("Production".to_string()),
+            count: 3,
+        });
+        let _ = ctx.run(Default::default(), |ctx| {
+            app.render_delete_confirmation_modal(ctx);
+        });
+    }

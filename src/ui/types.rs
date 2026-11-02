@@ -33,6 +33,19 @@ pub(crate) enum ConfirmDeleteAction {
         env_key: String,
         env_name: String,
     },
+    DeploymentRecord {
+        deployment_id: String,
+        project_name: String,
+        env_name: String,
+        version: String,
+    },
+    ClearDeploymentHistory {
+        project_id: Option<String>,
+        project_name: Option<String>,
+        env_key: Option<String>,
+        env_name: Option<String>,
+        count: usize,
+    },
 }
 
 #[derive(Debug, Clone)]
