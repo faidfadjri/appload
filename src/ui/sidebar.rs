@@ -287,21 +287,30 @@ impl ShiplyApp {
                         .interact(all_rect, egui::Id::new("rail_all_deploy_btn"), Sense::click())
                         .on_hover_cursor(egui::CursorIcon::PointingHand)
                         .on_hover_text("All Deployments");
-                    let all_bg = if is_overview {
-                        SB_ACCENT_SOFT
-                    } else if all_resp.hovered() {
+                    let all_bg = if is_overview || all_resp.hovered() {
                         SB_SURFACE_HOVER
                     } else {
                         Color32::TRANSPARENT
                     };
                     let all_fg = if is_overview {
-                        SB_ACCENT
+                        Color32::WHITE
                     } else if all_resp.hovered() {
                         SB_TEXT
                     } else {
                         SB_TEXT_MUTED
                     };
                     ui.painter().rect_filled(all_rect, CornerRadius::same(R_MD as u8), all_bg);
+                    if is_overview {
+                        let bar_rect = Rect::from_min_max(
+                            Pos2::new(all_rect.left(), all_rect.top() + 6.0),
+                            Pos2::new(all_rect.left() + 2.0, all_rect.bottom() - 6.0),
+                        );
+                        ui.painter().rect_filled(
+                            bar_rect,
+                            CornerRadius { nw: 0, ne: 2, se: 2, sw: 0 },
+                            SB_ACCENT,
+                        );
+                    }
                     draw_icon_layers(ui.painter(), all_rect.center(), all_fg);
                     if all_resp.clicked() {
                         self.selection = SidebarSelection::AllDeployments;
@@ -316,21 +325,30 @@ impl ShiplyApp {
                             .interact(bulk_rect, egui::Id::new("rail_bulk_deploy_btn"), Sense::click())
                             .on_hover_cursor(egui::CursorIcon::PointingHand)
                             .on_hover_text("Bulk Deploy...");
-                        let bulk_bg = if is_bulk {
-                            SB_ACCENT_SOFT
-                        } else if bulk_resp.hovered() {
+                        let bulk_bg = if is_bulk || bulk_resp.hovered() {
                             SB_SURFACE_HOVER
                         } else {
                             Color32::TRANSPARENT
                         };
                         let bulk_fg = if is_bulk {
-                            SB_ACCENT
+                            Color32::WHITE
                         } else if bulk_resp.hovered() {
                             SB_TEXT
                         } else {
                             SB_TEXT_MUTED
                         };
                         ui.painter().rect_filled(bulk_rect, CornerRadius::same(R_MD as u8), bulk_bg);
+                        if is_bulk {
+                            let bar_rect = Rect::from_min_max(
+                                Pos2::new(bulk_rect.left(), bulk_rect.top() + 6.0),
+                                Pos2::new(bulk_rect.left() + 2.0, bulk_rect.bottom() - 6.0),
+                            );
+                            ui.painter().rect_filled(
+                                bar_rect,
+                                CornerRadius { nw: 0, ne: 2, se: 2, sw: 0 },
+                                SB_ACCENT,
+                            );
+                        }
                         draw_icon_send(ui.painter(), bulk_rect.center(), bulk_fg);
                         if bulk_resp.clicked() {
                             self.open_bulk_deploy_modal();
@@ -350,15 +368,13 @@ impl ShiplyApp {
                         )
                         .on_hover_cursor(egui::CursorIcon::PointingHand)
                         .on_hover_text("Secret Management (OS Credential Manager)");
-                    let sec_bg = if is_secrets {
-                        SB_ACCENT_SOFT
-                    } else if sec_resp.hovered() {
+                    let sec_bg = if is_secrets || sec_resp.hovered() {
                         SB_SURFACE_HOVER
                     } else {
                         Color32::TRANSPARENT
                     };
                     let sec_fg = if is_secrets {
-                        SB_ACCENT
+                        Color32::WHITE
                     } else if sec_resp.hovered() {
                         SB_TEXT
                     } else {
@@ -366,6 +382,17 @@ impl ShiplyApp {
                     };
                     ui.painter()
                         .rect_filled(sec_rect, CornerRadius::same(R_MD as u8), sec_bg);
+                    if is_secrets {
+                        let bar_rect = Rect::from_min_max(
+                            Pos2::new(sec_rect.left(), sec_rect.top() + 6.0),
+                            Pos2::new(sec_rect.left() + 2.0, sec_rect.bottom() - 6.0),
+                        );
+                        ui.painter().rect_filled(
+                            bar_rect,
+                            CornerRadius { nw: 0, ne: 2, se: 2, sw: 0 },
+                            SB_ACCENT,
+                        );
+                    }
                     draw_outline_icon(ui.painter(), sec_rect.center(), OutlineIcon::Key, sec_fg);
                     if sec_resp.clicked() {
                         self.selection = SidebarSelection::SecretManagement;
@@ -494,37 +521,7 @@ impl ShiplyApp {
                     Align2::LEFT_CENTER,
                     "Shiply",
                     Typo::H2.font(),
-                    SB_TEXT,
-                );
-
-                // Version badge: mono 11px, bg --sb-surface, text --sb-text-muted, radius 4px
-                let ver_text = format!("v{APP_VERSION}");
-                let ver_galley =
-                    brand_ui
-                        .painter()
-                        .layout_no_wrap(ver_text, Typo::MonoSm.font(), SB_TEXT_MUTED);
-                let badge_pad_x = 6.0_f32;
-                let badge_h = 20.0_f32;
-                let badge_w = ver_galley.size().x + badge_pad_x * 2.0;
-                let badge_rect = Rect::from_min_size(
-                    Pos2::new(
-                        brand_rect.right() - badge_w - 2.0,
-                        brand_rect.center().y - badge_h / 2.0,
-                    ),
-                    Vec2::new(badge_w, badge_h),
-                );
-                brand_ui.painter().rect_filled(
-                    badge_rect,
-                    CornerRadius::same(R_SM as u8),
-                    SB_SURFACE,
-                );
-                brand_ui.painter().galley(
-                    Pos2::new(
-                        badge_rect.left() + badge_pad_x,
-                        badge_rect.center().y - ver_galley.size().y / 2.0,
-                    ),
-                    ver_galley,
-                    SB_TEXT_MUTED,
+                    Color32::WHITE,
                 );
 
                 // Hairline bottom border
@@ -537,8 +534,8 @@ impl ShiplyApp {
                 );
             }
 
-            // 2. Pinned Footer (138px) with zero-spacing to guarantee no bottom overflow
-            let footer_h = 138.0_f32;
+            // 2. Pinned Footer (142px) with zero-spacing to guarantee no bottom overflow
+            let footer_h = 142.0_f32;
             let footer_rect = Rect::from_min_size(
                 Pos2::new(inner_rect.left(), inner_rect.bottom() - footer_h),
                 Vec2::new(full_w, footer_h),
@@ -554,11 +551,11 @@ impl ShiplyApp {
                     Stroke::new(1.0_f32, SB_BORDER_LINE),
                 );
 
-                // 3 Ghost Buttons (30px high, radius 6px)
+                // 3 Ghost Buttons (32px high, radius 6px)
                 // Action 1: Sync App Directory Files
                 let sync_rect = Rect::from_min_size(
-                    Pos2::new(footer_rect.left(), footer_rect.top() + 8.0),
-                    Vec2::new(full_w, 30.0),
+                    Pos2::new(footer_rect.left(), footer_rect.top() + 6.0),
+                    Vec2::new(full_w, 32.0),
                 );
                 let sync_resp = footer_ui
                     .interact(sync_rect, egui::Id::new("sidebar_sync_btn"), Sense::click())
@@ -608,8 +605,8 @@ impl ShiplyApp {
 
                 // Action 2: Open App Folder
                 let dir_rect = Rect::from_min_size(
-                    Pos2::new(footer_rect.left(), footer_rect.top() + 40.0),
-                    Vec2::new(full_w, 30.0),
+                    Pos2::new(footer_rect.left(), footer_rect.top() + 42.0),
+                    Vec2::new(full_w, 32.0),
                 );
                 let dir_resp = footer_ui
                     .interact(
@@ -656,8 +653,8 @@ impl ShiplyApp {
 
                 // Action 3: Check for Updates
                 let upd_rect = Rect::from_min_size(
-                    Pos2::new(footer_rect.left(), footer_rect.top() + 72.0),
-                    Vec2::new(full_w, 30.0),
+                    Pos2::new(footer_rect.left(), footer_rect.top() + 78.0),
+                    Vec2::new(full_w, 32.0),
                 );
                 let upd_resp = footer_ui
                     .interact(
@@ -706,9 +703,9 @@ impl ShiplyApp {
                     }
                 }
 
-                // Status Row: 6px green circle + "Up to date" / "Installed v..." + action link
+                // Status Row: 7px green circle + "Installed v..." + "Reinstall · Donate" links
                 let stat_rect = Rect::from_min_size(
-                    Pos2::new(footer_rect.left(), footer_rect.top() + 108.0),
+                    Pos2::new(footer_rect.left(), footer_rect.top() + 116.0),
                     Vec2::new(full_w, 20.0),
                 );
                 let install_state = check_install_state(&default_install_dir(), APP_VERSION);
@@ -751,8 +748,8 @@ impl ShiplyApp {
                 let link_x = stat_rect.left() + 20.0 + st_galley.size().x + 8.0;
                 let link_galley = footer_ui.painter().layout_no_wrap(
                     action_text.to_string(),
-                    Typo::Caption.font(),
-                    SB_TEXT_FAINT,
+                    Typo::Small.font(),
+                    SB_TEXT_MUTED,
                 );
                 let link_rect = Rect::from_min_size(
                     Pos2::new(link_x, stat_rect.center().y - link_galley.size().y / 2.0),
@@ -768,7 +765,7 @@ impl ShiplyApp {
                 let link_color = if link_resp.hovered() {
                     SB_ACCENT
                 } else {
-                    SB_TEXT_FAINT
+                    SB_TEXT_MUTED
                 };
                 footer_ui
                     .painter()
@@ -781,12 +778,25 @@ impl ShiplyApp {
                     }
                 }
 
+                // Middle separator dot "·"
+                let sep_x = link_rect.right() + 4.0;
+                let sep_galley = footer_ui.painter().layout_no_wrap(
+                    "·".to_string(),
+                    Typo::Small.font(),
+                    SB_TEXT_FAINT,
+                );
+                footer_ui.painter().galley(
+                    Pos2::new(sep_x, stat_rect.center().y - sep_galley.size().y / 2.0),
+                    sep_galley.clone(),
+                    SB_TEXT_FAINT,
+                );
+
                 // Donate link on sidebar status line
-                let don_x = link_rect.right() + 8.0;
+                let don_x = sep_x + sep_galley.size().x + 4.0;
                 let don_galley = footer_ui.painter().layout_no_wrap(
                     "Donate".to_string(),
-                    Typo::Caption.font(),
-                    SB_TEXT_FAINT,
+                    Typo::Small.font(),
+                    SB_TEXT_MUTED,
                 );
                 let don_rect = Rect::from_min_size(
                     Pos2::new(don_x, stat_rect.center().y - don_galley.size().y / 2.0),
@@ -805,7 +815,7 @@ impl ShiplyApp {
                 let don_color = if don_resp.hovered() {
                     HEART_PINK
                 } else {
-                    SB_TEXT_FAINT
+                    SB_TEXT_MUTED
                 };
                 footer_ui
                     .painter()
@@ -836,15 +846,13 @@ impl ShiplyApp {
                     let (nav_rect, nav_resp) =
                         ui.allocate_exact_size(Vec2::new(full_w, 36.0), Sense::click());
                     let nav_resp = nav_resp.on_hover_cursor(egui::CursorIcon::PointingHand);
-                    let nav_bg = if is_overview {
-                        SB_ACCENT_SOFT
-                    } else if nav_resp.hovered() {
+                    let nav_bg = if is_overview || nav_resp.hovered() {
                         SB_SURFACE_HOVER
                     } else {
                         Color32::TRANSPARENT
                     };
                     let nav_fg = if is_overview {
-                        SB_ACCENT
+                        Color32::WHITE
                     } else if nav_resp.hovered() {
                         SB_TEXT
                     } else {
@@ -852,6 +860,22 @@ impl ShiplyApp {
                     };
                     ui.painter()
                         .rect_filled(nav_rect, CornerRadius::same(R_MD as u8), nav_bg);
+                    if is_overview {
+                        let bar_rect = Rect::from_min_max(
+                            Pos2::new(nav_rect.left(), nav_rect.top() + 6.0),
+                            Pos2::new(nav_rect.left() + 2.0, nav_rect.bottom() - 6.0),
+                        );
+                        ui.painter().rect_filled(
+                            bar_rect,
+                            CornerRadius {
+                                nw: 0,
+                                ne: 2,
+                                se: 2,
+                                sw: 0,
+                            },
+                            SB_ACCENT,
+                        );
+                    }
                     draw_icon_layers(
                         ui.painter(),
                         Pos2::new(nav_rect.left() + 16.0, nav_rect.center().y),
@@ -875,15 +899,13 @@ impl ShiplyApp {
                         let (bulk_rect, bulk_resp) =
                             ui.allocate_exact_size(Vec2::new(full_w, 36.0), Sense::click());
                         let bulk_resp = bulk_resp.on_hover_cursor(egui::CursorIcon::PointingHand);
-                        let bulk_bg = if is_bulk_active {
-                            SB_ACCENT_SOFT
-                        } else if bulk_resp.hovered() {
+                        let bulk_bg = if is_bulk_active || bulk_resp.hovered() {
                             SB_SURFACE_HOVER
                         } else {
                             Color32::TRANSPARENT
                         };
                         let bulk_fg = if is_bulk_active {
-                            SB_ACCENT
+                            Color32::WHITE
                         } else if bulk_resp.hovered() {
                             SB_TEXT
                         } else {
@@ -891,6 +913,22 @@ impl ShiplyApp {
                         };
                         ui.painter()
                             .rect_filled(bulk_rect, CornerRadius::same(R_MD as u8), bulk_bg);
+                        if is_bulk_active {
+                            let bar_rect = Rect::from_min_max(
+                                Pos2::new(bulk_rect.left(), bulk_rect.top() + 6.0),
+                                Pos2::new(bulk_rect.left() + 2.0, bulk_rect.bottom() - 6.0),
+                            );
+                            ui.painter().rect_filled(
+                                bar_rect,
+                                CornerRadius {
+                                    nw: 0,
+                                    ne: 2,
+                                    se: 2,
+                                    sw: 0,
+                                },
+                                SB_ACCENT,
+                            );
+                        }
                         draw_icon_send(
                             ui.painter(),
                             Pos2::new(bulk_rect.left() + 16.0, bulk_rect.center().y),
@@ -918,15 +956,13 @@ impl ShiplyApp {
                     let (sec_rect, sec_resp) =
                         ui.allocate_exact_size(Vec2::new(full_w, 36.0), Sense::click());
                     let sec_resp = sec_resp.on_hover_cursor(egui::CursorIcon::PointingHand);
-                    let sec_bg = if is_secrets_active {
-                        SB_ACCENT_SOFT
-                    } else if sec_resp.hovered() {
+                    let sec_bg = if is_secrets_active || sec_resp.hovered() {
                         SB_SURFACE_HOVER
                     } else {
                         Color32::TRANSPARENT
                     };
                     let sec_fg = if is_secrets_active {
-                        SB_ACCENT
+                        Color32::WHITE
                     } else if sec_resp.hovered() {
                         SB_TEXT
                     } else {
@@ -934,6 +970,22 @@ impl ShiplyApp {
                     };
                     ui.painter()
                         .rect_filled(sec_rect, CornerRadius::same(R_MD as u8), sec_bg);
+                    if is_secrets_active {
+                        let bar_rect = Rect::from_min_max(
+                            Pos2::new(sec_rect.left(), sec_rect.top() + 6.0),
+                            Pos2::new(sec_rect.left() + 2.0, sec_rect.bottom() - 6.0),
+                        );
+                        ui.painter().rect_filled(
+                            bar_rect,
+                            CornerRadius {
+                                nw: 0,
+                                ne: 2,
+                                se: 2,
+                                sw: 0,
+                            },
+                            SB_ACCENT,
+                        );
+                    }
                     draw_outline_icon(
                         ui.painter(),
                         Pos2::new(sec_rect.left() + 16.0, sec_rect.center().y),
@@ -952,11 +1004,7 @@ impl ShiplyApp {
                         let cg = ui.painter().layout_no_wrap(
                             count_str,
                             Typo::MonoSm.font(),
-                            if is_secrets_active {
-                                SB_ACCENT
-                            } else {
-                                SB_TEXT_MUTED
-                            },
+                            SB_TEXT_MUTED,
                         );
                         let cw = (cg.size().x + 10.0).max(20.0);
                         let ch = 18.0;
@@ -967,11 +1015,7 @@ impl ShiplyApp {
                         ui.painter().rect_filled(
                             crect,
                             CornerRadius::same(R_SM as u8),
-                            if is_secrets_active {
-                                SB_ACCENT.gamma_multiply(0.18)
-                            } else {
-                                SB_SURFACE
-                            },
+                            SB_SURFACE,
                         );
                         ui.painter().galley(
                             Pos2::new(
@@ -979,11 +1023,7 @@ impl ShiplyApp {
                                 crect.center().y - cg.size().y / 2.0,
                             ),
                             cg,
-                            if is_secrets_active {
-                                SB_ACCENT
-                            } else {
-                                SB_TEXT_MUTED
-                            },
+                            SB_TEXT_MUTED,
                         );
                     }
                     if sec_resp
@@ -1004,14 +1044,14 @@ impl ShiplyApp {
                         Pos2::new(hdr_rect.left() + 2.0, hdr_rect.center().y),
                         Align2::LEFT_CENTER,
                         "PROJECTS",
-                        Typo::Small.font(),
+                        Typo::Caption.font(),
                         SB_TEXT_FAINT,
                     );
 
                     let add_w = 46.0_f32;
                     let sort_w = 78.0_f32;
 
-                    // "+ Add" Button
+                    // "+ Add" Button as Ghost Sm
                     let add_btn_rect = Rect::from_min_size(
                         Pos2::new(hdr_rect.right() - add_w, hdr_rect.center().y - 12.0),
                         Vec2::new(add_w, 24.0),
@@ -1022,32 +1062,32 @@ impl ShiplyApp {
                             egui::Id::new("sidebar_add_proj_btn"),
                             Sense::click(),
                         )
-                        .on_hover_cursor(egui::CursorIcon::PointingHand);
+                        .on_hover_cursor(egui::CursorIcon::PointingHand)
+                        .on_hover_text("Add new project");
                     let add_bg = if add_btn_resp.hovered() {
                         SB_SURFACE_HOVER
                     } else {
-                        SB_SURFACE
+                        Color32::TRANSPARENT
+                    };
+                    let add_fg = if add_btn_resp.hovered() {
+                        Color32::WHITE
+                    } else {
+                        SB_TEXT_MUTED
                     };
                     ui.painter()
-                        .rect_filled(add_btn_rect, CornerRadius::same(R_SM as u8), add_bg);
-                    ui.painter().rect_stroke(
-                        add_btn_rect,
-                        CornerRadius::same(R_SM as u8),
-                        Stroke::new(1.0_f32, SB_BORDER_LINE),
-                        StrokeKind::Inside,
-                    );
+                        .rect_filled(add_btn_rect, CornerRadius::same(R_MD as u8), add_bg);
                     ui.painter().text(
                         add_btn_rect.center(),
                         Align2::CENTER_CENTER,
                         "+ Add",
                         Typo::Caption.font(),
-                        SB_TEXT,
+                        add_fg,
                     );
                     if add_btn_resp.clicked() {
                         self.open_new_project_modal();
                     }
 
-                    // Sort Control
+                    // Sort Control as Ghost Sm
                     let sort_area_rect = Rect::from_min_size(
                         Pos2::new(
                             hdr_rect.right() - add_w - 6.0 - sort_w,
@@ -1072,21 +1112,15 @@ impl ShiplyApp {
                     let sort_bg = if is_sort_open || sort_btn_resp.hovered() {
                         SB_SURFACE_HOVER
                     } else {
-                        SB_SURFACE
+                        Color32::TRANSPARENT
                     };
-                    let sort_stroke = if is_sort_open {
-                        Stroke::new(1.5_f32, SB_ACCENT)
+                    let sort_fg = if is_sort_open || sort_btn_resp.hovered() {
+                        Color32::WHITE
                     } else {
-                        Stroke::new(1.0_f32, SB_BORDER_LINE)
+                        SB_TEXT_MUTED
                     };
                     ui.painter()
-                        .rect_filled(sort_area_rect, CornerRadius::same(R_SM as u8), sort_bg);
-                    ui.painter().rect_stroke(
-                        sort_area_rect,
-                        CornerRadius::same(R_SM as u8),
-                        sort_stroke,
-                        StrokeKind::Inside,
-                    );
+                        .rect_filled(sort_area_rect, CornerRadius::same(R_MD as u8), sort_bg);
 
                     let sort_label = match self.project_sort_mode {
                         ProjectSortMode::Custom => "Custom",
@@ -1099,7 +1133,7 @@ impl ShiplyApp {
                         Align2::LEFT_CENTER,
                         sort_label,
                         Typo::Caption.font(),
-                        SB_TEXT,
+                        sort_fg,
                     );
                     draw_outline_icon(
                         ui.painter(),
@@ -1109,7 +1143,7 @@ impl ShiplyApp {
                         } else {
                             OutlineIcon::ChevronDown
                         },
-                        SB_TEXT_MUTED,
+                        sort_fg,
                     );
 
                     ui.add_space(8.0);
@@ -1314,7 +1348,7 @@ impl ShiplyApp {
                                 let p_resp =
                                     p_resp.on_hover_cursor(egui::CursorIcon::PointingHand);
 
-                                let fill = if is_selected || is_switching || p_resp.hovered() {
+                                let fill = if p_resp.hovered() {
                                     SB_SURFACE_HOVER
                                 } else {
                                     SB_SURFACE

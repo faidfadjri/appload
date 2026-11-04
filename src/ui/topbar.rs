@@ -8,7 +8,7 @@ impl ShiplyApp {
         let theme = self.theme();
         let topbar_bg = SB_BG; // Deep navy-black topbar
         let pill_bg = SB_SURFACE_HOVER; // Dark hover fill for buttons
-        let topbar_text = SB_TEXT; // Clean white text
+        let topbar_text = Color32::WHITE; // Clean white text
         let icon_muted = SB_TEXT_MUTED; // Light muted icon
 
         if let Some(maximized) = ctx.input(|i| i.viewport().maximized) {

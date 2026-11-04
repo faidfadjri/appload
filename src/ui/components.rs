@@ -174,7 +174,7 @@ pub(crate) fn sidebar_search_text_edit(
 
     // Single background fill
     ui.painter()
-        .rect_filled(rect, CornerRadius::same(R_SM as u8), SB_SURFACE);
+        .rect_filled(rect, CornerRadius::same(R_MD as u8), SB_SURFACE);
 
     // Left magnifying glass search icon (standard enterprise UX)
     let icon_center = Pos2::new(rect.left() + 14.0, rect.center().y);
