@@ -139,6 +139,7 @@ pub struct ShiplyApp {
     pub(crate) server_http_proxy_buffer: Option<(String, String)>,
     pub refresh_anim_start: Option<Instant>,
     pub(crate) dpi_diagnostics_logged: bool,
+    pub(crate) screenshot_frames: usize,
 }
 impl ShiplyApp {
     pub fn new(storage: AppStorage) -> Self {
@@ -156,10 +157,20 @@ impl ShiplyApp {
             .and_then(|p| p.environments.first())
             .map(|e| e.key.clone())
             .unwrap_or_default();
-        let selection = match &initial_project_id {
+        let mut selection = match &initial_project_id {
             Some(id) => SidebarSelection::Project(id.clone()),
             None => SidebarSelection::AllDeployments,
         };
+        if let Ok(val) = std::env::var("SHIPLY_INITIAL_VIEW") {
+            if val.eq_ignore_ascii_case("all_deployments") {
+                selection = SidebarSelection::AllDeployments;
+            } else if val.eq_ignore_ascii_case("secret_management") {
+                selection = SidebarSelection::SecretManagement;
+            }
+        }
+        let show_modal = std::env::var("SHIPLY_OPEN_MODAL")
+            .map(|v| v.eq_ignore_ascii_case("new_project"))
+            .unwrap_or(false);
         let initial_selected_dep = storage.deployments.first().map(|d| d.id.clone());
 
         let mut app = Self {
@@ -199,7 +210,7 @@ impl ShiplyApp {
             event_rx,
             active_deployments: HashMap::new(),
             active_deployment_id: None,
-            show_new_project_modal: false,
+            show_new_project_modal: show_modal,
             new_project_ps1_path: String::new(),
             new_project_import_siblings: true,
             new_project_name: String::new(),
@@ -273,6 +284,7 @@ impl ShiplyApp {
             server_http_proxy_buffer: None,
             refresh_anim_start: None,
             dpi_diagnostics_logged: false,
+            screenshot_frames: 0,
             git_inspect_tx,
             git_inspect_rx,
         };
@@ -1445,6 +1457,49 @@ impl ShiplyApp {
         Self::configure_workspace_theme(ctx, false);
     }
 }
+
+fn save_color_image_as_bmp(
+    image: &egui::ColorImage,
+    path: &std::path::Path,
+) -> std::io::Result<()> {
+    use std::io::Write;
+    let [w, h] = image.size;
+    let pixel_bytes_len = (w * h * 4) as u32;
+    let file_size = 54 + pixel_bytes_len;
+    let mut file = std::fs::File::create(path)?;
+
+    // BITMAPFILEHEADER (14 bytes)
+    file.write_all(b"BM")?;
+    file.write_all(&file_size.to_le_bytes())?;
+    file.write_all(&0u32.to_le_bytes())?;
+    file.write_all(&54u32.to_le_bytes())?;
+
+    // BITMAPINFOHEADER (40 bytes)
+    file.write_all(&40u32.to_le_bytes())?;
+    file.write_all(&(w as i32).to_le_bytes())?;
+    file.write_all(&(-(h as i32)).to_le_bytes())?; // negative for top-down bitmap
+    file.write_all(&1u16.to_le_bytes())?;
+    file.write_all(&32u16.to_le_bytes())?;
+    file.write_all(&0u32.to_le_bytes())?;
+    file.write_all(&pixel_bytes_len.to_le_bytes())?;
+    file.write_all(&0i32.to_le_bytes())?;
+    file.write_all(&0i32.to_le_bytes())?;
+    file.write_all(&0u32.to_le_bytes())?;
+    file.write_all(&0u32.to_le_bytes())?;
+
+    // Pixels (BGRA)
+    let mut raw_pixels = Vec::with_capacity(w * h * 4);
+    for p in &image.pixels {
+        raw_pixels.push(p.b());
+        raw_pixels.push(p.g());
+        raw_pixels.push(p.r());
+        raw_pixels.push(p.a());
+    }
+    file.write_all(&raw_pixels)?;
+    file.flush()?;
+    Ok(())
+}
+
 impl eframe::App for ShiplyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         if !self.fonts_initialized {
@@ -1454,6 +1509,26 @@ impl eframe::App for ShiplyApp {
         if self.logo_texture.is_none() {
             self.logo_texture = Some(load_shiply_logo_texture(ctx));
         }
+
+        if let Ok(path) = std::env::var("SHIPLY_SCREENSHOT_PATH") {
+            self.screenshot_frames += 1;
+            if self.screenshot_frames == 5 {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(Default::default()));
+            }
+            for event in &ctx.input(|i| i.raw.events.clone()) {
+                if let egui::Event::Screenshot { image, .. } = event {
+                    let bmp_path = std::path::PathBuf::from(&path);
+                    if let Err(err) = save_color_image_as_bmp(image, &bmp_path) {
+                        eprintln!("[Screenshot Error] Failed to save BMP: {err}");
+                    } else {
+                        eprintln!("[Screenshot Success] Saved frame to {}", bmp_path.display());
+                    }
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+            }
+            ctx.request_repaint();
+        }
+
         self.poll_executor_events(ctx);
         Self::configure_light_workspace_style(ctx);
 
@@ -1527,7 +1602,11 @@ impl eframe::App for ShiplyApp {
         self.render_window_resize_handles(ctx);
 
         egui::CentralPanel::default()
-            .frame(egui::Frame::new().fill(CANVAS_BG).inner_margin(Margin::ZERO))
+            .frame(
+                egui::Frame::new()
+                    .fill(CANVAS_BG)
+                    .inner_margin(Margin::ZERO),
+            )
             .show(ctx, |ui| {
                 ScrollArea::vertical()
                     .id_salt("main_workspace_vertical_scroll")
