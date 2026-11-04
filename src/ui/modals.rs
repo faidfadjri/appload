@@ -45,7 +45,27 @@ pub(crate) fn animated_modal_window(
     anim_t: f32,
     frame_override: Option<egui::Frame>,
 ) -> (egui::Window<'static>, f32) {
-    let (modal_w, inner_w) = modal_width_and_inner(ctx);
+    animated_modal_window_with_width(ctx, title, anim_t, 560.0, frame_override)
+}
+
+/// Constructs a standardized modal window with custom target width (e.g. 720px for bulk deploy).
+pub(crate) fn animated_modal_window_with_width(
+    ctx: &egui::Context,
+    title: &str,
+    anim_t: f32,
+    target_width: f32,
+    frame_override: Option<egui::Frame>,
+) -> (egui::Window<'static>, f32) {
+    let screen_w = ctx.screen_rect().width();
+    let (modal_w, inner_w) = if screen_w < 480.0 {
+        let modal_w = screen_w;
+        let inner_w = (screen_w - 24.0).max(200.0);
+        (modal_w, inner_w)
+    } else {
+        let modal_w = target_width.min(screen_w - 32.0).max(300.0);
+        let inner_w = modal_w - 48.0;
+        (modal_w, inner_w)
+    };
     let slide_y = (1.0 - anim_t) * -18.0;
     let frame = frame_override.unwrap_or_else(|| modal_dialog_frame_for(ctx));
     let window = egui::Window::new(title.to_string())
@@ -94,20 +114,22 @@ impl ShiplyApp {
 
                 ui.add_space(SP_16);
 
-                // Auto-Import .ps1 Card Box
+                // Auto-Import from PowerShell Script Box
                 egui::Frame::new()
-                    .fill(MD_PANEL_BG)
-                    .stroke(Stroke::new(1.0_f32, MD_BORDER))
-                    .corner_radius(R_LG)
-                    .inner_margin(Margin::same(16))
+                    .fill(SUBTLE_BG)
+                    .stroke(Stroke::new(1.0_f32, CARD_BORDER))
+                    .corner_radius(CornerRadius::same(R_MD as u8))
+                    .inner_margin(Margin::same(14))
                     .show(ui, |ui| {
+                        ui.label(Typo::H3.rich("Auto-import from PowerShell script"));
+                        ui.add_space(2.0);
                         ui.label(
-                            RichText::new("Auto-import from PowerShell script (.ps1)")
-                                .typo(Typo::Caption)
-                                .color(ACCENT),
+                            Typo::Small
+                                .rich("Select a deploy.ps1 file to auto-populate environments and pipeline steps.")
+                                .color(TEXT_MUTED),
                         );
-                        ui.add_space(SP_8);
-                        let ps1_input_w = (inner_w - 32.0 - 216.0).max(120.0);
+                        ui.add_space(SP_12);
+                        let ps1_input_w = (inner_w - 28.0 - 200.0).max(120.0);
                         horizontal_row(ui, 40.0, |ui| {
                             modal_text_input(
                                 ui,
@@ -117,7 +139,7 @@ impl ShiplyApp {
                                 Some(r"e.g. C:\Projects\my-app\deploy-dev.ps1"),
                             );
                             ui.add_space(SP_8);
-                            let browse_btn = modal_secondary_button("Browse .ps1...");
+                            let browse_btn = modal_secondary_button("Browse…");
                             if ui.add(browse_btn).clicked() {
                                 if let Some(picked) = pick_ps1_file_dialog() {
                                     self.new_project_ps1_path = picked.clone();
@@ -126,7 +148,7 @@ impl ShiplyApp {
                             }
                             ui.add_space(SP_8);
                             let can_autofill = !self.new_project_ps1_path.trim().is_empty();
-                            let parse_btn = modal_primary_button("Auto-Fill", can_autofill);
+                            let parse_btn = modal_primary_button("Auto-fill", can_autofill);
                             if ui.add(parse_btn).clicked() && can_autofill {
                                 let path_copy = self.new_project_ps1_path.clone();
                                 self.apply_ps1_auto_import_to_modal(&path_copy);
@@ -134,16 +156,12 @@ impl ShiplyApp {
                         });
 
                         ui.add_space(SP_8);
-                        if ui
-                            .checkbox(
-                                &mut self.new_project_import_siblings,
-                                RichText::new(
-                                    "Also auto-import sibling deploy-*.ps1 scripts in the same project folder",
-                                )
-                                .typo(Typo::Small)
-                                .color(MD_TEXT_MUTED),
-                            )
-                            .changed()
+                        if kit::checkbox(
+                            ui,
+                            &mut self.new_project_import_siblings,
+                            "Also auto-import sibling deploy-*.ps1 scripts in the same folder",
+                        )
+                        .changed()
                             && !self.new_project_ps1_path.trim().is_empty()
                         {
                             let path_copy = self.new_project_ps1_path.clone();
@@ -154,13 +172,9 @@ impl ShiplyApp {
                             ui.add_space(SP_8);
                             let is_err = notice.starts_with("Import error:");
                             ui.label(
-                                RichText::new(notice)
-                                    .typo(Typo::SmallMedium)
-                                    .color(if is_err {
-                                        FAIL_PILL_TEXT
-                                    } else {
-                                        SUCCESS_PILL_TEXT
-                                    }),
+                                Typo::SmallMedium
+                                    .rich(notice)
+                                    .color(if is_err { DANGER } else { SUCCESS }),
                             );
                         }
                     });
@@ -239,25 +253,21 @@ impl ShiplyApp {
                 if !existing_groups.is_empty() {
                     ui.add_space(SP_8);
                     horizontal_row(ui, 24.0, |ui| {
-                        ui.label(RichText::new("Quick Select:").typo(Typo::Caption).color(MD_TEXT_MUTED));
+                        ui.label(Typo::Caption.rich("Quick select:").color(TEXT_MUTED));
                         for grp in existing_groups {
                             let is_sel = self.new_project_group == grp;
-                            if ui
-                                .add(
-                                    egui::Button::new(
-                                        RichText::new(&grp).typo(Typo::Caption).color(if is_sel {
-                                            Color32::WHITE
-                                        } else {
-                                            MD_TEXT
-                                        }),
-                                    )
-                                    .fill(if is_sel { ACCENT } else { MD_PANEL_BG })
-                                    .stroke(Stroke::new(1.0_f32, if is_sel { ACCENT } else { MD_BORDER }))
-                                    .corner_radius(R_SM),
-                                )
-                                .on_hover_cursor(egui::CursorIcon::PointingHand)
-                                .clicked()
-                            {
+                            let (bg, fg) = if is_sel {
+                                (PRIMARY_BLUE, Color32::WHITE)
+                            } else {
+                                (SUBTLE_BG, TEXT_SECONDARY)
+                            };
+                            let resp = ui.add(
+                                egui::Button::new(Typo::Caption.rich(&grp).color(fg))
+                                    .fill(bg)
+                                    .stroke(Stroke::new(1.0_f32, if is_sel { PRIMARY_BLUE } else { CARD_BORDER }))
+                                    .corner_radius(CornerRadius::same(R_SM as u8)),
+                            );
+                            if resp.clicked() {
                                 self.new_project_group = grp;
                             }
                         }
@@ -388,18 +398,20 @@ impl ShiplyApp {
 
                 // Optional: Import/Sync additional .ps1 script into this project
                 egui::Frame::new()
-                    .fill(MD_PANEL_BG)
-                    .stroke(Stroke::new(1.0_f32, MD_BORDER))
-                    .corner_radius(R_LG)
-                    .inner_margin(Margin::same(16))
+                    .fill(SUBTLE_BG)
+                    .stroke(Stroke::new(1.0_f32, CARD_BORDER))
+                    .corner_radius(CornerRadius::same(R_MD as u8))
+                    .inner_margin(Margin::same(14))
                     .show(ui, |ui| {
+                        ui.label(Typo::H3.rich("Sync / import environment from script"));
+                        ui.add_space(2.0);
                         ui.label(
-                            RichText::new("Sync / import environment from .ps1 script")
-                                .typo(Typo::Caption)
-                                .color(ACCENT),
+                            Typo::Small
+                                .rich("Select a deploy.ps1 file to import or update an environment configuration.")
+                                .color(TEXT_MUTED),
                         );
-                        ui.add_space(SP_8);
-                        let ps1_input_w = (inner_w - 32.0 - 208.0).max(120.0);
+                        ui.add_space(SP_12);
+                        let ps1_input_w = (inner_w - 28.0 - 180.0).max(120.0);
                         horizontal_row(ui, 40.0, |ui| {
                             modal_text_input(
                                 ui,
@@ -409,7 +421,7 @@ impl ShiplyApp {
                                 Some(r"e.g. C:\Projects\my-app\deploy-prod.ps1"),
                             );
                             ui.add_space(SP_8);
-                            let browse_btn = modal_secondary_button("Browse .ps1...");
+                            let browse_btn = modal_secondary_button("Browse…");
                             if ui.add(browse_btn).clicked() {
                                 if let Some(picked) = pick_ps1_file_dialog() {
                                     self.edit_project_ps1_path = picked;
@@ -447,12 +459,12 @@ impl ShiplyApp {
                             ui.add_space(SP_8);
                             let is_err = notice.starts_with("Import error:");
                             ui.label(
-                                RichText::new(notice)
-                                    .typo(Typo::SmallMedium)
+                                Typo::SmallMedium
+                                    .rich(notice)
                                     .color(if is_err {
-                                        FAIL_PILL_TEXT
+                                        DANGER
                                     } else {
-                                        SUCCESS_PILL_TEXT
+                                        SUCCESS
                                     }),
                             );
                         }
@@ -529,28 +541,24 @@ impl ShiplyApp {
                 if !existing_groups.is_empty() {
                     ui.add_space(SP_8);
                     horizontal_row(ui, 24.0, |ui| {
-                        ui.label(RichText::new("Quick Select:").typo(Typo::Caption).color(MD_TEXT_MUTED));
+                        ui.label(Typo::Caption.rich("Quick select:").color(TEXT_MUTED));
                         for grp in existing_groups {
                             let is_sel = self.edit_project_group == grp;
-                            if ui
-                                .add(
-                                    egui::Button::new(
-                                        RichText::new(&grp).typo(Typo::Caption).color(if is_sel {
-                                            Color32::WHITE
-                                        } else {
-                                            MD_TEXT
-                                        }),
-                                    )
-                                    .fill(if is_sel { ACCENT } else { MD_PANEL_BG })
+                            let (bg, fg) = if is_sel {
+                                (PRIMARY_BLUE, Color32::WHITE)
+                            } else {
+                                (SUBTLE_BG, TEXT_SECONDARY)
+                            };
+                            let resp = ui.add(
+                                egui::Button::new(Typo::Caption.rich(&grp).color(fg))
+                                    .fill(bg)
                                     .stroke(Stroke::new(
                                         1.0_f32,
-                                        if is_sel { ACCENT } else { MD_BORDER },
+                                        if is_sel { PRIMARY_BLUE } else { CARD_BORDER },
                                     ))
-                                    .corner_radius(R_SM),
-                                )
-                                .on_hover_cursor(egui::CursorIcon::PointingHand)
-                                .clicked()
-                            {
+                                    .corner_radius(CornerRadius::same(R_SM as u8)),
+                            );
+                            if resp.clicked() {
                                 self.edit_project_group = grp;
                             }
                         }
@@ -1085,12 +1093,7 @@ impl ShiplyApp {
                         .inner_margin(Margin::symmetric(14, 12))
                         .show(ui, |ui| {
                             horizontal_row(ui, 24.0, |ui| {
-                                render_pill(
-                                    ui,
-                                    "Up to date",
-                                    SUCCESS,
-                                    Color32::WHITE,
-                                );
+                                kit::status_badge(ui, StatusKind::Success, "Up to date");
                                 ui.label(
                                     RichText::new(format!("Shiply v{APP_VERSION}"))
                                         .typo(Typo::Label).color(SUCCESS_PILL_TEXT),
@@ -1277,21 +1280,30 @@ impl ShiplyApp {
                     );
 
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        let delete_btn = egui::Button::new(
-                            RichText::new("Delete permanently")
-                                .typo(Typo::Label).color(Color32::WHITE),
+                        let enter_submitted = ctx.input(|i| i.key_pressed(egui::Key::Enter));
+                        if kit::button(
+                            ui,
+                            ButtonVariant::DangerSolid,
+                            ButtonSize::Md,
+                            "Delete permanently",
+                            Some(OutlineIcon::Trash),
                         )
-                        .fill(DANGER)
-                        .corner_radius(R_MD)
-                        .min_size(Vec2::new(160.0, 40.0));
-
-                        if ui.add(delete_btn).clicked() {
+                        .clicked()
+                            || enter_submitted
+                        {
                             execute_delete = true;
                         }
 
                         ui.add_space(SP_8);
-                        let cancel_btn = modal_secondary_button("Cancel");
-                        if ui.add(cancel_btn).clicked() {
+                        if kit::button(
+                            ui,
+                            ButtonVariant::Secondary,
+                            ButtonSize::Md,
+                            "Cancel",
+                            None,
+                        )
+                        .clicked()
+                        {
                             dismiss = true;
                         }
                     });
@@ -1417,7 +1429,8 @@ impl ShiplyApp {
         else {
             return;
         };
-        let (window, inner_w) = animated_modal_window(ctx, "Bulk Deployment", anim_t, None);
+        let (window, inner_w) =
+            animated_modal_window_with_width(ctx, "Bulk Deployment", anim_t, 720.0, None);
         window.show(ctx, |ui| {
             ui.set_width(inner_w);
 

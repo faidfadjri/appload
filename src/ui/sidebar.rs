@@ -1915,7 +1915,7 @@ impl ShiplyApp {
                         Pos2::new(r.left() + 32.0, r.center().y),
                         Align2::LEFT_CENTER,
                         "Move Up",
-                        Typo::Small.font(),
+                        Typo::Label.font(),
                         SB_TEXT,
                     );
                     if resp.clicked() {
@@ -1950,7 +1950,7 @@ impl ShiplyApp {
                         Pos2::new(r.left() + 32.0, r.center().y),
                         Align2::LEFT_CENTER,
                         "Move Down",
-                        Typo::Small.font(),
+                        Typo::Label.font(),
                         SB_TEXT,
                     );
                     if resp.clicked() {
@@ -1997,7 +1997,7 @@ impl ShiplyApp {
                         Pos2::new(r.left() + 32.0, r.center().y),
                         Align2::LEFT_CENTER,
                         "Edit Project",
-                        Typo::Small.font(),
+                        Typo::Label.font(),
                         SB_TEXT,
                     );
                     if resp.clicked() {
@@ -2045,7 +2045,7 @@ impl ShiplyApp {
                         Pos2::new(r.left() + 32.0, r.center().y),
                         Align2::LEFT_CENTER,
                         "Set Group...",
-                        Typo::Small.font(),
+                        Typo::Label.font(),
                         fg,
                     );
                     draw_outline_icon(
@@ -2087,7 +2087,7 @@ impl ShiplyApp {
                         Pos2::new(r.left() + 32.0, r.center().y),
                         Align2::LEFT_CENTER,
                         "Duplicate Project",
-                        Typo::Small.font(),
+                        Typo::Label.font(),
                         SB_TEXT,
                     );
                     if resp.clicked() {
@@ -2127,7 +2127,7 @@ impl ShiplyApp {
                         Pos2::new(r.left() + 32.0, r.center().y),
                         Align2::LEFT_CENTER,
                         "Refresh Metadata",
-                        Typo::Small.font(),
+                        Typo::Label.font(),
                         fg,
                     );
                     if resp.clicked() {
@@ -2175,7 +2175,7 @@ impl ShiplyApp {
                         Pos2::new(r.left() + 32.0, r.center().y),
                         Align2::LEFT_CENTER,
                         "Delete Project",
-                        Typo::Small.font(),
+                        Typo::Label.font(),
                         DESTRUCTIVE_TEXT,
                     );
                     if resp.clicked() {
@@ -2244,7 +2244,7 @@ impl ShiplyApp {
                             Pos2::new(r.left() + 32.0, r.center().y),
                             Align2::LEFT_CENTER,
                             grp,
-                            Typo::Small.font(),
+                            Typo::Label.font(),
                             fg,
                         );
                         if resp.clicked() {
@@ -2290,7 +2290,7 @@ impl ShiplyApp {
                             Pos2::new(r.left() + 32.0, r.center().y),
                             Align2::LEFT_CENTER,
                             "Remove from Group",
-                            Typo::Small.font(),
+                            Typo::Label.font(),
                             SB_TEXT_MUTED,
                         );
                         if resp.clicked() {

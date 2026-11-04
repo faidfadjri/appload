@@ -536,6 +536,7 @@ pub(crate) fn render_modal_header(
 }
 
 /// Calculates responsive modal width: min(560px, 100vw - 32px); below 480px it becomes a full-screen sheet.
+#[allow(dead_code)]
 pub(crate) fn modal_width_and_inner(ctx: &egui::Context) -> (f32, f32) {
     let screen_w = ctx.screen_rect().width();
     if screen_w < 480.0 {

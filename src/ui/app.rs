@@ -125,6 +125,7 @@ pub struct ShiplyApp {
 
     // Status banner & Window/Sidebar state
     pub(crate) status_banner: Option<(String, bool)>,
+    pub(crate) status_banner_time: Option<Instant>,
     pub(crate) sidebar_collapsed: bool,
     pub(crate) window_maximized: bool,
     pub(crate) pending_delete_confirm: Option<ConfirmDeleteAction>,
@@ -285,6 +286,7 @@ impl ShiplyApp {
             pending_update_restart: None,
             last_sync_check: Instant::now(),
             status_banner: None,
+            status_banner_time: None,
             sidebar_collapsed: false,
             window_maximized: false,
             pending_delete_confirm: None,
@@ -401,6 +403,7 @@ impl ShiplyApp {
 
     pub fn set_status_banner(&mut self, message: String, is_success: bool) {
         self.status_banner = Some((message, is_success));
+        self.status_banner_time = Some(Instant::now());
     }
 
     pub fn is_env_deploying(&self, project_id: &str, env_key: &str) -> bool {
@@ -1640,100 +1643,79 @@ impl eframe::App for ShiplyApp {
                             ui.vertical(|ui| {
                                 ui.set_width(col_w);
                                 if let Some((msg, is_ok)) = &self.status_banner.clone() {
-                                    let (bg, fg, border) = if *is_ok {
-                                        (SUCCESS_PILL_BG, SUCCESS_PILL_TEXT, SUCCESS)
-                                    } else {
-                                        (FAIL_PILL_BG, FAIL_PILL_TEXT, DANGER)
-                                    };
-                                    let banner_w = ui.available_width();
-                                    let (b_rect, b_resp) = ui.allocate_exact_size(
-                                        Vec2::new(banner_w, 40.0),
-                                        Sense::hover(),
-                                    );
-                                    ui.painter().rect_filled(b_rect, CornerRadius::same(8), bg);
-                                    ui.painter().rect_stroke(
-                                        b_rect,
-                                        CornerRadius::same(8),
-                                        Stroke::new(1.0_f32, border),
-                                        StrokeKind::Inside,
-                                    );
-                                    let right_reserve = if self.pending_update_restart.is_some() {
-                                        176.0
-                                    } else {
-                                        68.0
-                                    };
-                                    let text_clip = Rect::from_min_max(
-                                        Pos2::new(b_rect.left() + 10.0, b_rect.top()),
-                                        Pos2::new(
-                                            (b_rect.right() - right_reserve)
-                                                .max(b_rect.left() + 40.0),
-                                            b_rect.bottom(),
-                                        ),
-                                    );
-                                    ui.painter().with_clip_rect(text_clip).text(
-                                        Pos2::new(b_rect.left() + 14.0, b_rect.center().y),
-                                        Align2::LEFT_CENTER,
-                                        msg,
-                                        Typo::Body.font(),
-                                        fg,
-                                    );
-                                    b_resp.on_hover_text(msg);
-                                    let close_rect = Rect::from_center_size(
-                                        Pos2::new(b_rect.right() - 36.0, b_rect.center().y),
-                                        Vec2::new(48.0, 24.0),
-                                    );
-                                    let close_resp = ui
-                                        .interact(
-                                            close_rect,
-                                            egui::Id::new("close_status_banner"),
-                                            Sense::click(),
-                                        )
-                                        .on_hover_cursor(egui::CursorIcon::PointingHand);
-                                    ui.painter().text(
-                                        close_rect.center(),
-                                        Align2::CENTER_CENTER,
-                                        "Close",
-                                        Typo::SmallMedium.font(),
-                                        fg,
-                                    );
-                                    if close_resp.clicked() {
+                                    let now = Instant::now();
+                                    let banner_time = *self.status_banner_time.get_or_insert(now);
+                                    if *is_ok && now.duration_since(banner_time).as_secs_f32() > 4.0 {
                                         self.status_banner = None;
-                                    }
+                                        self.status_banner_time = None;
+                                    } else {
+                                        let bar_color = if *is_ok { SUCCESS } else { DANGER };
+                                        let icon = if *is_ok { OutlineIcon::Check } else { OutlineIcon::Info };
+                                        let icon_color = if *is_ok { SUCCESS } else { DANGER };
 
-                                    if let Some((_, exe_path)) = self.pending_update_restart.clone()
-                                    {
-                                        let restart_rect = Rect::from_center_size(
-                                            Pos2::new(b_rect.right() - 118.0, b_rect.center().y),
-                                            Vec2::new(96.0, 24.0),
-                                        );
-                                        let restart_resp = ui
-                                            .interact(
-                                                restart_rect,
-                                                egui::Id::new("banner_restart_now_btn"),
-                                                Sense::click(),
-                                            )
-                                            .on_hover_cursor(egui::CursorIcon::PointingHand);
-                                        ui.painter().rect_filled(
-                                            restart_rect,
-                                            CornerRadius::same(5),
-                                            PRIMARY_BLUE,
-                                        );
-                                        ui.painter().text(
-                                            restart_rect.center(),
-                                            Align2::CENTER_CENTER,
-                                            "Restart Now",
-                                            Typo::SmallMedium.font(),
-                                            Color32::WHITE,
-                                        );
-                                        if restart_resp.clicked() {
-                                            if let Err(err) = restart_application(&exe_path) {
-                                                self.update_error = Some(err);
-                                            } else {
-                                                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                                            }
-                                        }
+                                        egui::Area::new(egui::Id::new("floating_toast_area"))
+                                            .order(egui::Order::Foreground)
+                                            .anchor(Align2::RIGHT_TOP, Vec2::new(-24.0, 24.0))
+                                            .show(ctx, |ui| {
+                                                egui::Frame::new()
+                                                    .fill(CARD_BG)
+                                                    .stroke(Stroke::new(1.0_f32, CARD_BORDER))
+                                                    .corner_radius(CornerRadius::same(R_MD as u8))
+                                                    .shadow(Shadow {
+                                                        offset: [0, 8],
+                                                        blur: 24,
+                                                        spread: 0,
+                                                        color: SHADOW_MODAL,
+                                                    })
+                                                    .inner_margin(Margin::symmetric(14, 10))
+                                                    .show(ui, |ui| {
+                                                        ui.set_max_width(420.0);
+                                                        ui.horizontal(|ui| {
+                                                            let (bar_rect, _) = ui.allocate_exact_size(Vec2::new(4.0, 24.0), Sense::hover());
+                                                            ui.painter().rect_filled(bar_rect, CornerRadius::same(2), bar_color);
+                                                            ui.add_space(SP_8);
+
+                                                            let (ic_rect, _) = ui.allocate_exact_size(Vec2::splat(16.0), Sense::hover());
+                                                            draw_outline_icon(ui.painter(), ic_rect.center(), icon, icon_color);
+                                                            ui.add_space(SP_8);
+
+                                                            ui.label(Typo::Body.rich(msg).color(TEXT_PRIMARY));
+
+                                                            if let Some((_, exe_path)) = self.pending_update_restart.clone() {
+                                                                ui.add_space(SP_8);
+                                                                if kit::button(
+                                                                    ui,
+                                                                    ButtonVariant::Primary,
+                                                                    ButtonSize::Sm,
+                                                                    "Restart now",
+                                                                    None,
+                                                                )
+                                                                .clicked()
+                                                                {
+                                                                    if let Err(err) = restart_application(&exe_path) {
+                                                                        self.update_error = Some(err);
+                                                                    } else {
+                                                                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            ui.add_space(SP_8);
+                                                            let (close_rect, close_resp) = ui.allocate_exact_size(Vec2::splat(16.0), Sense::click());
+                                                            let close_resp = close_resp.on_hover_cursor(egui::CursorIcon::PointingHand);
+                                                            let close_color = if close_resp.hovered() { TEXT_PRIMARY } else { TEXT_MUTED };
+                                                            let c = close_rect.center();
+                                                            let s = Stroke::new(1.5_f32, close_color);
+                                                            ui.painter().line_segment([Pos2::new(c.x - 3.5, c.y - 3.5), Pos2::new(c.x + 3.5, c.y + 3.5)], s);
+                                                            ui.painter().line_segment([Pos2::new(c.x + 3.5, c.y - 3.5), Pos2::new(c.x - 3.5, c.y + 3.5)], s);
+                                                            if close_resp.clicked() {
+                                                                self.status_banner = None;
+                                                                self.status_banner_time = None;
+                                                            }
+                                                        });
+                                                    });
+                                            });
                                     }
-                                    ui.add_space(12.0);
                                 }
 
                                 if self.storage.projects.is_empty()
