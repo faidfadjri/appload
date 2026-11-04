@@ -16,9 +16,11 @@ pub struct ShiplyApp {
 
     // Collapsible Console Output & Code Changes state
     pub(crate) console_collapsed: bool,
+    pub(crate) console_expanded_height: bool,
     pub(crate) changes_collapsed: bool,
     pub(crate) collapsed_step_indices: HashSet<usize>,
     pub(crate) dragged_step_idx: Option<usize>,
+    pub(crate) history_search_query: String,
 
     // Project Sorting & Grouping state
     pub(crate) project_sort_mode: ProjectSortMode,
@@ -196,9 +198,11 @@ impl ShiplyApp {
             last_edit_time: None,
             servers_edit_buffer: None,
             console_collapsed: false,
+            console_expanded_height: false,
             changes_collapsed: false,
             collapsed_step_indices: HashSet::new(),
             dragged_step_idx: None,
+            history_search_query: String::new(),
             project_sort_mode: ProjectSortMode::Custom,
             collapsed_project_groups: HashSet::new(),
             dragged_project_idx: None,

@@ -575,6 +575,7 @@ pub(crate) fn render_project_loading_indicator(ui: &mut egui::Ui, proj_name: &st
     render_project_workspace_skeleton(ui, proj_name);
 }
 
+#[allow(dead_code)]
 pub(crate) fn render_light_status_badge(ui: &mut egui::Ui, status: DeploymentStatus) {
     let (bg, fg) = status_pill_colors(status);
     let text = status.label().to_string();

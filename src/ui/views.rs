@@ -3600,104 +3600,97 @@ impl ShiplyApp {
             .count();
 
         // Section Header + Filter Pills + Clear History Button (Fixed 34px height)
-        let theme = self.theme();
         let mut trigger_clear_history = false;
-        horizontal_row(ui, 34.0, |ui| {
-            ui.label(
-                RichText::new("Deployment history")
-                    .typo(Typo::Label)
-                    .color(theme.text),
-            );
-
+        horizontal_row(ui, 36.0, |ui| {
             if is_project_view {
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.spacing_mut().item_spacing = Vec2::new(6.0, 0.0);
-                    if deletable_count > 0 {
-                        let show_label = ui.available_width() > 380.0;
-                        if outline_icon_button(
-                            ui,
-                            ("clear_proj_history_btn", project_filter.unwrap_or("all")),
-                            OutlineIcon::Trash,
-                            if show_label { Some("Clear History") } else { None },
-                            FAIL_PILL_TEXT,
-                            FAIL_PILL_BG,
-                            DANGER_SOFT,
-                            DANGER_SOFT,
-                            true,
-                        )
-                        .on_hover_text(format!(
-                            "Clear {deletable_count} completed/failed deployment record(s) for this environment"
-                        ))
-                        .clicked()
-                        {
-                            trigger_clear_history = true;
-                        }
+                let mut selected_idx = project_envs
+                    .iter()
+                    .position(|(_, k)| k == &self.selected_env_key)
+                    .unwrap_or(0);
+                let env_names: Vec<&str> =
+                    project_envs.iter().map(|(n, _)| n.as_str()).collect();
+                if !env_names.is_empty() && kit::segmented(ui, &mut selected_idx, &env_names) {
+                    if let Some((_, k)) = project_envs.get(selected_idx) {
+                        switched_env_key = Some(k.clone());
                     }
-                    for (env_name, env_key) in project_envs.iter().cloned().rev() {
-                        let is_active = self.selected_env_key == env_key;
-                        let btn = egui::Button::new(
-                            RichText::new(env_name).typo(Typo::SmallMedium).color(if is_active {
-                                theme.ink_fg
-                            } else {
-                                theme.text_muted
-                            }),
-                        )
-                        .fill(if is_active { theme.ink } else { theme.surface_2 })
-                        .stroke(Stroke::new(
-                            1.0_f32,
-                            if is_active { theme.ink } else { theme.border },
-                        ))
-                        .corner_radius(R_MD as u8);
-                        if ui.add(btn).clicked() {
-                            switched_env_key = Some(env_key);
-                        }
-                    }
-                });
+                }
             } else {
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.spacing_mut().item_spacing = Vec2::new(6.0, 0.0);
-                    if deletable_count > 0 {
-                        let show_label = ui.available_width() > 380.0;
-                        if outline_icon_button(
-                            ui,
-                            "clear_all_history_btn",
-                            OutlineIcon::Trash,
-                            if show_label { Some("Clear History") } else { None },
-                            FAIL_PILL_TEXT,
-                            FAIL_PILL_BG,
-                            DANGER_SOFT,
-                            DANGER_SOFT,
-                            true,
-                        )
-                        .on_hover_text(format!(
-                            "Clear {deletable_count} completed/failed deployment record(s) in current filter"
-                        ))
-                        .clicked()
-                        {
-                            trigger_clear_history = true;
-                        }
+                let mut selected_idx = if let Some(ref cur) = self.history_env_filter {
+                    filter_options
+                        .iter()
+                        .position(|(_, k)| k.as_ref() == Some(cur))
+                        .unwrap_or(0)
+                } else {
+                    0
+                };
+                let filter_labels: Vec<&str> =
+                    filter_options.iter().map(|(lbl, _)| lbl.as_str()).collect();
+                if !filter_labels.is_empty()
+                    && kit::segmented(ui, &mut selected_idx, &filter_labels)
+                {
+                    if let Some((_, opt_val)) = filter_options.get(selected_idx) {
+                        switched_history_filter = Some(opt_val.clone());
                     }
-                    for (label, filter_val) in filter_options.into_iter().rev() {
-                        let is_active = self.history_env_filter == filter_val;
-                        let btn = egui::Button::new(
-                            RichText::new(label).typo(Typo::SmallMedium).color(if is_active {
-                                theme.ink_fg
-                            } else {
-                                theme.text_muted
-                            }),
-                        )
-                        .fill(if is_active { theme.ink } else { theme.surface_2 })
-                        .stroke(Stroke::new(
-                            1.0_f32,
-                            if is_active { theme.ink } else { theme.border },
-                        ))
-                        .corner_radius(R_MD as u8);
-                        if ui.add(btn).clicked() {
-                            switched_history_filter = Some(filter_val);
-                        }
-                    }
-                });
+                }
             }
+
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                ui.spacing_mut().item_spacing = Vec2::new(8.0, 0.0);
+
+                // ⋯ Overflow menu button containing "Clear history…"
+                let more_id = ui.make_persistent_id("history_overflow_menu");
+                let more_resp = outline_icon_button(
+                    ui,
+                    ("history_more_btn", project_filter.unwrap_or("all")),
+                    OutlineIcon::MoreHorizontal,
+                    None,
+                    TEXT_PRIMARY,
+                    CARD_BG,
+                    SUBTLE_BG,
+                    CARD_BORDER,
+                    true,
+                )
+                .on_hover_text("More actions");
+
+                if more_resp.clicked() {
+                    ui.memory_mut(|m| m.toggle_popup(more_id));
+                }
+
+                egui::popup_below_widget(
+                    ui,
+                    more_id,
+                    &more_resp,
+                    egui::PopupCloseBehavior::CloseOnClick,
+                    |ui| {
+                        ui.set_min_width(140.0);
+                        let can_clear = deletable_count > 0;
+                        let clr_btn = egui::Button::new(
+                            RichText::new("Clear history…")
+                                .typo(Typo::SmallMedium)
+                                .color(if can_clear {
+                                    FAIL_PILL_TEXT
+                                } else {
+                                    TEXT_PLACEHOLDER
+                                }),
+                        )
+                        .fill(Color32::TRANSPARENT)
+                        .stroke(Stroke::NONE);
+                        if ui.add_enabled(can_clear, clr_btn).clicked() {
+                            trigger_clear_history = true;
+                            ui.memory_mut(|m| m.close_popup());
+                        }
+                    },
+                );
+
+                // Search/filter input
+                styled_text_edit(
+                    ui,
+                    "history_search_input",
+                    &mut self.history_search_query,
+                    160.0,
+                    Some("Filter deployments..."),
+                );
+            });
         });
 
         if trigger_clear_history && deletable_count > 0 {
@@ -3754,10 +3747,22 @@ impl ShiplyApp {
             self.history_env_filter.as_deref()
         };
 
+        let query = self.history_search_query.trim().to_lowercase();
         let filtered: Vec<DeploymentRecord> = self
             .storage
             .filter_deployments(project_filter, effective_env_filter, None)
             .into_iter()
+            .filter(|d| {
+                if query.is_empty() {
+                    true
+                } else {
+                    d.version.to_lowercase().contains(&query)
+                        || d.project_name.to_lowercase().contains(&query)
+                        || d.environment.to_lowercase().contains(&query)
+                        || d.git_branch.as_deref().unwrap_or("").to_lowercase().contains(&query)
+                        || d.git_commit.as_deref().unwrap_or("").to_lowercase().contains(&query)
+                }
+            })
             .cloned()
             .collect();
 
@@ -3766,7 +3771,7 @@ impl ShiplyApp {
         let mut delete_target: Option<DeploymentRecord> = None;
 
         let is_stacked_view =
-            ui.ctx().screen_rect().width() < 860.0 || ui.available_width() < 640.0;
+            ui.ctx().screen_rect().width() < 720.0 || ui.available_width() < 560.0;
         let total_count = filtered.len();
         let visible_count = total_count.min(self.history_visible_limit.max(5));
 
@@ -3774,18 +3779,21 @@ impl ShiplyApp {
         egui::Frame::new()
             .fill(CARD_BG)
             .stroke(Stroke::new(1.0_f32, CARD_BORDER))
-            .corner_radius(10.0)
-            .inner_margin(Margin::symmetric(20, 14))
+            .corner_radius(CornerRadius::same(8))
+            .inner_margin(Margin::symmetric(18, 14))
             .show(ui, |ui| {
-                let table_avail_w = ui.available_width();
-                // Fixed columns: STATUS (110) + ENV (80) + VERSION (95) + TIMESTAMP (155) + ACTIONS (~250)
-                let details_col_w =
-                    (table_avail_w - (110.0 + 80.0 + 95.0 + 155.0 + 250.0)).max(140.0);
+                // Fixed column widths: Status: 90, Version: 80, Branch: 120, Commit: 70, Deployed: 140, Trigger: 110, Actions: remaining
+                let col_status = 90.0;
+                let col_version = 80.0;
+                let col_branch = 120.0;
+                let col_commit = 70.0;
+                let col_deployed = 140.0;
+                let col_trigger = 110.0;
 
                 if !is_stacked_view {
-                    horizontal_row(ui, 22.0, |ui| {
+                    horizontal_row(ui, 24.0, |ui| {
                         ui.add_sized(
-                            [110.0, 20.0],
+                            [col_status, 20.0],
                             egui::Label::new(
                                 RichText::new("Status")
                                     .typo(Typo::Caption)
@@ -3793,13 +3801,7 @@ impl ShiplyApp {
                             ),
                         );
                         ui.add_sized(
-                            [80.0, 20.0],
-                            egui::Label::new(
-                                RichText::new("ENV").typo(Typo::Caption).color(TEXT_MUTED),
-                            ),
-                        );
-                        ui.add_sized(
-                            [95.0, 20.0],
+                            [col_version, 20.0],
                             egui::Label::new(
                                 RichText::new("Version")
                                     .typo(Typo::Caption)
@@ -3807,17 +3809,33 @@ impl ShiplyApp {
                             ),
                         );
                         ui.add_sized(
-                            [details_col_w, 20.0],
+                            [col_branch, 20.0],
                             egui::Label::new(
-                                RichText::new("Details & git changes")
+                                RichText::new("Branch")
                                     .typo(Typo::Caption)
                                     .color(TEXT_MUTED),
                             ),
                         );
                         ui.add_sized(
-                            [155.0, 20.0],
+                            [col_commit, 20.0],
                             egui::Label::new(
-                                RichText::new("Timestamp (local)")
+                                RichText::new("Commit")
+                                    .typo(Typo::Caption)
+                                    .color(TEXT_MUTED),
+                            ),
+                        );
+                        ui.add_sized(
+                            [col_deployed, 20.0],
+                            egui::Label::new(
+                                RichText::new("Deployed")
+                                    .typo(Typo::Caption)
+                                    .color(TEXT_MUTED),
+                            ),
+                        );
+                        ui.add_sized(
+                            [col_trigger, 20.0],
+                            egui::Label::new(
+                                RichText::new("Trigger / User")
                                     .typo(Typo::Caption)
                                     .color(TEXT_MUTED),
                             ),
@@ -3852,7 +3870,7 @@ impl ShiplyApp {
                 }
 
                 if is_stacked_view {
-                    // Mobile / narrow stacked card view (< 860px)
+                    // Mobile / narrow stacked card view (< 720px)
                     for (idx, dep) in filtered.iter().take(visible_count).enumerate() {
                         if idx > 0 {
                             draw_divider(ui, SUBTLE_BG);
@@ -3860,7 +3878,7 @@ impl ShiplyApp {
                         ui.add_space(6.0);
                         let is_selected = self.selected_deployment_id.as_deref() == Some(&dep.id);
 
-                        // Line 1: Status + Env + Version (left), Timestamp (right)
+                        // Line 1: Status + Env + Version (left), Deployed relative time (right)
                         horizontal_row(ui, 24.0, |ui| {
                             let (s_rect, _) =
                                 ui.allocate_exact_size(Vec2::new(96.0, 22.0), Sense::hover());
@@ -3871,7 +3889,7 @@ impl ShiplyApp {
                                 paint_running_pill_left_aligned(
                                     ui.painter(),
                                     Pos2::new(s_rect.left(), s_rect.center().y),
-                                    &dep.status.label().to_uppercase(),
+                                    dep.status.label(),
                                     s_bg,
                                     s_fg,
                                     time,
@@ -3880,7 +3898,7 @@ impl ShiplyApp {
                                 paint_pill_left_aligned(
                                     ui.painter(),
                                     Pos2::new(s_rect.left(), s_rect.center().y),
-                                    &dep.status.label().to_uppercase(),
+                                    dep.status.label(),
                                     s_bg,
                                     s_fg,
                                 );
@@ -3895,7 +3913,7 @@ impl ShiplyApp {
 
                             ui.label(
                                 RichText::new(format!("v{}", dep.version))
-                                    .typo(Typo::Label)
+                                    .typo(Typo::Mono)
                                     .color(TEXT_PRIMARY),
                             );
 
@@ -3908,8 +3926,9 @@ impl ShiplyApp {
                             }
 
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                                let rel = helpers::format_relative_time(dep.started_at);
                                 let ts_resp = ui.label(
-                                    RichText::new(dep.format_started_at_local("%Y-%m-%d %H:%M"))
+                                    RichText::new(rel)
                                         .typo(Typo::Small)
                                         .color(TEXT_MUTED),
                                 );
@@ -3928,7 +3947,7 @@ impl ShiplyApp {
 
                         ui.add_space(4.0);
 
-                        // Line 2: Git branch @ commit + git_changes / server summary
+                        // Line 2: Git branch @ commit
                         horizontal_row(ui, 20.0, |ui| {
                             let (icon_r, _) =
                                 ui.allocate_exact_size(Vec2::new(14.0, 14.0), Sense::hover());
@@ -3938,42 +3957,17 @@ impl ShiplyApp {
                                 TEXT_MUTED,
                             );
                             let git_line = match (&dep.git_branch, &dep.git_commit) {
-                                (Some(b), Some(c)) => format!("{b} @ {c}"),
+                                (Some(b), Some(c)) => {
+                                    let short = if c.len() > 7 { &c[..7] } else { c };
+                                    format!("{b} @ {short}")
+                                }
                                 _ => dep.project_name.clone(),
                             };
                             ui.label(
                                 RichText::new(git_line)
-                                    .typo(Typo::Small)
+                                    .typo(Typo::MonoSm)
                                     .color(TEXT_SECONDARY),
                             );
-
-                            let sub_detail = dep
-                                .git_changes
-                                .first()
-                                .cloned()
-                                .unwrap_or_else(|| dep.servers.join(", "));
-                            let max_chars = ((table_avail_w - 180.0) / 7.2).max(18.0) as usize;
-                            let truncated = if sub_detail.chars().count() > max_chars {
-                                let s: String = sub_detail
-                                    .chars()
-                                    .take(max_chars.saturating_sub(2))
-                                    .collect();
-                                format!("{s}…")
-                            } else {
-                                sub_detail
-                            };
-                            let det_resp = ui.label(
-                                RichText::new(format!("— {truncated}"))
-                                    .typo(Typo::Small)
-                                    .color(TEXT_MUTED),
-                            );
-                            if !dep.git_changes.is_empty() {
-                                det_resp.on_hover_text(format!(
-                                    "Code Changes in v{}:\n• {}",
-                                    dep.version,
-                                    dep.git_changes.join("\n• ")
-                                ));
-                            }
                         });
 
                         ui.add_space(6.0);
@@ -4003,11 +3997,7 @@ impl ShiplyApp {
                                     CARD_BORDER,
                                     can_delete,
                                 )
-                                .on_hover_text(if can_delete {
-                                    "Delete this deployment history record"
-                                } else {
-                                    "Cancel running deployment before deleting"
-                                })
+                                .on_hover_text("Delete this deployment record")
                                 .clicked()
                                     && can_delete
                                 {
@@ -4025,7 +4015,7 @@ impl ShiplyApp {
                                     CARD_BORDER,
                                     !is_busy,
                                 )
-                                .on_hover_text("Re-run this deployment version and pipeline")
+                                .on_hover_text("Re-run this deployment")
                                 .clicked()
                                     && !is_busy
                                 {
@@ -4074,20 +4064,20 @@ impl ShiplyApp {
 
                                 let logs_btn = egui::Button::new(
                                     RichText::new(if is_selected {
-                                        "Viewing Logs"
+                                        "Viewing log"
                                     } else {
-                                        "View Logs"
+                                        "View log"
                                     })
                                     .typo(Typo::SmallMedium)
-                                    .color(TEXT_PRIMARY),
+                                    .color(if is_selected { PRIMARY_BLUE } else { TEXT_PRIMARY }),
                                 )
                                 .fill(if is_selected {
-                                    PILL_CONTAINER_BG
+                                    BLUE_PILL_BG
                                 } else {
                                     SUBTLE_BG
                                 })
-                                .stroke(Stroke::new(1.0_f32, CARD_BORDER))
-                                .corner_radius(6.0);
+                                .stroke(Stroke::new(1.0_f32, if is_selected { PRIMARY_BLUE } else { CARD_BORDER }))
+                                .corner_radius(CornerRadius::same(6));
 
                                 if ui.add(logs_btn).clicked() {
                                     self.selected_deployment_id = Some(dep.id.clone());
@@ -4098,27 +4088,28 @@ impl ShiplyApp {
                         ui.add_space(6.0);
                     }
                 } else {
-                    // Desktop normal table (>= 860px, 48px row height)
+                    // Desktop table: Status: 90, Version: 80, Branch: 120, Commit: 70, Deployed: 140, Trigger: 110, Actions: remaining
                     for (idx, dep) in filtered.iter().take(visible_count).enumerate() {
                         if idx > 0 {
                             draw_divider(ui, SUBTLE_BG);
                         }
-                        ui.add_space(6.0);
+                        ui.add_space(4.0);
                         let is_selected = self.selected_deployment_id.as_deref() == Some(&dep.id);
-                        let row_h = TABLE_ROW_HEIGHT;
+                        let row_h = 42.0;
 
                         horizontal_row(ui, row_h, |ui| {
-                            // STATUS column
+                            // 1. Status (90px)
                             let (s_rect, _) =
-                                ui.allocate_exact_size(Vec2::new(110.0, row_h), Sense::hover());
+                                ui.allocate_exact_size(Vec2::new(col_status, row_h), Sense::hover());
                             let (s_bg, s_fg) = status_pill_colors(dep.status);
+                            let s_pos = Pos2::new(s_rect.left(), s_rect.center().y);
                             if dep.status == DeploymentStatus::Running {
                                 ui.ctx().request_repaint();
                                 let time = ui.input(|i| i.time);
                                 paint_running_pill_left_aligned(
                                     ui.painter(),
-                                    Pos2::new(s_rect.left(), s_rect.center().y),
-                                    &dep.status.label().to_uppercase(),
+                                    s_pos,
+                                    dep.status.label(),
                                     s_bg,
                                     s_fg,
                                     time,
@@ -4126,183 +4117,203 @@ impl ShiplyApp {
                             } else {
                                 paint_pill_left_aligned(
                                     ui.painter(),
-                                    Pos2::new(s_rect.left(), s_rect.center().y),
-                                    &dep.status.label().to_uppercase(),
+                                    s_pos,
+                                    dep.status.label(),
                                     s_bg,
                                     s_fg,
                                 );
                             }
 
-                            // ENV column
-                            let (e_rect, _) =
-                                ui.allocate_exact_size(Vec2::new(80.0, row_h), Sense::hover());
-                            let (_, env_fg) = env_pastel_pill_colors(&dep.environment);
-                            ui.painter().text(
-                                Pos2::new(e_rect.left(), e_rect.center().y),
-                                Align2::LEFT_CENTER,
-                                format_env_badge(&dep.environment),
-                                Typo::Body.font(),
-                                env_fg,
-                            );
-
-                            // VERSION column (+ ROLLBACK tag if rollback)
+                            // 2. Version (80px, MONO)
                             let (v_rect, _) =
-                                ui.allocate_exact_size(Vec2::new(95.0, row_h), Sense::hover());
+                                ui.allocate_exact_size(Vec2::new(col_version, row_h), Sense::hover());
                             ui.painter().text(
-                                Pos2::new(
-                                    v_rect.left(),
-                                    if dep.is_rollback {
-                                        v_rect.top() + 14.0
-                                    } else {
-                                        v_rect.center().y
-                                    },
-                                ),
+                                Pos2::new(v_rect.left(), v_rect.center().y),
                                 Align2::LEFT_CENTER,
                                 format!("v{}", dep.version),
-                                Typo::Body.font(),
+                                Typo::Mono.font(),
                                 TEXT_PRIMARY,
                             );
-                            if dep.is_rollback {
-                                ui.painter().text(
-                                    Pos2::new(v_rect.left(), v_rect.top() + 32.0),
-                                    Align2::LEFT_CENTER,
-                                    "Rollback",
-                                    Typo::Caption.font(),
-                                    WARN_PILL_TEXT,
-                                );
-                            }
 
-                            // DETAILS & GIT CHANGES column (Feature #10, responsive width)
-                            let (d_rect, d_resp) = ui.allocate_exact_size(
-                                Vec2::new(details_col_w, row_h),
-                                Sense::hover(),
-                            );
+                            // 3. Branch (120px, MONO, truncated with ellipsis)
+                            let (b_rect, b_resp) =
+                                ui.allocate_exact_size(Vec2::new(col_branch, row_h), Sense::hover());
                             draw_icon_git_branch(
                                 ui.painter(),
-                                Pos2::new(d_rect.left() + 6.0, d_rect.top() + 14.0),
+                                Pos2::new(b_rect.left() + 2.0, b_rect.center().y),
                                 TEXT_MUTED,
                             );
-                            let git_line = match (&dep.git_branch, &dep.git_commit) {
-                                (Some(b), Some(c)) => format!("{b} @ {c}"),
-                                _ => dep.project_name.clone(),
+                            let raw_branch = dep.git_branch.as_deref().unwrap_or("main");
+                            let max_b_chars = 11;
+                            let b_text = if raw_branch.chars().count() > max_b_chars {
+                                let truncated: String =
+                                    raw_branch.chars().take(max_b_chars.saturating_sub(1)).collect();
+                                format!("{truncated}…")
+                            } else {
+                                raw_branch.to_string()
                             };
-                            ui.painter().with_clip_rect(d_rect).text(
-                                Pos2::new(d_rect.left() + 18.0, d_rect.top() + 14.0),
+                            ui.painter().with_clip_rect(b_rect).text(
+                                Pos2::new(b_rect.left() + 16.0, b_rect.center().y),
                                 Align2::LEFT_CENTER,
-                                git_line,
+                                b_text,
+                                Typo::MonoSm.font(),
+                                TEXT_SECONDARY,
+                            );
+                            b_resp.on_hover_text(format!("Branch: {raw_branch}"));
+
+                            // 4. Commit (70px, MONO)
+                            let (c_rect, c_resp) =
+                                ui.allocate_exact_size(Vec2::new(col_commit, row_h), Sense::hover());
+                            let full_sha = dep.git_commit.as_deref().unwrap_or("-");
+                            let short_sha =
+                                if full_sha.len() > 7 { &full_sha[..7] } else { full_sha };
+                            ui.painter().text(
+                                Pos2::new(c_rect.left(), c_rect.center().y),
+                                Align2::LEFT_CENTER,
+                                short_sha,
+                                Typo::MonoSm.font(),
+                                TEXT_MUTED,
+                            );
+                            if full_sha != "-" {
+                                c_resp.on_hover_text(format!("Commit: {full_sha}"));
+                            }
+
+                            // 5. Deployed (140px, relative time + tooltip with full timestamp)
+                            let (t_rect, t_resp) =
+                                ui.allocate_exact_size(Vec2::new(col_deployed, row_h), Sense::hover());
+                            let rel_time = helpers::format_relative_time(dep.started_at);
+                            ui.painter().text(
+                                Pos2::new(t_rect.left(), t_rect.center().y),
+                                Align2::LEFT_CENTER,
+                                rel_time,
                                 Typo::Small.font(),
                                 TEXT_SECONDARY,
                             );
-
-                            // Second line in DETAILS: Latest commit subject or server list
-                            let sub_detail = dep
-                                .git_changes
-                                .first()
-                                .cloned()
-                                .unwrap_or_else(|| dep.servers.join(", "));
-                            let max_detail_chars =
-                                ((details_col_w - 16.0) / 6.8).max(18.0) as usize;
-                            let truncated_detail = if sub_detail.chars().count() > max_detail_chars
-                            {
-                                let s: String = sub_detail
-                                    .chars()
-                                    .take(max_detail_chars.saturating_sub(2))
-                                    .collect();
-                                format!("{s}…")
-                            } else {
-                                sub_detail
-                            };
-                            ui.painter().with_clip_rect(d_rect).text(
-                                Pos2::new(d_rect.left() + 6.0, d_rect.top() + 33.0),
-                                Align2::LEFT_CENTER,
-                                truncated_detail,
-                                Typo::Small.font(),
-                                TEXT_MUTED,
-                            );
-                            if !dep.git_changes.is_empty() {
-                                d_resp.on_hover_text(format!(
-                                    "Code Changes in v{}:\n• {}",
-                                    dep.version,
-                                    dep.git_changes.join("\n• ")
-                                ));
-                            }
-
-                            // TIMESTAMP column (Local Desktop Timezone)
-                            let (t_rect, t_resp) =
-                                ui.allocate_exact_size(Vec2::new(155.0, row_h), Sense::hover());
-                            ui.painter().text(
-                                Pos2::new(t_rect.left(), t_rect.top() + 14.0),
-                                Align2::LEFT_CENTER,
-                                dep.format_started_at_local("%Y-%m-%d %H:%M:%S"),
-                                Typo::Small.font(),
-                                TEXT_PRIMARY,
-                            );
-                            let dur_str = dep
-                                .duration_ms
-                                .map(|ms| format!("took {:.1}s", ms as f64 / 1000.0))
-                                .unwrap_or_else(|| "running...".to_string());
-                            ui.painter().text(
-                                Pos2::new(t_rect.left(), t_rect.top() + 33.0),
-                                Align2::LEFT_CENTER,
-                                dur_str,
-                                Typo::Small.font(),
-                                TEXT_MUTED,
-                            );
                             let mut hover_msg = format!(
-                                "Started (Local): {}",
+                                "Started: {}",
                                 dep.format_started_at_local("%Y-%m-%d %H:%M:%S %:z")
                             );
-                            if let Some(fin) = dep.format_finished_at_local("%Y-%m-%d %H:%M:%S %:z")
+                            if let Some(fin) =
+                                dep.format_finished_at_local("%Y-%m-%d %H:%M:%S %:z")
                             {
-                                hover_msg.push_str(&format!("\nFinished (Local): {fin}"));
+                                hover_msg.push_str(&format!("\nFinished: {fin}"));
+                            }
+                            if let Some(ms) = dep.duration_ms {
+                                hover_msg.push_str(&format!("\nDuration: {:.1}s", ms as f64 / 1000.0));
                             }
                             t_resp.on_hover_text(hover_msg);
 
-                            // ACTIONS column (Delete + Rollback + Re-run + View Logs) using outline icons
+                            // 6. Trigger / User (110px)
+                            let (u_rect, _) =
+                                ui.allocate_exact_size(Vec2::new(col_trigger, row_h), Sense::hover());
+                            let trigger_lbl = if dep.is_rollback {
+                                "Rollback"
+                            } else {
+                                "Manual"
+                            };
+                            ui.painter().text(
+                                Pos2::new(u_rect.left(), u_rect.center().y),
+                                Align2::LEFT_CENTER,
+                                trigger_lbl,
+                                Typo::Small.font(),
+                                TEXT_MUTED,
+                            );
+
+                            // 7. Actions (remaining width, right-aligned)
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                                 ui.spacing_mut().item_spacing = Vec2::new(6.0, 0.0);
                                 let is_busy =
                                     self.is_env_deploying(&dep.project_id, &dep.environment);
                                 let can_delete = dep.status != DeploymentStatus::Running;
 
-                                if outline_icon_button(
+                                // Row overflow menu "⋯"
+                                let row_more_id = ui.make_persistent_id(("row_more_menu", &dep.id));
+                                let row_more_resp = outline_icon_button(
                                     ui,
-                                    ("hist_del_dep_btn", &dep.id),
-                                    OutlineIcon::Trash,
+                                    ("row_more_btn", &dep.id),
+                                    OutlineIcon::MoreHorizontal,
                                     None,
-                                    FAIL_PILL_TEXT,
+                                    TEXT_PRIMARY,
+                                    CARD_BG,
                                     SUBTLE_BG,
-                                    FAIL_PILL_BG,
                                     CARD_BORDER,
-                                    can_delete,
+                                    true,
                                 )
-                                .on_hover_text(if can_delete {
-                                    "Delete this deployment history record"
-                                } else {
-                                    "Cancel running deployment before deleting"
-                                })
-                                .clicked()
-                                    && can_delete
-                                {
-                                    delete_target = Some(dep.clone());
+                                .on_hover_text("Row actions");
+
+                                if row_more_resp.clicked() {
+                                    ui.memory_mut(|m| m.toggle_popup(row_more_id));
                                 }
 
-                                if outline_icon_button(
+                                egui::popup_below_widget(
                                     ui,
-                                    ("hist_rerun_btn", &dep.id),
-                                    OutlineIcon::Refresh,
-                                    None,
-                                    TEXT_SECONDARY,
-                                    SUBTLE_BG,
-                                    PILL_CONTAINER_BG,
-                                    CARD_BORDER,
-                                    !is_busy,
-                                )
-                                .on_hover_text("Re-run this deployment version and pipeline")
-                                .clicked()
-                                    && !is_busy
-                                {
-                                    redeploy_target = Some((dep.clone(), false));
+                                    row_more_id,
+                                    &row_more_resp,
+                                    egui::PopupCloseBehavior::CloseOnClick,
+                                    |ui| {
+                                        ui.set_min_width(140.0);
+                                        if ui.button("Copy version").clicked() {
+                                            ui.ctx().copy_text(dep.version.clone());
+                                            ui.memory_mut(|m| m.close_popup());
+                                        }
+                                        let del_btn = egui::Button::new(
+                                            RichText::new("Delete record")
+                                                .typo(Typo::SmallMedium)
+                                                .color(if can_delete {
+                                                    FAIL_PILL_TEXT
+                                                } else {
+                                                    TEXT_PLACEHOLDER
+                                                }),
+                                        )
+                                        .fill(Color32::TRANSPARENT)
+                                        .stroke(Stroke::NONE);
+                                        if ui.add_enabled(can_delete, del_btn).clicked() {
+                                            delete_target = Some(dep.clone());
+                                            ui.memory_mut(|m| m.close_popup());
+                                        }
+                                    },
+                                );
+
+                                // Rollback / Redeploy button
+                                if dep.status == DeploymentStatus::Succeeded {
+                                    if outline_icon_button(
+                                        ui,
+                                        ("hist_rollback_btn", &dep.id),
+                                        OutlineIcon::RotateCcw,
+                                        Some("Rollback"),
+                                        WARN_PILL_TEXT,
+                                        WARN_PILL_BG,
+                                        WARNING_SOFT,
+                                        WARNING,
+                                        !is_busy,
+                                    )
+                                    .on_hover_text(format!(
+                                        "Rollback {} to v{}",
+                                        dep.environment, dep.version
+                                    ))
+                                    .clicked()
+                                        && !is_busy
+                                    {
+                                        redeploy_target = Some((dep.clone(), true));
+                                    }
+                                } else {
+                                    if outline_icon_button(
+                                        ui,
+                                        ("hist_rerun_btn", &dep.id),
+                                        OutlineIcon::Refresh,
+                                        None,
+                                        TEXT_SECONDARY,
+                                        SUBTLE_BG,
+                                        PILL_CONTAINER_BG,
+                                        CARD_BORDER,
+                                        !is_busy,
+                                    )
+                                    .on_hover_text("Re-run this deployment")
+                                    .clicked()
+                                        && !is_busy
+                                    {
+                                        redeploy_target = Some((dep.clone(), false));
+                                    }
                                 }
 
                                 if dep.status == DeploymentStatus::Running
@@ -4323,44 +4334,34 @@ impl ShiplyApp {
                                     cancel_target = Some(dep.id.clone());
                                 }
 
-                                if dep.status == DeploymentStatus::Succeeded
-                                    && outline_icon_button(
-                                        ui,
-                                        ("hist_rollback_btn", &dep.id),
-                                        OutlineIcon::RotateCcw,
-                                        Some("Rollback"),
-                                        WARN_PILL_TEXT,
-                                        WARN_PILL_BG,
-                                        WARNING_SOFT,
-                                        WARNING,
-                                        !is_busy,
-                                    )
-                                    .on_hover_text(format!(
-                                        "Rollback {} to v{}",
-                                        dep.environment, dep.version
-                                    ))
-                                    .clicked()
-                                    && !is_busy
-                                {
-                                    redeploy_target = Some((dep.clone(), true));
-                                }
-
+                                // View log button
                                 let logs_btn = egui::Button::new(
                                     RichText::new(if is_selected {
-                                        "Viewing Logs"
+                                        "Viewing log"
                                     } else {
-                                        "View Logs"
+                                        "View log"
                                     })
                                     .typo(Typo::SmallMedium)
-                                    .color(TEXT_PRIMARY),
+                                    .color(if is_selected {
+                                        PRIMARY_BLUE
+                                    } else {
+                                        TEXT_PRIMARY
+                                    }),
                                 )
                                 .fill(if is_selected {
-                                    PILL_CONTAINER_BG
+                                    BLUE_PILL_BG
                                 } else {
                                     SUBTLE_BG
                                 })
-                                .stroke(Stroke::new(1.0_f32, CARD_BORDER))
-                                .corner_radius(6.0);
+                                .stroke(Stroke::new(
+                                    1.0_f32,
+                                    if is_selected {
+                                        PRIMARY_BLUE
+                                    } else {
+                                        CARD_BORDER
+                                    },
+                                ))
+                                .corner_radius(CornerRadius::same(6));
 
                                 if ui.add(logs_btn).clicked() {
                                     self.selected_deployment_id = Some(dep.id.clone());
@@ -4368,7 +4369,7 @@ impl ShiplyApp {
                                 }
                             });
                         });
-                        ui.add_space(6.0);
+                        ui.add_space(4.0);
                     }
                 }
 
@@ -4474,43 +4475,21 @@ impl ShiplyApp {
                 .map(|p| p.name.clone())
         });
 
-        let code_changes_data: Option<(String, Vec<String>)> = if let Some(dep) = &selected_dep {
+        let code_changes_data: Option<Vec<String>> = if let Some(dep) = &selected_dep {
             if !dep.git_changes.is_empty() {
-                Some((
-                    format!(
-                        "CODE CHANGES — {} v{} ({} entry/entries)",
-                        dep.project_name,
-                        dep.version,
-                        dep.git_changes.len()
-                    ),
-                    dep.git_changes.clone(),
-                ))
-            } else if let Some(pname) = &active_project_name {
+                Some(dep.git_changes.clone())
+            } else if active_project_name.is_some() {
                 if !self.cached_git_changes.is_empty() {
-                    Some((
-                        format!(
-                            "CODE CHANGES — {} (Current Branch - {} entry/entries)",
-                            pname,
-                            self.cached_git_changes.len()
-                        ),
-                        self.cached_git_changes.clone(),
-                    ))
+                    Some(self.cached_git_changes.clone())
                 } else {
                     None
                 }
             } else {
                 None
             }
-        } else if let Some(pname) = &active_project_name {
+        } else if active_project_name.is_some() {
             if !self.cached_git_changes.is_empty() {
-                Some((
-                    format!(
-                        "CODE CHANGES — {} (Current Branch - {} entry/entries)",
-                        pname,
-                        self.cached_git_changes.len()
-                    ),
-                    self.cached_git_changes.clone(),
-                ))
+                Some(self.cached_git_changes.clone())
             } else {
                 None
             }
@@ -4518,14 +4497,14 @@ impl ShiplyApp {
             None
         };
 
-        if let Some((hdr_title, changes_lines)) = code_changes_data {
+        if let Some(changes_lines) = code_changes_data {
             egui::Frame::new()
                 .fill(CARD_BG)
                 .stroke(Stroke::new(1.0_f32, CARD_BORDER))
-                .corner_radius(10.0)
+                .corner_radius(CornerRadius::same(8))
                 .inner_margin(Margin::symmetric(18, 12))
                 .show(ui, |ui| {
-                    horizontal_row(ui, 26.0, |ui| {
+                    horizontal_row(ui, 28.0, |ui| {
                         let (chev_r, chev_resp) =
                             ui.allocate_exact_size(Vec2::new(18.0, 18.0), Sense::click());
                         let chev_resp = chev_resp.on_hover_cursor(egui::CursorIcon::PointingHand);
@@ -4535,34 +4514,63 @@ impl ShiplyApp {
                             !self.changes_collapsed,
                             TEXT_PRIMARY,
                         );
-                        draw_icon_git_branch(
-                            ui.painter(),
-                            Pos2::new(chev_r.right() + 10.0, chev_r.center().y),
-                            PRIMARY_BLUE,
+                        ui.add_space(8.0);
+                        let title_resp = ui.add(
+                            egui::Button::new(
+                                RichText::new("Code changes since last deploy")
+                                    .typo(Typo::Label)
+                                    .color(TEXT_PRIMARY),
+                            )
+                            .fill(Color32::TRANSPARENT)
+                            .stroke(Stroke::NONE),
                         );
-                        ui.add_space(18.0);
-                        let hdr_btn = egui::Button::new(
-                            RichText::new(&hdr_title)
-                                .typo(Typo::SmallMedium)
-                                .color(TEXT_PRIMARY),
-                        )
-                        .fill(Color32::TRANSPARENT)
-                        .stroke(Stroke::NONE);
-                        if chev_resp.clicked() || ui.add(hdr_btn).clicked() {
+                        ui.add_space(6.0);
+                        let count_str = format!("{} file(s) modified", changes_lines.len());
+                        render_pill(ui, &count_str, WARN_PILL_BG, WARN_PILL_TEXT);
+
+                        if chev_resp.clicked() || title_resp.clicked() {
                             self.changes_collapsed = !self.changes_collapsed;
                         }
                     });
 
                     if !self.changes_collapsed {
-                        ui.add_space(6.0);
+                        ui.add_space(8.0);
                         draw_divider(ui, SUBTLE_BG);
-                        ui.add_space(6.0);
-                        for change_line in &changes_lines {
-                            ui.label(
-                                RichText::new(format!("• {change_line}"))
-                                    .typo(Typo::Small)
-                                    .color(TEXT_SECONDARY),
-                            );
+                        ui.add_space(8.0);
+                        for line in &changes_lines {
+                            let trimmed = line.trim();
+                            let (status_char, path, char_color) =
+                                if let Some(rest) = trimmed.strip_prefix("M ") {
+                                    ("M", rest, WARNING)
+                                } else if let Some(rest) = trimmed.strip_prefix("A ") {
+                                    ("A", rest, SUCCESS)
+                                } else if let Some(rest) = trimmed.strip_prefix("D ") {
+                                    ("D", rest, DANGER)
+                                } else if let Some(rest) = trimmed.strip_prefix("?? ") {
+                                    ("?", rest, TEXT_MUTED)
+                                } else if let Some(rest) = trimmed.strip_prefix("? ") {
+                                    ("?", rest, TEXT_MUTED)
+                                } else {
+                                    ("•", trimmed, PRIMARY_BLUE)
+                                };
+
+                            ui.horizontal(|ui| {
+                                ui.add_space(8.0);
+                                let (badge_r, _) =
+                                    ui.allocate_exact_size(Vec2::new(16.0, 18.0), Sense::hover());
+                                ui.painter().text(
+                                    badge_r.center(),
+                                    Align2::CENTER_CENTER,
+                                    status_char,
+                                    Typo::MonoSm.font(),
+                                    char_color,
+                                );
+                                ui.label(
+                                    RichText::new(path)
+                                        .typo(Typo::MonoSm)
+                                        .color(TEXT_SECONDARY),
+                                );
+                            });
                         }
                     }
                 });
@@ -4570,140 +4578,18 @@ impl ShiplyApp {
         }
 
         if let Some(dep) = selected_dep {
-            // Collapsible CONSOLE OUTPUT Section (Fixed 32px header row, responsive to width)
-            let console_hdr_w = ui.available_width();
-            let compact_console_hdr = console_hdr_w < 680.0;
-            horizontal_row(ui, 32.0, |ui| {
-                let (chev_r, chev_resp) =
-                    ui.allocate_exact_size(Vec2::new(18.0, 18.0), Sense::click());
-                let chev_resp = chev_resp.on_hover_cursor(egui::CursorIcon::PointingHand);
-                draw_icon_chevron(
-                    ui.painter(),
-                    chev_r.center(),
-                    !self.console_collapsed,
-                    TEXT_PRIMARY,
-                );
-                let title_resp = ui.add(
-                    egui::Button::new(
-                        RichText::new("Console output")
-                            .typo(Typo::Label)
-                            .color(TEXT_PRIMARY),
-                    )
-                    .fill(Color32::TRANSPARENT)
-                    .stroke(Stroke::NONE),
-                );
-                if chev_resp.clicked() || title_resp.clicked() {
-                    self.console_collapsed = !self.console_collapsed;
-                }
-
-                if !compact_console_hdr {
-                    ui.label(
-                        RichText::new(format!(
-                            "— {} ({}) v{}",
-                            dep.project_name,
-                            format_env_badge(&dep.environment),
-                            dep.version
-                        ))
-                        .typo(Typo::SmallMedium)
-                        .color(TEXT_MUTED),
-                    );
-                } else {
-                    ui.label(
-                        RichText::new(format!("v{}", dep.version))
-                            .typo(Typo::SmallMedium)
-                            .color(TEXT_MUTED),
-                    );
-                }
-                render_light_status_badge(ui, dep.status);
-
-                if dep.status == DeploymentStatus::Running || self.is_deployment_active(&dep.id) {
-                    ui.add_space(8.0);
-                    ui.ctx().request_repaint();
-                    let time = ui.input(|i| i.time);
-                    let (spin_r, _) = ui.allocate_exact_size(Vec2::new(14.0, 14.0), Sense::hover());
-                    draw_circle_loading_spinner(
-                        ui.painter(),
-                        spin_r.center(),
-                        5.0,
-                        PRIMARY_BLUE,
-                        time,
-                    );
-                    if !compact_console_hdr {
-                        ui.label(
-                            RichText::new("Pipeline running...")
-                                .typo(Typo::SmallMedium)
-                                .color(PRIMARY_BLUE),
-                        );
-                    }
-                }
-
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    let toggle_lbl = if compact_console_hdr {
-                        if self.console_collapsed {
-                            "Expand"
-                        } else {
-                            "Collapse"
-                        }
-                    } else if self.console_collapsed {
-                        "Expand Console"
-                    } else {
-                        "Collapse Console"
-                    };
-                    let btn = egui::Button::new(
-                        RichText::new(toggle_lbl)
-                            .typo(Typo::SmallMedium)
-                            .color(TEXT_SECONDARY),
-                    )
-                    .fill(CARD_BG)
-                    .stroke(Stroke::new(1.0_f32, CARD_BORDER));
-                    if ui.add(btn).clicked() {
-                        self.console_collapsed = !self.console_collapsed;
-                    }
-
-                    if !self.console_collapsed && !dep.step_logs.is_empty() {
-                        let all_steps_collapsed =
-                            self.collapsed_step_indices.len() >= dep.step_logs.len();
-                        let steps_btn_lbl = if compact_console_hdr {
-                            if all_steps_collapsed {
-                                "Expand Steps"
-                            } else {
-                                "Collapse Steps"
-                            }
-                        } else if all_steps_collapsed {
-                            "Expand All Steps"
-                        } else {
-                            "Collapse All Steps"
-                        };
-                        let steps_btn = egui::Button::new(
-                            RichText::new(steps_btn_lbl)
-                                .typo(Typo::SmallMedium)
-                                .color(TEXT_SECONDARY),
-                        )
-                        .fill(CARD_BG)
-                        .stroke(Stroke::new(1.0_f32, CARD_BORDER));
-                        if ui.add(steps_btn).clicked() {
-                            if all_steps_collapsed {
-                                self.collapsed_step_indices.clear();
-                            } else {
-                                self.collapsed_step_indices = (0..dep.step_logs.len()).collect();
-                            }
-                        }
-                    }
-                });
-            });
-
-            if !self.console_collapsed {
-                ui.add_space(10.0);
-                self.render_terminal_window(ui, &dep);
-            }
+            self.render_terminal_window(ui, &dep);
         }
     }
 
     pub(crate) fn render_terminal_window(&mut self, ui: &mut egui::Ui, dep: &DeploymentRecord) {
+        let is_running = dep.status == DeploymentStatus::Running || self.is_deployment_active(&dep.id);
+        let term_h = if self.console_expanded_height { 480.0 } else { 260.0 };
+
         egui::Frame::new()
-            .fill(TERM_BODY_BG)
+            .fill(SB_BG)
             .stroke(Stroke::new(1.0_f32, SB_BORDER_LINE))
-            .corner_radius(10.0)
+            .corner_radius(CornerRadius::same(8))
             .shadow(Shadow {
                 offset: [0, 4],
                 blur: 12,
@@ -4712,210 +4598,280 @@ impl ShiplyApp {
             })
             .show(ui, |ui| {
                 let avail_w = ui.available_width();
+
+                // Header (36px): "Deployment log" + running spinner or status pill + Copy log + Clear + expand/collapse toggle
                 let (top_rect, _) =
                     ui.allocate_exact_size(Vec2::new(avail_w, 36.0), Sense::hover());
                 ui.painter().rect_filled(
                     top_rect,
                     CornerRadius {
-                        nw: 10,
-                        ne: 10,
+                        nw: 8,
+                        ne: 8,
                         sw: 0,
                         se: 0,
                     },
                     TERM_HEADER_BG,
                 );
-                let mut dot_x = top_rect.left() + 18.0;
+
+                // Decorative dots
+                let mut dot_x = top_rect.left() + 16.0;
                 for dot_color in [TERM_RED, TERM_YELLOW, TERM_GREEN] {
                     ui.painter().circle_filled(
                         Pos2::new(dot_x, top_rect.center().y),
-                        5.0,
+                        4.5,
                         dot_color,
                     );
-                    dot_x += 16.0;
+                    dot_x += 14.0;
                 }
+
+                // Title: Deployment log
                 ui.painter().text(
                     Pos2::new(dot_x + 8.0, top_rect.center().y),
                     Align2::LEFT_CENTER,
-                    "Terminal output",
-                    Typo::Caption.font(),
-                    SIDEBAR_TEXT_MUTED,
+                    "Deployment log",
+                    Typo::Label.font(),
+                    Color32::WHITE,
                 );
 
-                if dep.status == DeploymentStatus::Running || self.is_deployment_active(&dep.id) {
-                    ui.ctx().request_repaint();
-                    let time = ui.input(|i| i.time);
-                    let running_lbl_galley = ui.painter().layout_no_wrap(
-                        "Running pipeline".to_string(),
-                        Typo::Caption.font(),
-                        SB_ACCENT,
-                    );
-                    let r_text_w = running_lbl_galley.size().x;
-                    let r_spinner_r = 4.2;
-                    let r_spinner_x = top_rect.right() - 20.0 - r_text_w - 8.0 - r_spinner_r;
-                    let r_spinner_c = Pos2::new(r_spinner_x, top_rect.center().y);
+                // Right controls in header
+                let mut child = ui.new_child(
+                    egui::UiBuilder::new()
+                        .id_salt("term_header_controls")
+                        .max_rect(top_rect.shrink2(Vec2::new(12.0, 0.0)))
+                        .layout(Layout::right_to_left(Align::Center)),
+                );
+
+                // Expand / Collapse height toggle
+                let height_toggle_lbl = if self.console_expanded_height {
+                    "Compact 260px"
+                } else {
+                    "Expand 480px"
+                };
+                let h_btn = egui::Button::new(
+                    RichText::new(height_toggle_lbl)
+                        .typo(Typo::Small)
+                        .color(SB_TEXT_MUTED),
+                )
+                .fill(Color32::TRANSPARENT)
+                .stroke(Stroke::NONE);
+                if child.add(h_btn).clicked() {
+                    self.console_expanded_height = !self.console_expanded_height;
+                }
+
+                child.add_space(8.0);
+
+                // Clear button
+                let clr_btn = egui::Button::new(
+                    RichText::new("Clear")
+                        .typo(Typo::Small)
+                        .color(SB_TEXT_MUTED),
+                )
+                .fill(Color32::TRANSPARENT)
+                .stroke(Stroke::NONE);
+                if child.add(clr_btn).on_hover_text("Close log console").clicked() {
+                    self.selected_deployment_id = None;
+                    self.console_collapsed = true;
+                }
+
+                child.add_space(8.0);
+
+                // Copy log button
+                let copy_btn = egui::Button::new(
+                    RichText::new("Copy log")
+                        .typo(Typo::Small)
+                        .color(Color32::WHITE),
+                )
+                .fill(SB_SURFACE_HOVER)
+                .stroke(Stroke::new(1.0_f32, SB_BORDER_LINE))
+                .corner_radius(CornerRadius::same(4));
+
+                if child.add(copy_btn).on_hover_text("Copy full log to clipboard").clicked() {
+                    let mut full_log = String::new();
+                    for step in &dep.step_logs {
+                        full_log.push_str(&format!("[{}] {}\n", step.status.label(), step.step_name));
+                        full_log.push_str(&format!("$ {}\n", step.command_summary));
+                        full_log.push_str(&step.output);
+                        full_log.push('\n');
+                    }
+                    child.ctx().copy_text(full_log);
+                    self.set_status_banner("Copied deployment log to clipboard".to_string(), false);
+                }
+
+                child.add_space(8.0);
+
+                // Running spinner or status pill
+                if is_running {
+                    child.ctx().request_repaint();
+                    let time = child.input(|i| i.time);
+                    let (spin_r, _) = child.allocate_exact_size(Vec2::new(14.0, 14.0), Sense::hover());
                     draw_circle_loading_spinner(
-                        ui.painter(),
-                        r_spinner_c,
-                        r_spinner_r,
+                        child.painter(),
+                        spin_r.center(),
+                        4.5,
                         SB_ACCENT,
                         time,
                     );
-                    ui.painter().galley(
-                        Pos2::new(
-                            r_spinner_x + r_spinner_r + 6.0,
-                            top_rect.center().y - running_lbl_galley.size().y / 2.0,
-                        ),
-                        running_lbl_galley,
-                        SB_ACCENT,
+                    child.label(
+                        RichText::new("Running...")
+                            .typo(Typo::Small)
+                            .color(SB_ACCENT),
                     );
+                } else {
+                    let (s_bg, s_fg) = status_pill_colors(dep.status);
+                    render_pill(&mut child, dep.status.label(), s_bg, s_fg);
                 }
 
+                // Terminal Body: Monospace, auto-scroll when running, height 260px / 480px
                 egui::Frame::new()
-                    .fill(TERM_BODY_BG)
+                    .fill(SB_BG)
                     .corner_radius(CornerRadius {
                         nw: 0,
                         ne: 0,
-                        sw: 10,
-                        se: 10,
+                        sw: 8,
+                        se: 8,
                     })
-                    .inner_margin(Margin::symmetric(20, 16))
+                    .inner_margin(Margin::symmetric(16, 12))
                     .show(ui, |ui| {
                         ui.set_width(ui.available_width());
-                        if dep.step_logs.is_empty() {
-                            ui.label(
-                                RichText::new("Initializing deployment pipeline...")
-                                    .typo(Typo::Small)
-                                    .color(SIDEBAR_TEXT_MUTED),
-                            );
-                        }
 
-                        for (i, step_log) in dep.step_logs.iter().enumerate() {
-                            let is_step_collapsed = self.collapsed_step_indices.contains(&i);
-                            let color = match step_log.status {
-                                DeploymentStatus::Succeeded => TERM_GREEN,
-                                DeploymentStatus::Failed => TERM_RED,
-                                DeploymentStatus::Running => TERM_YELLOW,
-                                DeploymentStatus::Cancelled => SIDEBAR_TEXT_MUTED,
-                            };
-
-                            let step_resp = horizontal_row(ui, 24.0, |ui| {
-                                let (ic_r, _) =
-                                    ui.allocate_exact_size(Vec2::new(14.0, 14.0), Sense::hover());
-                                if step_log.status == DeploymentStatus::Succeeded {
-                                    draw_icon_check(ui.painter(), ic_r.center(), color);
-                                } else if step_log.status == DeploymentStatus::Running {
-                                    ui.ctx().request_repaint();
-                                    let time = ui.input(|i| i.time);
-                                    draw_circle_loading_spinner(
-                                        ui.painter(),
-                                        ic_r.center(),
-                                        4.8,
-                                        color,
-                                        time,
-                                    );
-                                } else {
-                                    ui.painter().circle_filled(ic_r.center(), 4.5, color);
-                                }
-
-                                ui.label(
-                                    RichText::new(format!(
-                                        "[{}/{}] {}",
-                                        i + 1,
-                                        dep.step_logs.len(),
-                                        step_log.step_name
-                                    ))
-                                    .typo(Typo::Label)
-                                    .color(color),
-                                );
-                                ui.label(
-                                    RichText::new(format!("({} ms)", step_log.duration_ms))
-                                        .typo(Typo::Small)
-                                        .color(SB_TEXT_FAINT),
-                                );
-
-                                let (ch_r, _) =
-                                    ui.allocate_exact_size(Vec2::new(14.0, 14.0), Sense::hover());
-                                draw_icon_chevron(
-                                    ui.painter(),
-                                    ch_r.center(),
-                                    !is_step_collapsed,
-                                    SB_TEXT_FAINT,
-                                );
-                            })
-                            .response
-                            .interact(Sense::click())
-                            .on_hover_cursor(egui::CursorIcon::PointingHand);
-
-                            if step_resp
-                                .on_hover_text("Click to collapse or expand this step")
-                                .clicked()
-                            {
-                                if is_step_collapsed {
-                                    self.collapsed_step_indices.remove(&i);
-                                } else {
-                                    self.collapsed_step_indices.insert(i);
-                                }
-                            }
-
-                            if !is_step_collapsed {
-                                ui.indent(format!("term_step_indent_{i}"), |ui| {
+                        egui::ScrollArea::vertical()
+                            .max_height(term_h)
+                            .stick_to_bottom(is_running)
+                            .show(ui, |ui| {
+                                if dep.step_logs.is_empty() {
                                     ui.label(
-                                        RichText::new(format!("$ {}", step_log.command_summary))
-                                            .typo(Typo::Small)
-                                            .color(SB_TEXT_FAINT),
+                                        RichText::new("Initializing deployment pipeline...")
+                                            .typo(Typo::Code)
+                                            .color(SIDEBAR_TEXT_MUTED),
                                     );
-                                    for line in step_log.output.lines() {
-                                        let trimmed = line.trim();
-                                        let line_color = if trimmed.starts_with("[OK]")
-                                            || trimmed.starts_with("Updated ")
-                                        {
-                                            TERM_GREEN
-                                        } else if trimmed.starts_with("[FAILED]")
-                                            || trimmed.starts_with("[ERROR]")
-                                        {
-                                            TERM_RED
-                                        } else {
-                                            SB_TEXT
-                                        };
-                                        ui.label(
-                                            RichText::new(trimmed)
-                                                .typo(Typo::Small)
-                                                .color(line_color),
-                                        );
-                                    }
-                                });
-                            }
-                            ui.add_space(10.0);
-                        }
+                                }
 
-                        if dep.status == DeploymentStatus::Running
-                            || self.is_deployment_active(&dep.id)
-                        {
-                            ui.add_space(4.0);
-                            horizontal_row(ui, 24.0, |ui| {
-                                let (ic_r, _) =
-                                    ui.allocate_exact_size(Vec2::new(14.0, 14.0), Sense::hover());
-                                ui.ctx().request_repaint();
-                                let time = ui.input(|i| i.time);
-                                draw_circle_loading_spinner(
-                                    ui.painter(),
-                                    ic_r.center(),
-                                    5.0,
-                                    SB_ACCENT,
-                                    time,
-                                );
-                                let active_step_name = dep
-                                    .step_logs
-                                    .last()
-                                    .map(|s| s.step_name.as_str())
-                                    .unwrap_or("Running pipeline");
-                                ui.label(
-                                    RichText::new(format!("Executing: {active_step_name}..."))
-                                        .typo(Typo::Body)
-                                        .color(SB_ACCENT),
-                                );
+                                for (i, step_log) in dep.step_logs.iter().enumerate() {
+                                    let is_step_collapsed = self.collapsed_step_indices.contains(&i);
+                                    let color = match step_log.status {
+                                        DeploymentStatus::Succeeded => TERM_GREEN,
+                                        DeploymentStatus::Failed => TERM_RED,
+                                        DeploymentStatus::Running => TERM_YELLOW,
+                                        DeploymentStatus::Cancelled => SIDEBAR_TEXT_MUTED,
+                                    };
+
+                                    let step_resp = horizontal_row(ui, 24.0, |ui| {
+                                        let (ic_r, _) =
+                                            ui.allocate_exact_size(Vec2::new(14.0, 14.0), Sense::hover());
+                                        if step_log.status == DeploymentStatus::Succeeded {
+                                            draw_icon_check(ui.painter(), ic_r.center(), color);
+                                        } else if step_log.status == DeploymentStatus::Running {
+                                            ui.ctx().request_repaint();
+                                            let time = ui.input(|i| i.time);
+                                            draw_circle_loading_spinner(
+                                                ui.painter(),
+                                                ic_r.center(),
+                                                4.5,
+                                                color,
+                                                time,
+                                            );
+                                        } else {
+                                            ui.painter().circle_filled(ic_r.center(), 4.0, color);
+                                        }
+
+                                        ui.label(
+                                            RichText::new(format!(
+                                                "[{}/{}] {}",
+                                                i + 1,
+                                                dep.step_logs.len(),
+                                                step_log.step_name
+                                            ))
+                                            .typo(Typo::SmallMedium)
+                                            .color(color),
+                                        );
+                                        ui.label(
+                                            RichText::new(format!("({} ms)", step_log.duration_ms))
+                                                .typo(Typo::Code)
+                                                .color(SB_TEXT_FAINT),
+                                        );
+
+                                        let (ch_r, _) =
+                                            ui.allocate_exact_size(Vec2::new(14.0, 14.0), Sense::hover());
+                                        draw_icon_chevron(
+                                            ui.painter(),
+                                            ch_r.center(),
+                                            !is_step_collapsed,
+                                            SB_TEXT_FAINT,
+                                        );
+                                    })
+                                    .response
+                                    .interact(Sense::click())
+                                    .on_hover_cursor(egui::CursorIcon::PointingHand);
+
+                                    if step_resp
+                                        .on_hover_text("Click to collapse or expand this step")
+                                        .clicked()
+                                    {
+                                        if is_step_collapsed {
+                                            self.collapsed_step_indices.remove(&i);
+                                        } else {
+                                            self.collapsed_step_indices.insert(i);
+                                        }
+                                    }
+
+                                    if !is_step_collapsed {
+                                        ui.indent(format!("term_step_indent_{i}"), |ui| {
+                                            ui.label(
+                                                RichText::new(format!("$ {}", step_log.command_summary))
+                                                    .typo(Typo::Code)
+                                                    .color(SB_TEXT_FAINT),
+                                            );
+                                            for line in step_log.output.lines() {
+                                                let trimmed = line.trim();
+                                                let line_color = if trimmed.starts_with("[OK]")
+                                                    || trimmed.starts_with("Updated ")
+                                                {
+                                                    TERM_GREEN
+                                                } else if trimmed.starts_with("[FAILED]")
+                                                    || trimmed.starts_with("[ERROR]")
+                                                {
+                                                    TERM_RED
+                                                } else {
+                                                    SB_TEXT
+                                                };
+                                                ui.label(
+                                                    RichText::new(trimmed)
+                                                        .typo(Typo::Code)
+                                                        .color(line_color),
+                                                );
+                                            }
+                                        });
+                                    }
+                                    ui.add_space(8.0);
+                                }
+
+                                if is_running {
+                                    ui.add_space(4.0);
+                                    horizontal_row(ui, 24.0, |ui| {
+                                        let (ic_r, _) =
+                                            ui.allocate_exact_size(Vec2::new(14.0, 14.0), Sense::hover());
+                                        ui.ctx().request_repaint();
+                                        let time = ui.input(|i| i.time);
+                                        draw_circle_loading_spinner(
+                                            ui.painter(),
+                                            ic_r.center(),
+                                            4.5,
+                                            SB_ACCENT,
+                                            time,
+                                        );
+                                        let active_step_name = dep
+                                            .step_logs
+                                            .last()
+                                            .map(|s| s.step_name.as_str())
+                                            .unwrap_or("Running pipeline");
+                                        ui.label(
+                                            RichText::new(format!("Executing: {active_step_name}..."))
+                                                .typo(Typo::Code)
+                                                .color(SB_ACCENT),
+                                        );
+                                    });
+                                }
                             });
-                        }
                     });
             });
     }
