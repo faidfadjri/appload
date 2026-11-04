@@ -98,6 +98,14 @@ pub struct ShiplyApp {
     pub(crate) cred_guide_target_input: String,
     pub(crate) cred_guide_user_input: String,
 
+    // Secret Management (OS Credential Manager) state
+    pub(crate) secret_form_key: String,
+    pub(crate) secret_form_username: String,
+    pub(crate) secret_form_value: String,
+    pub(crate) secret_form_description: String,
+    pub(crate) secret_form_editing_existing: bool,
+    pub(crate) secret_search_query: String,
+
     // In-App GitHub Releases Auto-Updater state
     pub(crate) updater_tx: Sender<UpdaterEvent>,
     pub(crate) updater_rx: Receiver<UpdaterEvent>,
@@ -230,6 +238,12 @@ impl ShiplyApp {
             },
             cred_guide_target_input: "prod-ssh-server".to_string(),
             cred_guide_user_input: "deploy".to_string(),
+            secret_form_key: String::new(),
+            secret_form_username: String::new(),
+            secret_form_value: String::new(),
+            secret_form_description: String::new(),
+            secret_form_editing_existing: false,
+            secret_search_query: String::new(),
             updater_tx,
             updater_rx,
             show_update_modal: false,
@@ -263,8 +277,87 @@ impl ShiplyApp {
         if let Some(notice) = migration_notice {
             app.status_banner = Some((notice, true));
         }
+        app.storage.sync_project_vault_targets_to_secrets();
         app.refresh_selected_project_metadata(true);
         app
+    }
+
+    /// Saves the secret currently in the Secret Management form directly to the OS Credential Manager
+    /// and updates the non-sensitive metadata in `AppStorage`.
+    pub fn save_secret_to_os_vault(&mut self) -> Result<String, String> {
+        let key = self.secret_form_key.trim().to_string();
+        if key.is_empty() {
+            return Err("Secret Name / Target Key cannot be empty.".to_string());
+        }
+        if self.secret_form_value.is_empty() {
+            return Err("Secret Value / Password cannot be empty.".to_string());
+        }
+
+        let username_opt = {
+            let u = self.secret_form_username.trim();
+            if u.is_empty() {
+                None
+            } else {
+                Some(u.to_string())
+            }
+        };
+
+        write_os_vault_credential(&key, username_opt.as_deref(), &self.secret_form_value)?;
+
+        let entry = SecretEntry::new(
+            key.clone(),
+            username_opt,
+            self.secret_form_description.trim(),
+        );
+        self.storage.upsert_secret_metadata(entry);
+
+        // Wipe plaintext secret value from memory immediately after storing in OS Vault
+        self.secret_form_value.clear();
+        self.secret_form_key.clear();
+        self.secret_form_username.clear();
+        self.secret_form_description.clear();
+        self.secret_form_editing_existing = false;
+
+        self.refresh_selected_project_metadata(false);
+        let msg = format!("Saved secret '{key}' to OS Credential Manager.");
+        self.status_banner = Some((msg.clone(), true));
+        Ok(msg)
+    }
+
+    /// Removes a secret from both the OS Credential Manager and `AppStorage` metadata.
+    pub fn delete_secret_from_os_vault(&mut self, key: &str) -> Result<(), String> {
+        let trimmed = key.trim();
+        let res = delete_os_vault_credential(trimmed);
+        self.storage.remove_secret_metadata(trimmed);
+        self.refresh_selected_project_metadata(false);
+        match res {
+            Ok(()) => {
+                self.status_banner = Some((
+                    format!("Deleted secret '{trimmed}' from OS Credential Manager."),
+                    true,
+                ));
+                Ok(())
+            }
+            Err(err) => {
+                self.status_banner = Some((err.clone(), false));
+                Err(err)
+            }
+        }
+    }
+
+    /// Opens the Secret Management page with the form pre-filled for creating or updating a specific secret key.
+    pub fn open_secret_management_for_target(
+        &mut self,
+        key: &str,
+        username: &str,
+        description: &str,
+    ) {
+        self.secret_form_key = key.trim().to_string();
+        self.secret_form_username = username.trim().to_string();
+        self.secret_form_description = description.trim().to_string();
+        self.secret_form_value.clear();
+        self.secret_form_editing_existing = !self.secret_form_key.is_empty();
+        self.selection = SidebarSelection::SecretManagement;
     }
 
     pub fn theme(&self) -> Theme {
@@ -596,7 +689,7 @@ impl ShiplyApp {
                                 self.selected_env_key == record.environment
                             }
                         }
-                        SidebarSelection::AllDeployments => {
+                        SidebarSelection::AllDeployments | SidebarSelection::SecretManagement => {
                             if let Some(sel_id) = &self.selected_deployment_id {
                                 sel_id == &record.id
                             } else {
@@ -642,7 +735,7 @@ impl ShiplyApp {
                                 self.selected_env_key == record.environment
                             }
                         }
-                        SidebarSelection::AllDeployments => {
+                        SidebarSelection::AllDeployments | SidebarSelection::SecretManagement => {
                             if let Some(sel_id) = &self.selected_deployment_id {
                                 sel_id == &record.id
                             } else {
@@ -1419,12 +1512,17 @@ impl eframe::App for ShiplyApp {
                                     ui.add_space(12.0);
                                 }
 
-                                if self.storage.projects.is_empty() {
+                                if self.storage.projects.is_empty()
+                                    && !matches!(self.selection, SidebarSelection::SecretManagement)
+                                {
                                     self.render_first_time_empty_state(ui);
                                 } else {
                                     match self.selection.clone() {
                                         SidebarSelection::AllDeployments => {
                                             self.render_all_deployments_overview(ui);
+                                        }
+                                        SidebarSelection::SecretManagement => {
+                                            self.render_secret_management_view(ui);
                                         }
                                         SidebarSelection::Project(proj_id) => {
                                             self.render_project_workspace(ui, &proj_id);

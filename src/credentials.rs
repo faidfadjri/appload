@@ -190,6 +190,270 @@ fn read_windows_generic_credential(target: &str) -> Option<VaultCredential> {
     }
 }
 
+/// Writes or updates a secret credential directly in the OS native credential store:
+/// - Windows: Windows Credential Manager (`CredWriteW` Generic Credential, `CRED_PERSIST_LOCAL_MACHINE`)
+/// - macOS: Keychain (`security add-generic-password -U`)
+/// - Linux: Secret Service (`secret-tool store`)
+pub fn write_os_vault_credential(
+    target: &str,
+    username: Option<&str>,
+    secret_value: &str,
+) -> Result<(), String> {
+    let target = target.trim();
+    if target.is_empty() {
+        return Err("Secret name / target key cannot be empty.".to_string());
+    }
+    if secret_value.is_empty() {
+        return Err("Secret value / password cannot be empty.".to_string());
+    }
+
+    #[cfg(windows)]
+    {
+        write_windows_generic_credential(target, username, secret_value)
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let account = username.map(str::trim).filter(|u| !u.is_empty()).unwrap_or("shiply");
+        let output = std::process::Command::new("security")
+            .args([
+                "add-generic-password",
+                "-U",
+                "-s",
+                target,
+                "-a",
+                account,
+                "-w",
+                secret_value,
+            ])
+            .output()
+            .map_err(|e| format!("Failed to invoke macOS security tool: {e}"))?;
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(format!(
+                "macOS Keychain write failed: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            ))
+        }
+    }
+
+    #[cfg(all(not(windows), not(target_os = "macos")))]
+    {
+        use std::process::Stdio;
+        let account = username.map(str::trim).filter(|u| !u.is_empty()).unwrap_or("shiply");
+        let mut child = std::process::Command::new("secret-tool")
+            .args([
+                "store",
+                &format!("--label=Shiply ({target})"),
+                "service",
+                target,
+                "username",
+                account,
+            ])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| format!("Failed to invoke secret-tool: {e}"))?;
+        if let Some(mut stdin) = child.stdin.take() {
+            let _ = stdin.write_all(secret_value.as_bytes());
+        }
+        let output = child
+            .wait_with_output()
+            .map_err(|e| format!("Failed waiting for secret-tool: {e}"))?;
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(format!(
+                "Linux Secret Service write failed: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            ))
+        }
+    }
+}
+
+#[cfg(windows)]
+fn write_windows_generic_credential(
+    target: &str,
+    username: Option<&str>,
+    secret_value: &str,
+) -> Result<(), String> {
+    use std::ptr;
+    use windows_sys::Win32::Foundation::GetLastError;
+    use windows_sys::Win32::Security::Credentials::{
+        CredWriteW, CREDENTIALW, CRED_PERSIST_LOCAL_MACHINE, CRED_TYPE_GENERIC,
+    };
+
+    let mut wide_target: Vec<u16> = target.encode_utf16().collect();
+    wide_target.push(0);
+
+    let clean_user = username.map(str::trim).filter(|u| !u.is_empty());
+    let mut wide_user: Vec<u16> = clean_user
+        .map(|u| {
+            let mut v: Vec<u16> = u.encode_utf16().collect();
+            v.push(0);
+            v
+        })
+        .unwrap_or_default();
+
+    let mut utf16_secret_blob: Vec<u8> = secret_value
+        .encode_utf16()
+        .flat_map(|u| u.to_le_bytes())
+        .collect();
+
+    let cred = CREDENTIALW {
+        Flags: 0,
+        Type: CRED_TYPE_GENERIC,
+        TargetName: wide_target.as_mut_ptr(),
+        Comment: ptr::null_mut(),
+        LastWritten: unsafe { std::mem::zeroed() },
+        CredentialBlobSize: utf16_secret_blob.len() as u32,
+        CredentialBlob: utf16_secret_blob.as_mut_ptr(),
+        Persist: CRED_PERSIST_LOCAL_MACHINE,
+        AttributeCount: 0,
+        Attributes: ptr::null_mut(),
+        TargetAlias: ptr::null_mut(),
+        UserName: if wide_user.is_empty() {
+            ptr::null_mut()
+        } else {
+            wide_user.as_mut_ptr()
+        },
+    };
+
+    // SAFETY: `cred` pointers (`wide_target`, `wide_user`, `utf16_secret_blob`) remain valid for the duration of `CredWriteW`.
+    let ok = unsafe { CredWriteW(&cred, 0) };
+    if ok == 0 {
+        let err_code = unsafe { GetLastError() };
+        return Err(format!(
+            "Windows Credential Manager failed to write '{target}' (Win32 error {err_code})."
+        ));
+    }
+    Ok(())
+}
+
+/// Deletes a stored credential from the OS native credential store.
+pub fn delete_os_vault_credential(target: &str) -> Result<(), String> {
+    let target = target.trim();
+    if target.is_empty() {
+        return Err("Secret name / target key cannot be empty.".to_string());
+    }
+
+    #[cfg(windows)]
+    {
+        delete_windows_generic_credential(target)
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("security")
+            .args(["delete-generic-password", "-s", target])
+            .output();
+        Ok(())
+    }
+
+    #[cfg(all(not(windows), not(target_os = "macos")))]
+    {
+        let _ = std::process::Command::new("secret-tool")
+            .args(["clear", "service", target])
+            .output();
+        Ok(())
+    }
+}
+
+#[cfg(windows)]
+fn delete_windows_generic_credential(target: &str) -> Result<(), String> {
+    use windows_sys::Win32::Foundation::{GetLastError, ERROR_NOT_FOUND};
+    use windows_sys::Win32::Security::Credentials::{CredDeleteW, CRED_TYPE_GENERIC};
+
+    let mut wide_target: Vec<u16> = target.encode_utf16().collect();
+    wide_target.push(0);
+
+    // SAFETY: `wide_target` is a valid null-terminated UTF-16 string.
+    let ok = unsafe { CredDeleteW(wide_target.as_ptr(), CRED_TYPE_GENERIC, 0) };
+    if ok == 0 {
+        let err_code = unsafe { GetLastError() };
+        if err_code == ERROR_NOT_FOUND {
+            return Ok(());
+        }
+        return Err(format!(
+            "Windows Credential Manager failed to delete '{target}' (Win32 error {err_code})."
+        ));
+    }
+    Ok(())
+}
+
+/// Interpolates GitHub Actions-style secret references (`${{ secrets.KEY }}`, `${{ secrets.KEY.username }}`,
+/// `{secret:KEY}`, `{secret_user:KEY}`) from the OS Credential Manager and returns both the interpolated
+/// string and the list of sensitive secret values that must be redacted from logs.
+pub fn interpolate_os_secrets(input: &str) -> (String, Vec<String>) {
+    let mut output = input.to_string();
+    let mut resolved_secrets = Vec::new();
+
+    // 1. Handle `${{ secrets.KEY }}` and `${{ secrets.KEY.username }}`
+    while let Some(start) = output.find("${{") {
+        let Some(rel_end) = output[start..].find("}}") else {
+            break;
+        };
+        let end = start + rel_end + 2;
+        let inner = output[start + 3..start + rel_end].trim();
+        if let Some(rest) = inner.strip_prefix("secrets.") {
+            let rest = rest.trim();
+            let (key, want_username) = if let Some(k) = rest.strip_suffix(".username") {
+                (k.trim(), true)
+            } else if let Some(k) = rest.strip_suffix(".user") {
+                (k.trim(), true)
+            } else if let Some(k) = rest.strip_suffix(".password") {
+                (k.trim(), false)
+            } else {
+                (rest, false)
+            };
+
+            let replacement = if let Some(cred) = read_os_vault_credential(key) {
+                if !cred.password.is_empty() && !resolved_secrets.contains(&cred.password) {
+                    resolved_secrets.push(cred.password.clone());
+                }
+                if want_username {
+                    cred.username.unwrap_or_default()
+                } else {
+                    cred.password
+                }
+            } else {
+                String::new()
+            };
+            output.replace_range(start..end, &replacement);
+        } else {
+            break;
+        }
+    }
+
+    // 2. Handle `{secret:KEY}` and `{secret_user:KEY}`
+    for (prefix, want_username) in [("{secret:", false), ("{secret_user:", true)] {
+        while let Some(start) = output.find(prefix) {
+            let Some(rel_end) = output[start..].find('}') else {
+                break;
+            };
+            let end = start + rel_end + 1;
+            let key = output[start + prefix.len()..start + rel_end].trim();
+            let replacement = if let Some(cred) = read_os_vault_credential(key) {
+                if !cred.password.is_empty() && !resolved_secrets.contains(&cred.password) {
+                    resolved_secrets.push(cred.password.clone());
+                }
+                if want_username {
+                    cred.username.unwrap_or_default()
+                } else {
+                    cred.password
+                }
+            } else {
+                String::new()
+            };
+            output.replace_range(start..end, &replacement);
+        }
+    }
+
+    (output, resolved_secrets)
+}
+
 /// Resolves the SSH username and password by checking:
 /// 1. Explicit UI password override (if entered by user)
 /// 2. OS Vault / Credential Manager (`vault_target`, e.g., `indyserver`)
@@ -295,5 +559,30 @@ mod tests {
             "Connecting to user@10.0.0.1 with password [REDACTED] in /var/app"
         );
         assert!(!redacted.contains("SuperSecretPassword123!"));
+    }
+
+    #[test]
+    fn test_write_read_delete_os_vault_credential_and_secret_interpolation() {
+        let target = format!("shiply_test_secret_{}", uuid::Uuid::new_v4().simple());
+        write_os_vault_credential(&target, Some("deploy_admin"), "MyVaultS3cret!99")
+            .expect("write credential to OS vault");
+
+        let loaded = read_os_vault_credential(&target).expect("read credential from OS vault");
+        assert_eq!(loaded.username.as_deref(), Some("deploy_admin"));
+        assert_eq!(loaded.password, "MyVaultS3cret!99");
+
+        let cmd_template = format!(
+            "docker login -u ${{{{ secrets.{target}.username }}}} -p ${{{{ secrets.{target} }}}}"
+        );
+        let (interpolated, redact_list) = interpolate_os_secrets(&cmd_template);
+        assert_eq!(interpolated, "docker login -u deploy_admin -p MyVaultS3cret!99");
+        assert!(redact_list.contains(&"MyVaultS3cret!99".to_string()));
+
+        let refs: Vec<&str> = redact_list.iter().map(String::as_str).collect();
+        let sanitized = redact_secrets(&interpolated, &refs);
+        assert_eq!(sanitized, "docker login -u deploy_admin -p [REDACTED]");
+
+        delete_os_vault_credential(&target).expect("delete credential from OS vault");
+        assert!(read_os_vault_credential(&target).is_none());
     }
 }

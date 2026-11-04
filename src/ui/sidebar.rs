@@ -318,6 +318,40 @@ impl ShiplyApp {
                         ui.add_space(40.0);
                     }
 
+                    // Nav item 3: Secret Management (OS Credential Manager)
+                    let is_secrets = matches!(self.selection, SidebarSelection::SecretManagement);
+                    let sec_rect =
+                        Rect::from_center_size(Pos2::new(center_x, ui.cursor().min.y + 18.0), btn_size);
+                    let sec_resp = ui
+                        .interact(
+                            sec_rect,
+                            egui::Id::new("rail_secret_mgmt_btn"),
+                            Sense::click(),
+                        )
+                        .on_hover_cursor(egui::CursorIcon::PointingHand)
+                        .on_hover_text("Secret Management (OS Credential Manager)");
+                    let sec_bg = if is_secrets {
+                        SB_ACCENT_SOFT
+                    } else if sec_resp.hovered() {
+                        SB_SURFACE_HOVER
+                    } else {
+                        Color32::TRANSPARENT
+                    };
+                    let sec_fg = if is_secrets {
+                        SB_ACCENT
+                    } else if sec_resp.hovered() {
+                        SB_TEXT
+                    } else {
+                        SB_TEXT_MUTED
+                    };
+                    ui.painter()
+                        .rect_filled(sec_rect, CornerRadius::same(R_MD as u8), sec_bg);
+                    draw_outline_icon(ui.painter(), sec_rect.center(), OutlineIcon::Key, sec_fg);
+                    if sec_resp.clicked() {
+                        self.selection = SidebarSelection::SecretManagement;
+                    }
+                    ui.add_space(40.0);
+
                     // Separator
                     let sep_y = ui.cursor().min.y + 4.0;
                     ui.painter().line_segment(
@@ -407,7 +441,8 @@ impl ShiplyApp {
                         self.sidebar_context_menu = None;
                         let was_different = match &self.selection {
                             SidebarSelection::Project(cur) => cur != &pid,
-                            SidebarSelection::AllDeployments => true,
+                            SidebarSelection::AllDeployments
+                            | SidebarSelection::SecretManagement => true,
                         };
                         self.selection = SidebarSelection::Project(pid.clone());
                         if was_different {
@@ -846,6 +881,90 @@ impl ShiplyApp {
                         {
                             self.open_bulk_deploy_modal();
                         }
+                    }
+
+                    // Nav Item 3: Secret Management (36px high)
+                    ui.add_space(3.0);
+                    let is_secrets_active =
+                        matches!(self.selection, SidebarSelection::SecretManagement);
+                    let (sec_rect, sec_resp) =
+                        ui.allocate_exact_size(Vec2::new(full_w, 36.0), Sense::click());
+                    let sec_resp = sec_resp.on_hover_cursor(egui::CursorIcon::PointingHand);
+                    let sec_bg = if is_secrets_active {
+                        SB_ACCENT_SOFT
+                    } else if sec_resp.hovered() {
+                        SB_SURFACE_HOVER
+                    } else {
+                        Color32::TRANSPARENT
+                    };
+                    let sec_fg = if is_secrets_active {
+                        SB_ACCENT
+                    } else if sec_resp.hovered() {
+                        SB_TEXT
+                    } else {
+                        SB_TEXT_MUTED
+                    };
+                    ui.painter()
+                        .rect_filled(sec_rect, CornerRadius::same(R_MD as u8), sec_bg);
+                    draw_outline_icon(
+                        ui.painter(),
+                        Pos2::new(sec_rect.left() + 16.0, sec_rect.center().y),
+                        OutlineIcon::Key,
+                        sec_fg,
+                    );
+                    ui.painter().text(
+                        Pos2::new(sec_rect.left() + 34.0, sec_rect.center().y),
+                        Align2::LEFT_CENTER,
+                        "Secret Management",
+                        FontId::proportional(FS_BASE),
+                        sec_fg,
+                    );
+                    if !self.storage.secrets.is_empty() {
+                        let count_str = self.storage.secrets.len().to_string();
+                        let cg = ui.painter().layout_no_wrap(
+                            count_str,
+                            FontId::monospace(FS_MICRO),
+                            if is_secrets_active {
+                                SB_ACCENT
+                            } else {
+                                SB_TEXT_MUTED
+                            },
+                        );
+                        let cw = (cg.size().x + 10.0).max(20.0);
+                        let ch = 18.0;
+                        let crect = Rect::from_min_size(
+                            Pos2::new(sec_rect.right() - cw - 8.0, sec_rect.center().y - ch / 2.0),
+                            Vec2::new(cw, ch),
+                        );
+                        ui.painter().rect_filled(
+                            crect,
+                            CornerRadius::same(R_SM as u8),
+                            if is_secrets_active {
+                                SB_ACCENT.gamma_multiply(0.18)
+                            } else {
+                                SB_SURFACE
+                            },
+                        );
+                        ui.painter().galley(
+                            Pos2::new(
+                                crect.center().x - cg.size().x / 2.0,
+                                crect.center().y - cg.size().y / 2.0,
+                            ),
+                            cg,
+                            if is_secrets_active {
+                                SB_ACCENT
+                            } else {
+                                SB_TEXT_MUTED
+                            },
+                        );
+                    }
+                    if sec_resp
+                        .on_hover_text(
+                            "Manage SSH credentials, passwords, and pipeline secrets in your OS Credential Manager",
+                        )
+                        .clicked()
+                    {
+                        self.selection = SidebarSelection::SecretManagement;
                     }
 
                     ui.add_space(14.0);
@@ -1439,7 +1558,8 @@ impl ShiplyApp {
                             self.sidebar_context_menu = None;
                             let was_different = match &self.selection {
                                 SidebarSelection::Project(cur) => cur != &pid,
-                                SidebarSelection::AllDeployments => true,
+                                SidebarSelection::AllDeployments
+                                | SidebarSelection::SecretManagement => true,
                             };
                             self.selection = SidebarSelection::Project(pid.clone());
                             if was_different {

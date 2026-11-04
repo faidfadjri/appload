@@ -1,5 +1,5 @@
 use crate::credentials::{
-    redact_secrets, resolve_credentials, ENV_ASKPASS_FILE, ENV_ASKPASS_MODE,
+    interpolate_os_secrets, redact_secrets, resolve_credentials, ENV_ASKPASS_FILE, ENV_ASKPASS_MODE,
 };
 use crate::domain::{
     DeploymentRecord, DeploymentStatus, EnvironmentConfig, LocalShell, PipelineStep,
@@ -652,15 +652,31 @@ pub fn run_deployment(
         req.manual_password.as_deref(),
     );
 
-    let mut secrets_to_redact: Vec<&str> = Vec::new();
+    let mut owned_secrets_to_redact: Vec<String> = Vec::new();
     if let Some(pw) = req.manual_password.as_deref() {
-        secrets_to_redact.push(pw);
-    }
-    if let Some(pw) = resolved_creds.password.as_deref() {
-        if !secrets_to_redact.contains(&pw) {
-            secrets_to_redact.push(pw);
+        if !pw.is_empty() {
+            owned_secrets_to_redact.push(pw.to_string());
         }
     }
+    if let Some(pw) = resolved_creds.password.as_deref() {
+        if !pw.is_empty() && !owned_secrets_to_redact.iter().any(|s| s == pw) {
+            owned_secrets_to_redact.push(pw.to_string());
+        }
+    }
+    for step in &enabled_steps {
+        match &step.kind {
+            StepKind::LocalCommand { command, .. } | StepKind::RemoteCommand { command } => {
+                let (_, step_secrets) = interpolate_os_secrets(command);
+                for sec in step_secrets {
+                    if !sec.is_empty() && !owned_secrets_to_redact.contains(&sec) {
+                        owned_secrets_to_redact.push(sec);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    let secrets_to_redact: Vec<&str> = owned_secrets_to_redact.iter().map(String::as_str).collect();
 
     let pkg_path = req.local_path.join("package.json");
     let mut pkg_guard: Option<PackageJsonRevertGuard> = if req.bump_package_json && pkg_path.exists() {
@@ -991,7 +1007,8 @@ pub fn run_deployment(
                 allow_failure,
                 shell,
             } => {
-                let interpolated = env_cfg.interpolate(command, &req.version);
+                let (interpolated, _) =
+                    interpolate_os_secrets(&env_cfg.interpolate(command, &req.version));
                 match execute_local_shell_command(
                     &req.local_path,
                     &interpolated,
@@ -1199,7 +1216,8 @@ pub fn run_deployment(
             }
 
             StepKind::RemoteCommand { command } => {
-                let interpolated = env_cfg.interpolate(command, &req.version);
+                let (interpolated, _) =
+                    interpolate_os_secrets(&env_cfg.interpolate(command, &req.version));
                 let mut remote_output = String::new();
 
                 for server in &env_cfg.servers {

@@ -2583,3 +2583,56 @@ use super::*;
             app.render_delete_confirmation_modal(ctx);
         });
     }
+
+    #[test]
+    fn test_secret_management_page_and_os_vault_roundtrip() {
+        let ctx = egui::Context::default();
+        ShiplyApp::configure_light_workspace_style(&ctx);
+
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("shiply_state.db");
+        let storage = crate::storage::AppStorage::load_or_default(&db_path);
+        let mut app = ShiplyApp::new(storage);
+
+        let test_key = format!("shiply_ui_test_secret_{}", uuid::Uuid::new_v4().simple());
+        app.open_secret_management_for_target(
+            &test_key,
+            "deploy_user",
+            "Test SSH Credential for Secret Management UI",
+        );
+        assert_eq!(app.selection, SidebarSelection::SecretManagement);
+
+        app.secret_form_value = "TopS3cretVaultPass!2026".to_string();
+        let save_msg = app.save_secret_to_os_vault().expect("save secret to OS vault");
+        assert!(save_msg.contains(&test_key));
+        // Plaintext secret value must be wiped from UI memory immediately after saving
+        assert!(app.secret_form_value.is_empty());
+
+        // Verify OS Credential Manager has the secret and username
+        let vault_cred = read_os_vault_credential(&test_key).expect("secret in OS vault");
+        assert_eq!(vault_cred.username.as_deref(), Some("deploy_user"));
+        assert_eq!(vault_cred.password, "TopS3cretVaultPass!2026");
+
+        // Render both sidebar and Secret Management view at desktop and compact widths
+        for width in [1280.0_f32, 640.0_f32] {
+            let input = egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::Vec2::new(width, 800.0),
+                )),
+                ..Default::default()
+            };
+            let _ = ctx.run(input, |ctx| {
+                app.render_sidebar(ctx, 1.0);
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    app.render_secret_management_view(ui);
+                });
+            });
+        }
+
+        // Delete secret from OS Vault and verify cleanup
+        app.delete_secret_from_os_vault(&test_key)
+            .expect("delete secret from OS vault");
+        assert!(read_os_vault_credential(&test_key).is_none());
+        assert!(!app.storage.secrets.iter().any(|s| s.key == test_key));
+    }

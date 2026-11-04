@@ -436,6 +436,44 @@ impl DeploymentRecord {
     }
 }
 
+/// Metadata for a secret managed by Shiply and stored in the OS Credential Manager.
+/// The sensitive secret value / password itself is never stored in SQLite or JSON —
+/// it lives exclusively in the OS native credential store under `key`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SecretEntry {
+    /// Unique identifier / OS Credential Manager target key (e.g. `indyserver`, `prod-ssh-server`, `API_TOKEN`).
+    pub key: String,
+    /// Optional username / account associated with the secret in the OS Credential Manager (e.g. `appndq`, `deploy`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub username: Option<String>,
+    /// Optional human-readable description or note.
+    #[serde(default)]
+    pub description: String,
+    /// Timestamp when this secret entry was created or last updated.
+    pub updated_at: DateTime<Utc>,
+}
+
+impl SecretEntry {
+    pub fn new(
+        key: impl Into<String>,
+        username: Option<String>,
+        description: impl Into<String>,
+    ) -> Self {
+        Self {
+            key: key.into().trim().to_string(),
+            username: username
+                .map(|u| u.trim().to_string())
+                .filter(|u| !u.is_empty()),
+            description: description.into().trim().to_string(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    pub fn format_updated_at_local(&self, fmt: &str) -> String {
+        self.updated_at.with_timezone(&Local).format(fmt).to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

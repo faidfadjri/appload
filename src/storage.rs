@@ -1,4 +1,5 @@
-use crate::domain::{DeploymentRecord, DeploymentStatus, Project, StepExecutionLog};
+use crate::credentials::read_os_vault_credential;
+use crate::domain::{DeploymentRecord, DeploymentStatus, Project, SecretEntry, StepExecutionLog};
 use crate::ps1_importer::import_project_from_path;
 use crate::version::{bump_semver, VersionBump};
 use rusqlite::{params, Connection};
@@ -15,6 +16,8 @@ pub struct AppStorage {
     pub projects: Vec<Project>,
     #[serde(default)]
     pub deployments: Vec<DeploymentRecord>,
+    #[serde(default)]
+    pub secrets: Vec<SecretEntry>,
     #[serde(skip)]
     storage_path: Option<PathBuf>,
     #[serde(skip)]
@@ -31,6 +34,8 @@ struct LegacyJsonState {
     projects: Vec<Project>,
     #[serde(default)]
     deployments: Vec<DeploymentRecord>,
+    #[serde(default)]
+    secrets: Vec<SecretEntry>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -85,7 +90,14 @@ pub fn init_db(conn: &Connection) -> Result<(), rusqlite::Error> {
 
          CREATE INDEX IF NOT EXISTS idx_deployments_project ON deployments (project_id);
          CREATE INDEX IF NOT EXISTS idx_deployments_env ON deployments (project_id, environment);
-         CREATE INDEX IF NOT EXISTS idx_deployments_started_at ON deployments (started_at DESC);",
+         CREATE INDEX IF NOT EXISTS idx_deployments_started_at ON deployments (started_at DESC);
+
+         CREATE TABLE IF NOT EXISTS secrets (
+             key TEXT PRIMARY KEY,
+             username TEXT,
+             description TEXT NOT NULL,
+             updated_at TEXT NOT NULL
+         );",
     )?;
 
     // Backwards-compatible migrations for projects table columns if created in older versions
@@ -202,6 +214,61 @@ pub fn load_deployments_from_db(
         deployments.push(d?);
     }
     Ok(deployments)
+}
+
+pub fn load_secrets_from_db(conn: &Connection) -> Result<Vec<SecretEntry>, rusqlite::Error> {
+    init_db(conn)?;
+    let mut stmt = conn.prepare(
+        "SELECT key, username, description, updated_at
+         FROM secrets
+         ORDER BY key ASC",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        let key: String = row.get(0)?;
+        let username: Option<String> = row.get(1)?;
+        let description: String = row.get(2)?;
+        let updated_at_str: String = row.get(3)?;
+        let updated_at = chrono::DateTime::parse_from_rfc3339(&updated_at_str)
+            .map(|dt| dt.with_timezone(&chrono::Utc))
+            .unwrap_or_else(|_| chrono::Utc::now());
+        Ok(SecretEntry {
+            key,
+            username,
+            description,
+            updated_at,
+        })
+    })?;
+
+    let mut secrets = Vec::new();
+    for s in rows {
+        secrets.push(s?);
+    }
+    Ok(secrets)
+}
+
+pub fn save_secrets_to_db(
+    conn: &mut Connection,
+    secrets: &[SecretEntry],
+) -> Result<(), rusqlite::Error> {
+    init_db(conn)?;
+    let tx = conn.transaction()?;
+    tx.execute("DELETE FROM secrets", [])?;
+    {
+        let mut stmt = tx.prepare(
+            "INSERT INTO secrets (key, username, description, updated_at)
+             VALUES (?1, ?2, ?3, ?4)",
+        )?;
+        for s in secrets {
+            stmt.execute(params![
+                s.key,
+                s.username,
+                s.description,
+                s.updated_at.to_rfc3339()
+            ])?;
+        }
+    }
+    tx.commit()?;
+    Ok(())
 }
 
 pub fn save_all_to_db(
@@ -394,6 +461,7 @@ impl AppStorage {
         let mut state = AppStorage {
             projects: Vec::new(),
             deployments: Vec::new(),
+            secrets: Vec::new(),
             storage_path: Some(db_path.clone()),
             last_state_mtime: None,
             imported_files_mtime: HashMap::new(),
@@ -406,6 +474,7 @@ impl AppStorage {
             let _ = init_db(&conn);
             let mut db_projects = load_projects_from_db(&conn).unwrap_or_default();
             let mut db_deployments = load_deployments_from_db(&conn).unwrap_or_default();
+            let mut db_secrets = load_secrets_from_db(&conn).unwrap_or_default();
 
             // If SQLite is completely empty, check for legacy JSON state file to migrate seamlessly
             if db_projects.is_empty() && db_deployments.is_empty() {
@@ -447,6 +516,9 @@ impl AppStorage {
                                 if !parsed.projects.is_empty() || !parsed.deployments.is_empty() {
                                     db_projects = parsed.projects;
                                     db_deployments = parsed.deployments;
+                                    if !parsed.secrets.is_empty() {
+                                        db_secrets = parsed.secrets;
+                                    }
                                     needs_save = true;
 
                                     // Preserve backup file so user data is never lost
@@ -472,6 +544,11 @@ impl AppStorage {
 
             state.projects = db_projects;
             state.deployments = db_deployments;
+            state.secrets = db_secrets;
+
+            if state.sync_project_vault_targets_to_secrets() {
+                needs_save = true;
+            }
 
             if state.reconcile_orphaned_running_deployments(&HashSet::new()) > 0 {
                 needs_save = true;
@@ -479,6 +556,7 @@ impl AppStorage {
 
             if needs_save || !db_path.exists() {
                 let _ = save_all_to_db(&mut conn, &state.projects, &state.deployments);
+                let _ = save_secrets_to_db(&mut conn, &state.secrets);
             }
         }
 
@@ -514,6 +592,8 @@ impl AppStorage {
             .map_err(|e| format!("Failed to open SQLite database {}: {e}", db_path.display()))?;
         save_all_to_db(&mut conn, &self.projects, &self.deployments)
             .map_err(|e| format!("Failed to save state to SQLite database: {e}"))?;
+        save_secrets_to_db(&mut conn, &self.secrets)
+            .map_err(|e| format!("Failed to save secrets metadata to SQLite database: {e}"))?;
 
         // If path was originally requested as JSON (e.g. drop-in export), also write JSON mirror
         if path.extension().is_some_and(|e| e.eq_ignore_ascii_case("json")) {
@@ -550,7 +630,14 @@ impl AppStorage {
                     ) {
                         self.projects = p;
                         self.deployments = d;
+                        if let Ok(s) = load_secrets_from_db(&conn) {
+                            self.secrets = s;
+                        }
+                        let mut changed_on_sync = self.sync_project_vault_targets_to_secrets();
                         if self.reconcile_orphaned_running_deployments(&HashSet::new()) > 0 {
+                            changed_on_sync = true;
+                        }
+                        if changed_on_sync {
                             let _ = self.save();
                         }
                         self.last_state_mtime = file_mtime(&state_path).or(Some(disk_mtime));
@@ -970,6 +1057,97 @@ impl AppStorage {
             let _ = self.save();
         }
         removed_count
+    }
+
+    /// Inserts or updates a secret metadata entry in `self.secrets` and persists to SQLite.
+    pub fn upsert_secret_metadata(&mut self, mut entry: SecretEntry) {
+        entry.key = entry.key.trim().to_string();
+        if entry.key.is_empty() {
+            return;
+        }
+        if let Some(existing) = self
+            .secrets
+            .iter_mut()
+            .find(|s| s.key.eq_ignore_ascii_case(&entry.key))
+        {
+            *existing = entry;
+        } else {
+            self.secrets.push(entry);
+            self.secrets.sort_by_key(|a| a.key.to_lowercase());
+        }
+        let _ = self.save();
+    }
+
+    /// Removes a secret metadata entry by key and persists to SQLite.
+    pub fn remove_secret_metadata(&mut self, key: &str) -> Option<SecretEntry> {
+        let trimmed = key.trim();
+        let pos = self
+            .secrets
+            .iter()
+            .position(|s| s.key.eq_ignore_ascii_case(trimmed))?;
+        let removed = self.secrets.remove(pos);
+        let _ = self.save();
+        Some(removed)
+    }
+
+    /// Ensures any non-empty `vault_target` configured across project environments is registered
+    /// in `self.secrets` so users can view and manage all project credentials in Secret Management.
+    pub fn sync_project_vault_targets_to_secrets(&mut self) -> bool {
+        let mut added = false;
+        let now = chrono::Utc::now();
+        for proj in &self.projects {
+            for env in &proj.environments {
+                let target = env.vault_target.trim();
+                if target.is_empty() {
+                    continue;
+                }
+                if !self
+                    .secrets
+                    .iter()
+                    .any(|s| s.key.eq_ignore_ascii_case(target))
+                {
+                    let username = read_os_vault_credential(target)
+                        .and_then(|c| c.username)
+                        .or_else(|| {
+                            let u = env.remote_user.trim();
+                            if u.is_empty() {
+                                None
+                            } else {
+                                Some(u.to_string())
+                            }
+                        });
+                    self.secrets.push(SecretEntry {
+                        key: target.to_string(),
+                        username,
+                        description: format!("SSH Vault target for {} ({})", proj.name, env.name),
+                        updated_at: now,
+                    });
+                    added = true;
+                }
+            }
+        }
+        if added {
+            self.secrets.sort_by_key(|a| a.key.to_lowercase());
+        }
+        added
+    }
+
+    /// Returns a list of `"Project Name (ENV)"` labels for all environments referencing `secret_key`.
+    pub fn environments_using_secret(&self, secret_key: &str) -> Vec<String> {
+        let trimmed = secret_key.trim();
+        let mut usages = Vec::new();
+        for proj in &self.projects {
+            let mut matching_envs = Vec::new();
+            for env in &proj.environments {
+                if env.vault_target.trim().eq_ignore_ascii_case(trimmed) {
+                    matching_envs.push(crate::domain::format_env_badge(&env.key));
+                }
+            }
+            if !matching_envs.is_empty() {
+                usages.push(format!("{} ({})", proj.name, matching_envs.join(", ")));
+            }
+        }
+        usages
     }
 
     /// Returns the most recent successful deployment for a given project and environment key.
@@ -1600,5 +1778,36 @@ mod tests {
         assert_eq!(cleared_all, 2);
         assert_eq!(storage.deployments.len(), 1);
         assert_eq!(storage.deployments[0].id, "dep-running");
+    }
+
+    #[test]
+    fn test_secrets_metadata_persistence_and_project_vault_sync() {
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("shiply_state.db");
+
+        let mut storage = AppStorage::load_or_default(&db_path);
+        storage.upsert_secret_metadata(SecretEntry::new(
+            "GITHUB_TOKEN",
+            Some("octocat".to_string()),
+            "GitHub API Personal Access Token",
+        ));
+        storage.upsert_secret_metadata(SecretEntry::new(
+            "prod-ssh-server",
+            Some("deploy".to_string()),
+            "Production SSH Server Credential",
+        ));
+        assert_eq!(storage.secrets.len(), 2);
+
+        // Reload from SQLite and verify secrets metadata persisted
+        let mut reloaded = AppStorage::load_or_default(&db_path);
+        assert_eq!(reloaded.secrets.len(), 2);
+        assert_eq!(reloaded.secrets[0].key, "GITHUB_TOKEN");
+        assert_eq!(reloaded.secrets[0].username.as_deref(), Some("octocat"));
+        assert_eq!(reloaded.secrets[1].key, "prod-ssh-server");
+
+        // Remove a secret metadata entry and verify
+        let removed = reloaded.remove_secret_metadata("GITHUB_TOKEN");
+        assert!(removed.is_some());
+        assert_eq!(reloaded.secrets.len(), 1);
     }
 }

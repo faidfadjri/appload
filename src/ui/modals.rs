@@ -1243,6 +1243,14 @@ impl ShiplyApp {
                             ),
                         )
                     }
+                    ConfirmDeleteAction::Secret { key } => (
+                        "Delete Secret from OS Vault",
+                        "This will permanently remove this secret from your OS Credential Manager and Shiply.",
+                        key.clone(),
+                        format!(
+                            "Are you sure you want to delete secret '{key}'? Its stored password/token will be removed from your OS Credential Manager."
+                        ),
+                    ),
                 };
 
                 if render_modal_header(
@@ -1430,6 +1438,9 @@ impl ShiplyApp {
                         format!("Cleared {removed} deployment history record(s)."),
                         true,
                     ));
+                }
+                ConfirmDeleteAction::Secret { key } => {
+                    let _ = self.delete_secret_from_os_vault(&key);
                 }
             }
             self.pending_delete_confirm = None;

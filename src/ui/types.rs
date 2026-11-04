@@ -4,6 +4,7 @@ use crate::version::GitMetadata;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum SidebarSelection {
     AllDeployments,
+    SecretManagement,
     Project(String),
 }
 
@@ -45,6 +46,9 @@ pub(crate) enum ConfirmDeleteAction {
         env_key: Option<String>,
         env_name: Option<String>,
         count: usize,
+    },
+    Secret {
+        key: String,
     },
 }
 

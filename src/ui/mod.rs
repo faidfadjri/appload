@@ -22,10 +22,12 @@ pub(crate) use components::*;
 pub(crate) use modals::*;
 
 // Common imports used across UI submodules
-use crate::credentials::read_os_vault_credential;
+use crate::credentials::{
+    delete_os_vault_credential, read_os_vault_credential, write_os_vault_credential,
+};
 use crate::domain::{
-    format_env_badge, DeploymentRecord, DeploymentStatus, EnvironmentConfig, LocalShell, PipelineStep, Project,
-    StepKind,
+    format_env_badge, DeploymentRecord, DeploymentStatus, EnvironmentConfig, LocalShell,
+    PipelineStep, Project, SecretEntry, StepKind,
 };
 use crate::executor::{run_deployment, DeploymentRequest, ExecutorEvent};
 use crate::installer::{
