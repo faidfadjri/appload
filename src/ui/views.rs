@@ -2212,196 +2212,125 @@ impl ShiplyApp {
             .map(|e| e.name.clone())
             .unwrap_or_else(|| env_key.clone());
 
-        let header_avail_w = ui.available_width();
-        let stack_step_buttons = header_avail_w < 680.0;
-        let show_step_subtitle = header_avail_w >= 880.0;
+        let total_steps = self.storage.projects[proj_idx]
+            .get_env(&env_key)
+            .map(|e| e.steps.len())
+            .unwrap_or(0);
 
         let mut add_local = false;
         let mut add_verify = false;
         let mut add_scp = false;
         let mut add_remote = false;
 
-        let render_add_step_buttons =
-            |ui: &mut egui::Ui,
-             add_local: &mut bool,
-             add_verify: &mut bool,
-             add_scp: &mut bool,
-             add_remote: &mut bool| {
-                let local_btn = egui::Button::new(
-                    RichText::new("+ Local Command")
-                        .typo(Typo::SmallMedium)
-                        .color(BLUE_PILL_TEXT),
-                )
-                .fill(BLUE_PILL_BG)
-                .stroke(Stroke::new(1.0_f32, BLUE_PILL_TEXT))
-                .corner_radius(6.0);
-                if ui
-                    .add(local_btn)
-                    .on_hover_text("Add a local shell command step (e.g. npm run build)")
-                    .clicked()
-                {
-                    *add_local = true;
-                }
+        let header_avail_w = ui.available_width();
 
-                let verify_btn = egui::Button::new(
-                    RichText::new("+ Verify Path")
-                        .typo(Typo::SmallMedium)
-                        .color(WARN_PILL_TEXT),
-                )
-                .fill(WARN_PILL_BG)
-                .stroke(Stroke::new(1.0_f32, WARN_PILL_TEXT))
-                .corner_radius(6.0);
-                if ui
-                    .add(verify_btn)
-                    .on_hover_text(
-                        "Add a local file/folder verification guard (e.g. ./dist/server.js)",
-                    )
-                    .clicked()
-                {
-                    *add_verify = true;
-                }
-
-                let scp_btn = egui::Button::new(
-                    RichText::new("+ SCP Upload")
-                        .typo(Typo::SmallMedium)
-                        .color(PURPLE_PILL_TEXT),
-                )
-                .fill(PURPLE_PILL_BG)
-                .stroke(Stroke::new(1.0_f32, PURPLE_PILL_TEXT))
-                .corner_radius(6.0);
-                if ui
-                .add(scp_btn)
-                .on_hover_text(
-                    "Add an SCP file upload step (transfers local files & optional staged .env to {remote_dir})",
-                )
-                .clicked()
-            {
-                *add_scp = true;
+        // 1. Section Header: H2 Typo::H2 "Pipeline steps" + count badge + subtitle, Right: single Primary Sm "+ Add step" menu button
+        horizontal_row(ui, 36.0, |ui| {
+            ui.label(
+                RichText::new("Pipeline steps")
+                    .typo(Typo::H2)
+                    .color(TEXT_PRIMARY),
+            );
+            ui.add_space(8.0);
+            kit::count_badge(ui, total_steps);
+            ui.add_space(8.0);
+            if header_avail_w >= 640.0 {
+                ui.label(
+                    RichText::new(format!("for {env_name} — Sequential deployment stages"))
+                        .typo(Typo::Small)
+                        .color(TEXT_MUTED),
+                );
             }
 
-                let remote_btn = egui::Button::new(
-                    RichText::new("+ Remote SSH")
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                let add_menu_id = ui.make_persistent_id("pipeline_add_step_menu");
+                let add_btn = egui::Button::new(
+                    RichText::new("+ Add step")
                         .typo(Typo::SmallMedium)
-                        .color(TEAL_PILL_TEXT),
+                        .color(Color32::WHITE),
                 )
-                .fill(TEAL_PILL_BG)
-                .stroke(Stroke::new(1.0_f32, TEAL_PILL_TEXT))
-                .corner_radius(6.0);
-                if ui
-                    .add(remote_btn)
-                    .on_hover_text("Add a Remote SSH command step executed on target servers")
-                    .clicked()
-                {
-                    *add_remote = true;
-                }
-            };
+                .fill(PRIMARY_BLUE)
+                .corner_radius(CornerRadius::same(6))
+                .min_size(Vec2::new(96.0, 30.0));
 
-        if stack_step_buttons {
-            horizontal_row(ui, 28.0, |ui| {
-                ui.label(
-                    RichText::new(format!("{} PIPELINE STEPS", env_name.to_uppercase()))
-                        .typo(Typo::Label)
-                        .color(TEXT_PRIMARY),
-                );
-            });
-            ui.add_space(4.0);
-            ui.horizontal_wrapped(|ui| {
-                ui.spacing_mut().item_spacing = Vec2::new(6.0, 6.0);
-                render_add_step_buttons(
+                let add_resp = ui
+                    .add(add_btn)
+                    .on_hover_cursor(egui::CursorIcon::PointingHand);
+                if add_resp.clicked() {
+                    ui.memory_mut(|m| m.toggle_popup(add_menu_id));
+                }
+
+                egui::popup_below_widget(
                     ui,
-                    &mut add_local,
-                    &mut add_verify,
-                    &mut add_scp,
-                    &mut add_remote,
+                    add_menu_id,
+                    &add_resp,
+                    egui::PopupCloseBehavior::CloseOnClick,
+                    |ui| {
+                        ui.set_min_width(220.0);
+                        ui.spacing_mut().item_spacing = Vec2::new(0.0, 4.0);
+
+                        for (lbl, desc, accent, trigger) in [
+                            (
+                                "Local shell command",
+                                "Run build or test scripts locally",
+                                STEP_LOCAL_ACCENT,
+                                &mut add_local,
+                            ),
+                            (
+                                "Verify path guard",
+                                "Assert built file/folder exists",
+                                STEP_VERIFY_ACCENT,
+                                &mut add_verify,
+                            ),
+                            (
+                                "SCP file transfer",
+                                "Upload files & .env to remote server",
+                                STEP_SCP_ACCENT,
+                                &mut add_scp,
+                            ),
+                            (
+                                "Remote SSH command",
+                                "Execute restart/pm2 command on target",
+                                STEP_SSH_ACCENT,
+                                &mut add_remote,
+                            ),
+                        ] {
+                            let item_resp = ui
+                                .horizontal(|ui| {
+                                    let (dot_rect, _) = ui
+                                        .allocate_exact_size(Vec2::new(12.0, 24.0), Sense::hover());
+                                    ui.painter().circle_filled(dot_rect.center(), 4.0, accent);
+                                    ui.vertical(|ui| {
+                                        ui.label(
+                                            RichText::new(lbl)
+                                                .typo(Typo::SmallMedium)
+                                                .color(TEXT_PRIMARY),
+                                        );
+                                        ui.label(
+                                            RichText::new(desc)
+                                                .typo(Typo::Caption)
+                                                .color(TEXT_MUTED),
+                                        );
+                                    });
+                                })
+                                .response;
+
+                            let item_resp = ui
+                                .interact(
+                                    item_resp.rect,
+                                    ui.make_persistent_id(lbl),
+                                    Sense::click(),
+                                )
+                                .on_hover_cursor(egui::CursorIcon::PointingHand);
+                            if item_resp.clicked() {
+                                *trigger = true;
+                                ui.memory_mut(|m| m.close_popup());
+                            }
+                        }
+                    },
                 );
             });
-        } else {
-            horizontal_row(ui, 36.0, |ui| {
-                ui.label(
-                    RichText::new(format!("{} PIPELINE STEPS", env_name.to_uppercase()))
-                        .typo(Typo::Label)
-                        .color(TEXT_PRIMARY),
-                );
-                if show_step_subtitle {
-                    ui.label(
-                        RichText::new("— Add or customize any step type:")
-                            .typo(Typo::Small)
-                            .color(TEXT_MUTED),
-                    );
-                }
-
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.spacing_mut().item_spacing = Vec2::new(6.0, 0.0);
-                    let remote_btn = egui::Button::new(
-                        RichText::new("+ Remote SSH")
-                            .typo(Typo::SmallMedium)
-                            .color(TEAL_PILL_TEXT),
-                    )
-                    .fill(TEAL_PILL_BG)
-                    .stroke(Stroke::new(1.0_f32, TEAL_PILL_TEXT))
-                    .corner_radius(6.0);
-                    if ui
-                        .add(remote_btn)
-                        .on_hover_text("Add a Remote SSH command step executed on target servers")
-                        .clicked()
-                    {
-                        add_remote = true;
-                    }
-
-                    let scp_btn = egui::Button::new(
-                        RichText::new("+ SCP Upload")
-                            .typo(Typo::SmallMedium)
-                            .color(PURPLE_PILL_TEXT),
-                    )
-                    .fill(PURPLE_PILL_BG)
-                    .stroke(Stroke::new(1.0_f32, PURPLE_PILL_TEXT))
-                    .corner_radius(6.0);
-                    if ui
-                        .add(scp_btn)
-                        .on_hover_text(
-                            "Add an SCP file upload step (transfers local files & optional staged .env to {remote_dir})",
-                        )
-                        .clicked()
-                    {
-                        add_scp = true;
-                    }
-
-                    let verify_btn = egui::Button::new(
-                        RichText::new("+ Verify Path")
-                            .typo(Typo::SmallMedium)
-                            .color(WARN_PILL_TEXT),
-                    )
-                    .fill(WARN_PILL_BG)
-                    .stroke(Stroke::new(1.0_f32, WARN_PILL_TEXT))
-                    .corner_radius(6.0);
-                    if ui
-                        .add(verify_btn)
-                        .on_hover_text(
-                            "Add a local file/folder verification guard (e.g. ./dist/server.js)",
-                        )
-                        .clicked()
-                    {
-                        add_verify = true;
-                    }
-
-                    let local_btn = egui::Button::new(
-                        RichText::new("+ Local Command")
-                            .typo(Typo::SmallMedium)
-                            .color(BLUE_PILL_TEXT),
-                    )
-                    .fill(BLUE_PILL_BG)
-                    .stroke(Stroke::new(1.0_f32, BLUE_PILL_TEXT))
-                    .corner_radius(6.0);
-                    if ui
-                        .add(local_btn)
-                        .on_hover_text("Add a local shell command step (e.g. npm run build)")
-                        .clicked()
-                    {
-                        add_local = true;
-                    }
-                });
-            });
-        }
+        });
 
         if add_local || add_verify || add_scp || add_remote {
             let project = &mut self.storage.projects[proj_idx];
@@ -2449,17 +2378,66 @@ impl ShiplyApp {
             }
         }
 
-        ui.add_space(4.0);
-        ui.label(
-            RichText::new(
-                "Available template variables: {remote_dir}, {remote_user}, {app_name}, {http_proxy}, {env_source}, {version}",
-            )
-            .typo(Typo::Small)
-            .color(TEXT_MUTED),
-        );
-        ui.add_space(10.0);
+        ui.add_space(8.0);
 
-        let theme = self.theme();
+        // 2. Variables row: Muted "Variables:" followed by clickable MONO tags with "Click to copy"
+        horizontal_row(ui, 26.0, |ui| {
+            ui.label(
+                RichText::new("Variables:")
+                    .typo(Typo::Small)
+                    .color(TEXT_MUTED),
+            );
+            ui.add_space(6.0);
+            for var_name in [
+                "${{ version }}",
+                "${{ branch }}",
+                "${{ commit }}",
+                "${{ timestamp }}",
+                "${{ env }}",
+                "${{ project }}",
+                "${{ remote_dir }}",
+                "${{ secrets.KEY }}",
+            ] {
+                let galley = ui.painter().layout_no_wrap(
+                    var_name.to_string(),
+                    Typo::MonoSm.font(),
+                    TEXT_PRIMARY,
+                );
+                let pad_x = 6.0;
+                let tag_w = galley.size().x + pad_x * 2.0;
+                let tag_h = 22.0;
+                let (tag_rect, tag_resp) =
+                    ui.allocate_exact_size(Vec2::new(tag_w, tag_h), Sense::click());
+                let tag_resp = tag_resp
+                    .on_hover_cursor(egui::CursorIcon::PointingHand)
+                    .on_hover_text("Click to copy");
+                let bg = if tag_resp.hovered() {
+                    BLUE_PILL_HOVER_BG
+                } else {
+                    SUBTLE_BG
+                };
+                ui.painter()
+                    .rect_filled(tag_rect, CornerRadius::same(4), bg);
+                ui.painter().rect_stroke(
+                    tag_rect,
+                    CornerRadius::same(4),
+                    Stroke::new(1.0_f32, CARD_BORDER),
+                    StrokeKind::Inside,
+                );
+                let pos = Pos2::new(
+                    tag_rect.left() + pad_x,
+                    tag_rect.center().y - galley.size().y / 2.0,
+                );
+                ui.painter().galley(pos, galley, TEXT_PRIMARY);
+                if tag_resp.clicked() {
+                    ui.ctx().copy_text(var_name.to_string());
+                    self.set_status_banner(format!("Copied {var_name} to clipboard"), false);
+                }
+            }
+        });
+
+        ui.add_space(12.0);
+
         let project = &mut self.storage.projects[proj_idx];
         let Some(env_cfg) = project.get_env_mut(&env_key) else {
             return;
@@ -2481,16 +2459,16 @@ impl ShiplyApp {
         for (idx, step) in env_cfg.steps.iter_mut().enumerate() {
             let is_being_dragged = self.dragged_step_idx == Some(idx);
             let card_fill = if is_being_dragged {
-                theme.primary_soft
+                BLUE_PILL_BG
             } else if !step.enabled {
-                theme.surface_2
+                SUBTLE_BG
             } else {
-                theme.surface
+                CARD_BG
             };
             let step_border_color = if is_being_dragged {
-                theme.primary
+                PRIMARY_BLUE
             } else {
-                theme.border
+                CARD_BORDER
             };
             let step_accent_color = match &step.kind {
                 StepKind::LocalCommand { .. } => STEP_LOCAL_ACCENT,
@@ -2505,12 +2483,14 @@ impl ShiplyApp {
                     if is_being_dragged { 2.0_f32 } else { 1.0_f32 },
                     step_border_color,
                 ))
-                .corner_radius(10.0)
-                .inner_margin(Margin::symmetric(16, 12))
+                .corner_radius(CornerRadius::same(8))
+                .inner_margin(Margin::symmetric(16, 14))
                 .show(ui, |ui| {
-                    // Row 1: Drag Handle + Enable Checkbox + Step # + Interactive Type Dropdown + Step Name + Option Checkbox | Up / Down / Delete Buttons
-                    horizontal_row(ui, 32.0, |ui| {
-                        // Drag Handle: Vertical grip dots
+                    // Row 1: Header (36px)
+                    // Left: Drag handle + Enable checkbox + Step # + Step-type tag with colored dot and chevron + Step name
+                    // Right: Shell/options pills + Arrow Up / Down / Trash
+                    horizontal_row(ui, 36.0, |ui| {
+                        // Drag Handle
                         let handle_size = Vec2::new(18.0, 26.0);
                         let (handle_rect, handle_resp) =
                             ui.allocate_exact_size(handle_size, Sense::drag());
@@ -2549,41 +2529,44 @@ impl ShiplyApp {
                             handle_color,
                         );
                         handle_resp.on_hover_text("Drag to reorder this pipeline step");
-                        ui.add_space(3.0);
+                        ui.add_space(4.0);
 
+                        // Checkbox
                         if ui.checkbox(&mut step.enabled, "").changed() {
                             config_changed = true;
                         }
+                        ui.add_space(2.0);
+
+                        // Step Number in MONO (e.g. 01)
                         ui.label(
-                            RichText::new(format!("#{:02}", idx + 1))
-                                .typo(Typo::SmallMedium)
+                            RichText::new(format!("{:02}", idx + 1))
+                                .typo(Typo::Mono)
                                 .color(TEXT_MUTED),
                         );
+                        ui.add_space(6.0);
 
-                        let (type_label, _bg, fg) = match &step.kind {
-                            StepKind::LocalCommand { .. } => {
-                                ("Local", BLUE_PILL_BG, BLUE_PILL_TEXT)
-                            }
-                            StepKind::VerifyLocalPath { .. } => {
-                                ("Verify path", WARN_PILL_BG, WARN_PILL_TEXT)
-                            }
-                            StepKind::TransferFiles { .. } => {
-                                ("SCP upload", PURPLE_PILL_BG, PURPLE_PILL_TEXT)
-                            }
-                            StepKind::RemoteCommand { .. } => {
-                                ("Remote SSH", TEAL_PILL_BG, TEAL_PILL_TEXT)
-                            }
+                        // Step-type tag with colored dot and chevron
+                        let (type_label, fg) = match &step.kind {
+                            StepKind::LocalCommand { .. } => ("Local", BLUE_PILL_TEXT),
+                            StepKind::VerifyLocalPath { .. } => ("Verify", WARN_PILL_TEXT),
+                            StepKind::TransferFiles { .. } => ("SCP upload", PURPLE_PILL_TEXT),
+                            StepKind::RemoteCommand { .. } => ("Remote SSH", TEAL_PILL_TEXT),
                         };
 
-                        // Interactive Step Type Selector Dropdown so user can switch step type anytime!
+                        let (dot_rect, _) =
+                            ui.allocate_exact_size(Vec2::new(10.0, 20.0), Sense::hover());
+                        ui.painter()
+                            .circle_filled(dot_rect.center(), 3.5, step_accent_color);
+                        ui.add_space(2.0);
+
                         egui::ComboBox::from_id_salt(("step_kind_selector", &step.id))
-                            .selected_text(RichText::new(type_label).typo(Typo::Caption).color(fg))
-                            .width(120.0)
+                            .selected_text(
+                                RichText::new(type_label).typo(Typo::SmallMedium).color(fg),
+                            )
+                            .width(110.0)
                             .show_ui(ui, |ui| {
                                 let is_local = matches!(step.kind, StepKind::LocalCommand { .. });
-                                if ui
-                                    .selectable_label(is_local, "LOCAL — Local Command")
-                                    .clicked()
+                                if ui.selectable_label(is_local, "Local command").clicked()
                                     && !is_local
                                 {
                                     step.kind = StepKind::LocalCommand {
@@ -2596,9 +2579,7 @@ impl ShiplyApp {
 
                                 let is_verify =
                                     matches!(step.kind, StepKind::VerifyLocalPath { .. });
-                                if ui
-                                    .selectable_label(is_verify, "VERIFY PATH — Check File/Dir")
-                                    .clicked()
+                                if ui.selectable_label(is_verify, "Verify path").clicked()
                                     && !is_verify
                                 {
                                     step.kind = StepKind::VerifyLocalPath {
@@ -2608,10 +2589,7 @@ impl ShiplyApp {
                                 }
 
                                 let is_scp = matches!(step.kind, StepKind::TransferFiles { .. });
-                                if ui
-                                    .selectable_label(is_scp, "SCP UPLOAD — Transfer Files")
-                                    .clicked()
-                                    && !is_scp
+                                if ui.selectable_label(is_scp, "SCP transfer").clicked() && !is_scp
                                 {
                                     step.kind = StepKind::TransferFiles {
                                         sources: vec![
@@ -2625,9 +2603,7 @@ impl ShiplyApp {
                                 }
 
                                 let is_remote = matches!(step.kind, StepKind::RemoteCommand { .. });
-                                if ui
-                                    .selectable_label(is_remote, "Remote SSH — Server command")
-                                    .clicked()
+                                if ui.selectable_label(is_remote, "Remote SSH").clicked()
                                     && !is_remote
                                 {
                                     step.kind = StepKind::RemoteCommand {
@@ -2637,32 +2613,76 @@ impl ShiplyApp {
                                 }
                             });
 
+                        ui.add_space(8.0);
+
+                        // Step Name Input: inline editable, borderless until hover/focus
                         let rem_w = ui.available_width();
                         let reserved_for_opts_and_actions = match &step.kind {
                             StepKind::LocalCommand { .. } => {
-                                if rem_w < 460.0 {
-                                    300.0
+                                if rem_w < 500.0 {
+                                    280.0
                                 } else {
-                                    365.0
+                                    340.0
                                 }
                             }
-                            StepKind::TransferFiles { .. } => 235.0,
-                            _ => 120.0,
+                            StepKind::TransferFiles { .. } => 240.0,
+                            _ => 130.0,
                         };
                         let name_input_w =
-                            (rem_w - reserved_for_opts_and_actions).clamp(96.0, 320.0);
+                            (rem_w - reserved_for_opts_and_actions).clamp(100.0, 320.0);
 
-                        if styled_text_edit(
-                            ui,
-                            ("step_name", &step.id),
-                            &mut step.name,
-                            name_input_w,
-                            Some("Step name (e.g. Build Application)"),
-                        ) {
+                        let name_id = ui.make_persistent_id(("step_name_input", &step.id));
+                        let has_focus = ui.memory(|m| m.has_focus(name_id));
+                        let (outer_rect, outer_resp) =
+                            ui.allocate_exact_size(Vec2::new(name_input_w, 28.0), Sense::click());
+                        let is_hovered = outer_resp.hovered();
+                        let bg = if has_focus {
+                            INPUT_BG
+                        } else if is_hovered {
+                            SUBTLE_BG
+                        } else {
+                            Color32::TRANSPARENT
+                        };
+                        let stroke = if has_focus {
+                            Stroke::new(1.0_f32, PRIMARY_BLUE)
+                        } else if is_hovered {
+                            Stroke::new(1.0_f32, INPUT_BORDER)
+                        } else {
+                            Stroke::NONE
+                        };
+                        ui.painter()
+                            .rect_filled(outer_rect, CornerRadius::same(4), bg);
+                        if stroke != Stroke::NONE {
+                            ui.painter().rect_stroke(
+                                outer_rect,
+                                CornerRadius::same(4),
+                                stroke,
+                                StrokeKind::Inside,
+                            );
+                        }
+                        let inner_rect = outer_rect.shrink2(Vec2::new(6.0, 2.0));
+                        let mut child = ui.new_child(
+                            egui::UiBuilder::new()
+                                .id_salt(("step_name_child", &step.id))
+                                .max_rect(inner_rect),
+                        );
+                        let resp = child.add(
+                            egui::TextEdit::singleline(&mut step.name)
+                                .id_salt(name_id)
+                                .font(Typo::SmallMedium.font())
+                                .frame(false)
+                                .desired_width(inner_rect.width())
+                                .hint_text(
+                                    RichText::new("Step name")
+                                        .typo(Typo::Small)
+                                        .color(TEXT_PLACEHOLDER),
+                                ),
+                        );
+                        if resp.changed() {
                             config_changed = true;
                         }
 
-                        // Step-type specific toggle placed cleanly in Row 1 with responsive sizing
+                        // Right: Shell / Options pills
                         match &mut step.kind {
                             StepKind::LocalCommand {
                                 allow_failure,
@@ -2693,15 +2713,10 @@ impl ShiplyApp {
                                     });
 
                                 ui.add_space(6.0);
-                                let allow_fail_lbl = if rem_w < 460.0 {
-                                    "Allow failure"
-                                } else {
-                                    "Continue on non-zero exit"
-                                };
                                 if ui
                                     .checkbox(
                                         allow_failure,
-                                        RichText::new(allow_fail_lbl)
+                                        RichText::new("Continue on error")
                                             .typo(Typo::Small)
                                             .color(TEXT_SECONDARY),
                                     )
@@ -2727,7 +2742,7 @@ impl ShiplyApp {
                             _ => {}
                         }
 
-                        // Right-aligned Reorder & Delete actions using crisp vector outline icons!
+                        // Right-aligned Reorder & Delete actions
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             ui.spacing_mut().item_spacing = Vec2::new(6.0, 0.0);
                             if outline_icon_button(
@@ -2795,101 +2810,143 @@ impl ShiplyApp {
                         });
                     });
 
-                    ui.add_space(8.0);
+                    ui.add_space(10.0);
 
-                    // Row 2: Full-width Command / Path / SCP Sources field
-                    horizontal_row(ui, 34.0, |ui| {
-                        let (field_label, placeholder) = match &step.kind {
-                            StepKind::LocalCommand { .. } => ("Command:", "e.g. npm run build"),
-                            StepKind::VerifyLocalPath { .. } => {
-                                ("Verify Path:", "e.g. ./dist/index.js or ./dist")
-                            }
-                            StepKind::TransferFiles { .. } => (
-                                "SCP Sources:",
-                                "e.g. ./dist, ./package.json, ./package-lock.json",
-                            ),
-                            StepKind::RemoteCommand { .. } => {
-                                ("Remote SSH:", "e.g. pm2 restart {app_name} --update-env")
-                            }
-                        };
+                    // Row 2: Form labels above inputs, full-width CODE input, SCP in 2-column grid
+                    match &mut step.kind {
+                        StepKind::TransferFiles { sources, .. } => {
+                            ui.columns(2, |cols| {
+                                cols[0].vertical(|ui| {
+                                    ui.label(
+                                        RichText::new("Local source files / directories:")
+                                            .typo(Typo::SmallMedium)
+                                            .color(TEXT_SECONDARY),
+                                    );
+                                    ui.add_space(4.0);
+                                    let col_w = ui.available_width();
+                                    let sources_text = match &mut self.step_scp_sources_buffer {
+                                        Some((id, buf)) if id == &step.id => buf,
+                                        _ => {
+                                            let joined = sources.join(", ");
+                                            self.step_scp_sources_buffer =
+                                                Some((step.id.clone(), joined));
+                                            &mut self.step_scp_sources_buffer.as_mut().unwrap().1
+                                        }
+                                    };
+                                    if syntax_highlighted_text_edit(
+                                        ui,
+                                        ("step_transfer_sources", &step.id),
+                                        sources_text,
+                                        col_w,
+                                        Some("e.g. ./dist, ./package.json, ./package-lock.json"),
+                                    ) {
+                                        *sources = sources_text
+                                            .split(',')
+                                            .map(|s| s.trim().to_string())
+                                            .filter(|s| !s.is_empty())
+                                            .collect();
+                                        config_changed = true;
+                                    }
+                                });
 
-                        ui.add_sized(
-                            [88.0, 24.0],
-                            egui::Label::new(
-                                RichText::new(field_label)
-                                    .typo(Typo::SmallMedium)
-                                    .color(TEXT_SECONDARY),
-                            ),
-                        );
-
-                        let input_w = (ui.available_width() - 4.0).max(200.0);
-                        match &mut step.kind {
-                            StepKind::LocalCommand { command, .. } => {
+                                cols[1].vertical(|ui| {
+                                    ui.label(
+                                        RichText::new("Remote target directory:")
+                                            .typo(Typo::SmallMedium)
+                                            .color(TEXT_SECONDARY),
+                                    );
+                                    ui.add_space(4.0);
+                                    let col_w = ui.available_width();
+                                    egui::Frame::new()
+                                        .fill(SUBTLE_BG)
+                                        .corner_radius(CornerRadius::same(6))
+                                        .stroke(Stroke::new(1.0_f32, CARD_BORDER))
+                                        .inner_margin(Margin::symmetric(10, 8))
+                                        .show(ui, |ui| {
+                                            ui.set_min_width(col_w - 20.0);
+                                            ui.horizontal(|ui| {
+                                                ui.label(
+                                                    RichText::new("{remote_dir}")
+                                                        .typo(Typo::Code)
+                                                        .color(TEXT_PRIMARY),
+                                                );
+                                                ui.label(
+                                                    RichText::new("— configured in Settings")
+                                                        .typo(Typo::Small)
+                                                        .color(TEXT_MUTED),
+                                                );
+                                            });
+                                        });
+                                });
+                            });
+                        }
+                        StepKind::LocalCommand { command, .. } => {
+                            ui.vertical(|ui| {
+                                ui.label(
+                                    RichText::new("Shell command:")
+                                        .typo(Typo::SmallMedium)
+                                        .color(TEXT_SECONDARY),
+                                );
+                                ui.add_space(4.0);
+                                let input_w = ui.available_width();
                                 if syntax_highlighted_text_edit(
                                     ui,
                                     ("step_local_cmd", &step.id),
                                     command,
                                     input_w,
-                                    Some(placeholder),
+                                    Some("e.g. npm run build"),
                                 ) {
                                     config_changed = true;
                                 }
-                            }
-                            StepKind::VerifyLocalPath { path } => {
+                            });
+                        }
+                        StepKind::VerifyLocalPath { path } => {
+                            ui.vertical(|ui| {
+                                ui.label(
+                                    RichText::new("Verify path guard:")
+                                        .typo(Typo::SmallMedium)
+                                        .color(TEXT_SECONDARY),
+                                );
+                                ui.add_space(4.0);
+                                let input_w = ui.available_width();
                                 if syntax_highlighted_text_edit(
                                     ui,
                                     ("step_verify_path", &step.id),
                                     path,
                                     input_w,
-                                    Some(placeholder),
+                                    Some("e.g. ./dist/server.js or ./dist"),
                                 ) {
                                     config_changed = true;
                                 }
-                            }
-                            StepKind::TransferFiles { sources, .. } => {
-                                let sources_text = match &mut self.step_scp_sources_buffer {
-                                    Some((id, buf)) if id == &step.id => buf,
-                                    _ => {
-                                        let joined = sources.join(", ");
-                                        self.step_scp_sources_buffer =
-                                            Some((step.id.clone(), joined));
-                                        &mut self.step_scp_sources_buffer.as_mut().unwrap().1
-                                    }
-                                };
-                                if syntax_highlighted_text_edit(
-                                    ui,
-                                    ("step_transfer_sources", &step.id),
-                                    sources_text,
-                                    input_w,
-                                    Some(placeholder),
-                                ) {
-                                    *sources = sources_text
-                                        .split(',')
-                                        .map(|s| s.trim().to_string())
-                                        .filter(|s| !s.is_empty())
-                                        .collect();
-                                    config_changed = true;
-                                }
-                            }
-                            StepKind::RemoteCommand { command } => {
+                            });
+                        }
+                        StepKind::RemoteCommand { command } => {
+                            ui.vertical(|ui| {
+                                ui.label(
+                                    RichText::new("Remote SSH command:")
+                                        .typo(Typo::SmallMedium)
+                                        .color(TEXT_SECONDARY),
+                                );
+                                ui.add_space(4.0);
+                                let input_w = ui.available_width();
                                 if syntax_highlighted_text_edit(
                                     ui,
                                     ("step_remote_cmd", &step.id),
                                     command,
                                     input_w,
-                                    Some(placeholder),
+                                    Some("e.g. pm2 restart {app_name} --update-env"),
                                 ) {
                                     config_changed = true;
                                 }
-                            }
+                            });
                         }
-                    });
+                    }
                 });
 
             let card_rect = frame_resp.response.rect;
             let bar_rect = Rect::from_min_max(
-                Pos2::new(card_rect.left(), card_rect.top() + 6.0),
-                Pos2::new(card_rect.left() + 3.0, card_rect.bottom() - 6.0),
+                Pos2::new(card_rect.left(), card_rect.top() + 4.0),
+                Pos2::new(card_rect.left() + 3.0, card_rect.bottom() - 4.0),
             );
             ui.painter().rect_filled(
                 bar_rect,
@@ -2902,13 +2959,13 @@ impl ShiplyApp {
                 if step.enabled {
                     step_accent_color
                 } else {
-                    theme.text_subtle
+                    TEXT_MUTED
                 },
             );
             if is_being_dragged {
                 let shadow_rect = card_rect.translate(Vec2::new(0.0, 4.0)).expand(1.0);
                 ui.painter()
-                    .rect_filled(shadow_rect, CornerRadius::same(10), OVERLAY_SCRIM_LIGHT);
+                    .rect_filled(shadow_rect, CornerRadius::same(8), OVERLAY_SCRIM_LIGHT);
             }
             if let Some(from_idx) = self.dragged_step_idx {
                 if from_idx != idx {
@@ -2938,7 +2995,7 @@ impl ShiplyApp {
                             );
                             ui.painter().rect_filled(
                                 card_rect,
-                                CornerRadius::same(10),
+                                CornerRadius::same(8),
                                 PRIMARY_BLUE.gamma_multiply(0.08),
                             );
                             if is_pointer_released {
