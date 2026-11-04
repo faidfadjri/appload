@@ -17,14 +17,70 @@ fn main() {
 
     let version = env::var("CARGO_PKG_VERSION").unwrap_or_else(|_| "0.10.16".to_string());
     let version_parts: Vec<&str> = version.split('.').collect();
-    let major = version_parts.first().and_then(|v| v.parse::<u32>().ok()).unwrap_or(0);
-    let minor = version_parts.get(1).and_then(|v| v.parse::<u32>().ok()).unwrap_or(0);
-    let patch = version_parts.get(2).and_then(|v| v.parse::<u32>().ok()).unwrap_or(0);
+    let major = version_parts
+        .first()
+        .and_then(|v| v.parse::<u32>().ok())
+        .unwrap_or(0);
+    let minor = version_parts
+        .get(1)
+        .and_then(|v| v.parse::<u32>().ok())
+        .unwrap_or(0);
+    let patch = version_parts
+        .get(2)
+        .and_then(|v| v.parse::<u32>().ok())
+        .unwrap_or(0);
     let file_version_csv = format!("{major},{minor},{patch},0");
     let file_version_str = format!("{major}.{minor}.{patch}.0");
 
+    let manifest_content = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <assemblyIdentity
+    version="1.0.0.0"
+    processorArchitecture="*"
+    name="Shiply.Deployment.Platform"
+    type="win32"
+  />
+  <description>Shiply Mini Deployment Platform</description>
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2, PerMonitor</dpiAwareness>
+    </windowsSettings>
+  </application>
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <!-- Windows 10 and Windows 11 -->
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
+      <!-- Windows 8.1 -->
+      <supportedOS Id="{1f676c76-80e1-4239-95bb-83d0f6d0da78}"/>
+      <!-- Windows 8 -->
+      <supportedOS Id="{4a2f28e3-53b9-4441-ba9c-d69d4a4a6e38}"/>
+      <!-- Windows 7 -->
+      <supportedOS Id="{35138b9a-5d96-4fbd-8e2d-a2440225f93a}"/>
+    </application>
+  </compatibility>
+  <dependency>
+    <dependentAssembly>
+      <assemblyIdentity
+        type="win32"
+        name="Microsoft.Windows.Common-Controls"
+        version="6.0.0.0"
+        processorArchitecture="*"
+        publicKeyToken="6595b64144ccf1df"
+        language="*"
+      />
+    </dependentAssembly>
+  </dependency>
+</assembly>
+"#;
+
+    let manifest_file = out_dir.join("shiply.manifest");
+    let _ = fs::write(&manifest_file, manifest_content);
+    let manifest_escaped = manifest_file.to_string_lossy().replace('\\', "/");
+
     let rc_content = format!(
         r#"1 ICON "{ico_escaped}"
+1 24 "{manifest_escaped}"
 
 1 VERSIONINFO
 FILEVERSION {file_version_csv}
@@ -56,6 +112,7 @@ BEGIN
 END
 "#,
         ico_escaped = ico_path.to_string_lossy().replace('\\', "/"),
+        manifest_escaped = manifest_escaped,
     );
 
     let rc_file = out_dir.join("shiply.rc");
@@ -102,12 +159,17 @@ END
     }
 
     if !compiled_ok {
-        // Fallback: compile raw binary .res with RT_ICON and RT_GROUP_ICON
-        compile_raw_icon_res(&ico_path, &out_dir, &target_env);
+        // Fallback: compile raw binary .res with RT_ICON, RT_GROUP_ICON and RT_MANIFEST
+        compile_raw_icon_res(
+            &ico_path,
+            &out_dir,
+            &target_env,
+            manifest_content.as_bytes(),
+        );
     }
 }
 
-fn compile_raw_icon_res(ico_path: &Path, out_dir: &Path, target_env: &str) {
+fn compile_raw_icon_res(ico_path: &Path, out_dir: &Path, target_env: &str, manifest_bytes: &[u8]) {
     let Ok(ico) = fs::read(ico_path) else {
         return;
     };
@@ -161,6 +223,22 @@ fn compile_raw_icon_res(ico_path: &Path, out_dir: &Path, target_env: &str) {
     res.extend_from_slice(&0u32.to_le_bytes());
     res.extend_from_slice(&0u32.to_le_bytes());
     res.extend_from_slice(&grp_data);
+    while res.len() % 4 != 0 {
+        res.push(0);
+    }
+
+    // 4. RT_MANIFEST (Type = 24, Name = 1)
+    let manifest_size = manifest_bytes.len() as u32;
+    res.extend_from_slice(&manifest_size.to_le_bytes());
+    res.extend_from_slice(&32u32.to_le_bytes());
+    res.extend_from_slice(&[0xFF, 0xFF, 0x18, 0x00]); // RT_MANIFEST = 24
+    res.extend_from_slice(&[0xFF, 0xFF, 0x01, 0x00]); // ID = 1
+    res.extend_from_slice(&0u32.to_le_bytes());
+    res.extend_from_slice(&0x1030u16.to_le_bytes());
+    res.extend_from_slice(&0x0409u16.to_le_bytes());
+    res.extend_from_slice(&0u32.to_le_bytes());
+    res.extend_from_slice(&0u32.to_le_bytes());
+    res.extend_from_slice(manifest_bytes);
     while res.len() % 4 != 0 {
         res.push(0);
     }
