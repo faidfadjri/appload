@@ -4,11 +4,12 @@ impl ShiplyApp {
     /// Renders the custom frameless Webflow-style topbar with left navigation pills,
     /// 3px brand primary accent strip, theme toggle, draggable window region, notification bell, and window controls.
     pub(crate) fn render_termius_topbar(&mut self, ctx: &egui::Context) {
+        Self::install_fonts(ctx);
         let theme = self.theme();
-        let topbar_bg = Color32::from_rgb(11, 18, 32); // Deep navy-black topbar
-        let pill_bg = Color32::from_rgb(26, 36, 56);   // Dark hover fill for buttons
-        let topbar_text = Color32::from_rgb(241, 245, 249); // Clean white text
-        let icon_muted = Color32::from_rgb(180, 190, 205);  // Light muted icon
+        let topbar_bg = SB_BG; // Deep navy-black topbar
+        let pill_bg = SB_SURFACE_HOVER; // Dark hover fill for buttons
+        let topbar_text = SB_TEXT; // Clean white text
+        let icon_muted = SB_TEXT_MUTED; // Light muted icon
 
         if let Some(maximized) = ctx.input(|i| i.viewport().maximized) {
             self.window_maximized = maximized;
@@ -32,12 +33,13 @@ impl ShiplyApp {
                 // 1. Left Hamburger Menu Button (≡) — toggles sidebar visibility or off-canvas drawer
                 let menu_rect =
                     Rect::from_center_size(Pos2::new(x + 14.0, cy), Vec2::new(28.0, pill_h));
-                let menu_resp = ui.interact(
-                    menu_rect,
-                    egui::Id::new("topbar_hamburger_btn"),
-                    Sense::click(),
-                )
-                .on_hover_cursor(egui::CursorIcon::PointingHand);
+                let menu_resp = ui
+                    .interact(
+                        menu_rect,
+                        egui::Id::new("topbar_hamburger_btn"),
+                        Sense::click(),
+                    )
+                    .on_hover_cursor(egui::CursorIcon::PointingHand);
                 if menu_resp.hovered() {
                     ui.painter()
                         .rect_filled(menu_rect, CornerRadius::same(6), pill_bg);
@@ -50,7 +52,10 @@ impl ShiplyApp {
                 let mc = menu_rect.center();
                 for dy in [-4.0_f32, 0.0, 4.0] {
                     ui.painter().line_segment(
-                        [Pos2::new(mc.x - 6.5, mc.y + dy), Pos2::new(mc.x + 6.5, mc.y + dy)],
+                        [
+                            Pos2::new(mc.x - 6.5, mc.y + dy),
+                            Pos2::new(mc.x + 6.5, mc.y + dy),
+                        ],
                         Stroke::new(1.5_f32, menu_fg),
                     );
                 }
@@ -71,7 +76,7 @@ impl ShiplyApp {
                     ui.painter(),
                     logo_rect,
                     5,
-                    FONT_SM,
+                    Typo::Small.size(),
                     self.logo_texture.as_ref(),
                 );
                 x = logo_rect.right() + 8.0;
@@ -80,7 +85,7 @@ impl ShiplyApp {
                     Pos2::new(x, cy),
                     Align2::LEFT_CENTER,
                     format!("Shiply v{APP_VERSION}"),
-                    FontId::proportional(FONT_MD),
+                    Typo::Label.font(),
                     topbar_text,
                 );
                 let left_controls_end = x + 100.0;
@@ -134,12 +139,13 @@ impl ShiplyApp {
                 }
 
                 // A. Notification Bell Button (🔔) — acts as Update Information
-                let bell_resp = ui.interact(
-                    bell_rect,
-                    egui::Id::new("topbar_bell_update_btn"),
-                    Sense::click(),
-                )
-                .on_hover_cursor(egui::CursorIcon::PointingHand);
+                let bell_resp = ui
+                    .interact(
+                        bell_rect,
+                        egui::Id::new("topbar_bell_update_btn"),
+                        Sense::click(),
+                    )
+                    .on_hover_cursor(egui::CursorIcon::PointingHand);
                 if bell_resp.hovered() {
                     ui.painter()
                         .rect_filled(bell_rect, CornerRadius::same(6), pill_bg);
@@ -174,34 +180,43 @@ impl ShiplyApp {
                 }
 
                 // A2. Donation / Support Button (❤️) — redirects to Trakteer
-                let donate_resp = ui.interact(
-                    donate_rect,
-                    egui::Id::new("topbar_donate_btn"),
-                    Sense::click(),
-                )
-                .on_hover_cursor(egui::CursorIcon::PointingHand)
-                .on_hover_text("Support development on Trakteer (https://trakteer.id/faidfadjri)");
+                let donate_resp = ui
+                    .interact(
+                        donate_rect,
+                        egui::Id::new("topbar_donate_btn"),
+                        Sense::click(),
+                    )
+                    .on_hover_cursor(egui::CursorIcon::PointingHand)
+                    .on_hover_text(
+                        "Support development on Trakteer (https://trakteer.id/faidfadjri)",
+                    );
                 if donate_resp.hovered() {
                     ui.painter()
                         .rect_filled(donate_rect, CornerRadius::same(6), pill_bg);
                 }
                 let donate_fg = if donate_resp.hovered() {
-                    Color32::from_rgb(255, 95, 125)
+                    HEART_PINK
                 } else {
                     icon_muted
                 };
-                draw_outline_icon(ui.painter(), donate_rect.center(), OutlineIcon::Heart, donate_fg);
+                draw_outline_icon(
+                    ui.painter(),
+                    donate_rect.center(),
+                    OutlineIcon::Heart,
+                    donate_fg,
+                );
                 if donate_resp.clicked() {
                     open_url_in_browser(DONATION_URL);
                 }
 
                 // B. Minimize Button (─)
-                let min_resp = ui.interact(
-                    min_rect,
-                    egui::Id::new("topbar_window_minimize_btn"),
-                    Sense::click(),
-                )
-                .on_hover_cursor(egui::CursorIcon::PointingHand);
+                let min_resp = ui
+                    .interact(
+                        min_rect,
+                        egui::Id::new("topbar_window_minimize_btn"),
+                        Sense::click(),
+                    )
+                    .on_hover_cursor(egui::CursorIcon::PointingHand);
                 if min_resp.hovered() {
                     ui.painter()
                         .rect_filled(min_rect, CornerRadius::same(6), pill_bg);
@@ -213,7 +228,10 @@ impl ShiplyApp {
                 };
                 let min_c = min_rect.center();
                 ui.painter().line_segment(
-                    [Pos2::new(min_c.x - 5.0, min_c.y), Pos2::new(min_c.x + 5.0, min_c.y)],
+                    [
+                        Pos2::new(min_c.x - 5.0, min_c.y),
+                        Pos2::new(min_c.x + 5.0, min_c.y),
+                    ],
                     Stroke::new(1.5_f32, min_fg),
                 );
                 if min_resp.on_hover_text("Minimize").clicked() {
@@ -221,12 +239,13 @@ impl ShiplyApp {
                 }
 
                 // C. Maximize / Restore Button
-                let max_resp = ui.interact(
-                    max_rect,
-                    egui::Id::new("topbar_window_maximize_btn"),
-                    Sense::click(),
-                )
-                .on_hover_cursor(egui::CursorIcon::PointingHand);
+                let max_resp = ui
+                    .interact(
+                        max_rect,
+                        egui::Id::new("topbar_window_maximize_btn"),
+                        Sense::click(),
+                    )
+                    .on_hover_cursor(egui::CursorIcon::PointingHand);
                 if max_resp.hovered() {
                     ui.painter()
                         .rect_filled(max_rect, CornerRadius::same(6), pill_bg);
@@ -255,18 +274,16 @@ impl ShiplyApp {
                 }
 
                 // D. Close Button (×)
-                let close_resp = ui.interact(
-                    close_rect,
-                    egui::Id::new("topbar_window_close_btn"),
-                    Sense::click(),
-                )
-                .on_hover_cursor(egui::CursorIcon::PointingHand);
-                if close_resp.hovered() {
-                    ui.painter().rect_filled(
+                let close_resp = ui
+                    .interact(
                         close_rect,
-                        CornerRadius::same(6),
-                        theme.danger,
-                    );
+                        egui::Id::new("topbar_window_close_btn"),
+                        Sense::click(),
+                    )
+                    .on_hover_cursor(egui::CursorIcon::PointingHand);
+                if close_resp.hovered() {
+                    ui.painter()
+                        .rect_filled(close_rect, CornerRadius::same(6), theme.danger);
                 }
                 let close_fg = if close_resp.hovered() {
                     Color32::WHITE
@@ -276,11 +293,17 @@ impl ShiplyApp {
                 let cc = close_rect.center();
                 let cs = Stroke::new(1.5_f32, close_fg);
                 ui.painter().line_segment(
-                    [Pos2::new(cc.x - 4.5, cc.y - 4.5), Pos2::new(cc.x + 4.5, cc.y + 4.5)],
+                    [
+                        Pos2::new(cc.x - 4.5, cc.y - 4.5),
+                        Pos2::new(cc.x + 4.5, cc.y + 4.5),
+                    ],
                     cs,
                 );
                 ui.painter().line_segment(
-                    [Pos2::new(cc.x + 4.5, cc.y - 4.5), Pos2::new(cc.x - 4.5, cc.y + 4.5)],
+                    [
+                        Pos2::new(cc.x + 4.5, cc.y - 4.5),
+                        Pos2::new(cc.x - 4.5, cc.y + 4.5),
+                    ],
                     cs,
                 );
                 if close_resp.on_hover_text("Close").clicked() {
@@ -361,7 +384,10 @@ impl ShiplyApp {
             (
                 "resize_se",
                 Rect::from_min_size(
-                    Pos2::new(screen.right() - border * 2.0, screen.bottom() - border * 2.0),
+                    Pos2::new(
+                        screen.right() - border * 2.0,
+                        screen.bottom() - border * 2.0,
+                    ),
                     Vec2::splat(border * 2.0),
                 ),
                 egui::ResizeDirection::SouthEast,

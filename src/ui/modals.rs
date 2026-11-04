@@ -24,7 +24,8 @@ pub(crate) fn prepare_animated_modal(
         .show(ctx, |ui| {
             let screen_rect = ctx.screen_rect();
             let resp = ui.allocate_rect(screen_rect, Sense::click());
-            ui.painter().rect_filled(screen_rect, CornerRadius::ZERO, overlay_color);
+            ui.painter()
+                .rect_filled(screen_rect, CornerRadius::ZERO, overlay_color);
             if resp.clicked() {
                 *is_open = false;
             }
@@ -73,7 +74,9 @@ impl ShiplyApp {
     }
 
     pub(crate) fn render_new_project_modal(&mut self, ctx: &egui::Context) {
-        let Some(anim_t) = prepare_animated_modal(ctx, "new_project", &mut self.show_new_project_modal) else {
+        let Some(anim_t) =
+            prepare_animated_modal(ctx, "new_project", &mut self.show_new_project_modal)
+        else {
             return;
         };
         let (window, inner_w) = animated_modal_window(ctx, "Add Project", anim_t, None);
@@ -99,9 +102,8 @@ impl ShiplyApp {
                     .inner_margin(Margin::same(16))
                     .show(ui, |ui| {
                         ui.label(
-                            RichText::new("AUTO-IMPORT FROM POWERSHELL SCRIPT (.PS1)")
-                                .size(FS_MICRO)
-                                .strong()
+                            RichText::new("Auto-import from PowerShell script (.ps1)")
+                                .typo(Typo::Caption)
                                 .color(ACCENT),
                         );
                         ui.add_space(SP_8);
@@ -138,7 +140,7 @@ impl ShiplyApp {
                                 RichText::new(
                                     "Also auto-import sibling deploy-*.ps1 scripts in the same project folder",
                                 )
-                                .size(FS_SMALL)
+                                .typo(Typo::Small)
                                 .color(MD_TEXT_MUTED),
                             )
                             .changed()
@@ -153,8 +155,7 @@ impl ShiplyApp {
                             let is_err = notice.starts_with("Import error:");
                             ui.label(
                                 RichText::new(notice)
-                                    .size(FS_SMALL)
-                                    .strong()
+                                    .typo(Typo::SmallMedium)
                                     .color(if is_err {
                                         FAIL_PILL_TEXT
                                     } else {
@@ -166,12 +167,10 @@ impl ShiplyApp {
 
                 ui.add_space(SP_16);
 
-                // Project Form Fields (vertical gap 16px, label FS_BASE weight 500, margin-bottom 8px)
+                // Project Form Fields (vertical gap 16px, label Typo::Label weight 500, margin-bottom 8px)
                 ui.label(
                     RichText::new("Project Name")
-                        .size(FS_BASE)
-                        .strong()
-                        .color(MD_TEXT),
+                        .typo(Typo::Label).color(MD_TEXT),
                 );
                 ui.add_space(SP_8);
                 modal_text_input(
@@ -185,9 +184,7 @@ impl ShiplyApp {
                 ui.add_space(SP_16);
                 ui.label(
                     RichText::new("Local Project Directory")
-                        .size(FS_BASE)
-                        .strong()
-                        .color(MD_TEXT),
+                        .typo(Typo::Label).color(MD_TEXT),
                 );
                 ui.add_space(SP_8);
                 let dir_input_w = (inner_w - 152.0).max(140.0);
@@ -214,9 +211,7 @@ impl ShiplyApp {
                 ui.add_space(SP_16);
                 ui.label(
                     RichText::new("Description")
-                        .size(FS_BASE)
-                        .strong()
-                        .color(MD_TEXT),
+                        .typo(Typo::Label).color(MD_TEXT),
                 );
                 ui.add_space(SP_8);
                 modal_text_input(
@@ -230,9 +225,7 @@ impl ShiplyApp {
                 ui.add_space(SP_16);
                 ui.label(
                     RichText::new("Group (Optional)")
-                        .size(FS_BASE)
-                        .strong()
-                        .color(MD_TEXT),
+                        .typo(Typo::Label).color(MD_TEXT),
                 );
                 ui.add_space(SP_8);
                 modal_text_input(
@@ -246,13 +239,13 @@ impl ShiplyApp {
                 if !existing_groups.is_empty() {
                     ui.add_space(SP_8);
                     horizontal_row(ui, 24.0, |ui| {
-                        ui.label(RichText::new("Quick Select:").size(FS_MICRO).color(MD_TEXT_MUTED));
+                        ui.label(RichText::new("Quick Select:").typo(Typo::Caption).color(MD_TEXT_MUTED));
                         for grp in existing_groups {
                             let is_sel = self.new_project_group == grp;
                             if ui
                                 .add(
                                     egui::Button::new(
-                                        RichText::new(&grp).size(FS_MICRO).strong().color(if is_sel {
+                                        RichText::new(&grp).typo(Typo::Caption).color(if is_sel {
                                             Color32::WHITE
                                         } else {
                                             MD_TEXT
@@ -284,7 +277,7 @@ impl ShiplyApp {
                         } else {
                             "Starts empty (you can add or import environments anytime)".to_string()
                         })
-                        .size(FS_MICRO)
+                        .typo(Typo::Caption)
                         .color(MD_TEXT_MUTED),
                     );
 
@@ -373,7 +366,9 @@ impl ShiplyApp {
             return;
         };
 
-        let Some(anim_t) = prepare_animated_modal(ctx, "edit_project", &mut self.show_edit_project_modal) else {
+        let Some(anim_t) =
+            prepare_animated_modal(ctx, "edit_project", &mut self.show_edit_project_modal)
+        else {
             return;
         };
         let (window, inner_w) = animated_modal_window(ctx, "Edit Project", anim_t, None);
@@ -399,9 +394,8 @@ impl ShiplyApp {
                     .inner_margin(Margin::same(16))
                     .show(ui, |ui| {
                         ui.label(
-                            RichText::new("SYNC / IMPORT ENVIRONMENT FROM .PS1 SCRIPT")
-                                .size(FS_MICRO)
-                                .strong()
+                            RichText::new("Sync / import environment from .ps1 script")
+                                .typo(Typo::Caption)
                                 .color(ACCENT),
                         );
                         ui.add_space(SP_8);
@@ -454,8 +448,7 @@ impl ShiplyApp {
                             let is_err = notice.starts_with("Import error:");
                             ui.label(
                                 RichText::new(notice)
-                                    .size(FS_SMALL)
-                                    .strong()
+                                    .typo(Typo::SmallMedium)
                                     .color(if is_err {
                                         FAIL_PILL_TEXT
                                     } else {
@@ -467,12 +460,10 @@ impl ShiplyApp {
 
                 ui.add_space(SP_16);
 
-                // Project Form Fields (vertical gap 16px, label FS_BASE weight 500, margin-bottom 8px)
+                // Project Form Fields (vertical gap 16px, label Typo::Label weight 500, margin-bottom 8px)
                 ui.label(
                     RichText::new("Project Name")
-                        .size(FS_BASE)
-                        .strong()
-                        .color(MD_TEXT),
+                        .typo(Typo::Label).color(MD_TEXT),
                 );
                 ui.add_space(SP_8);
                 modal_text_input(
@@ -486,9 +477,7 @@ impl ShiplyApp {
                 ui.add_space(SP_16);
                 ui.label(
                     RichText::new("Local Project Directory")
-                        .size(FS_BASE)
-                        .strong()
-                        .color(MD_TEXT),
+                        .typo(Typo::Label).color(MD_TEXT),
                 );
                 ui.add_space(SP_8);
                 let dir_input_w = (inner_w - 152.0).max(140.0);
@@ -512,9 +501,7 @@ impl ShiplyApp {
                 ui.add_space(SP_16);
                 ui.label(
                     RichText::new("Description")
-                        .size(FS_BASE)
-                        .strong()
-                        .color(MD_TEXT),
+                        .typo(Typo::Label).color(MD_TEXT),
                 );
                 ui.add_space(SP_8);
                 modal_text_input(
@@ -528,9 +515,7 @@ impl ShiplyApp {
                 ui.add_space(SP_16);
                 ui.label(
                     RichText::new("Group (Optional)")
-                        .size(FS_BASE)
-                        .strong()
-                        .color(MD_TEXT),
+                        .typo(Typo::Label).color(MD_TEXT),
                 );
                 ui.add_space(SP_8);
                 modal_text_input(
@@ -544,13 +529,13 @@ impl ShiplyApp {
                 if !existing_groups.is_empty() {
                     ui.add_space(SP_8);
                     horizontal_row(ui, 24.0, |ui| {
-                        ui.label(RichText::new("Quick Select:").size(FS_MICRO).color(MD_TEXT_MUTED));
+                        ui.label(RichText::new("Quick Select:").typo(Typo::Caption).color(MD_TEXT_MUTED));
                         for grp in existing_groups {
                             let is_sel = self.edit_project_group == grp;
                             if ui
                                 .add(
                                     egui::Button::new(
-                                        RichText::new(&grp).size(FS_MICRO).strong().color(if is_sel {
+                                        RichText::new(&grp).typo(Typo::Caption).color(if is_sel {
                                             Color32::WHITE
                                         } else {
                                             MD_TEXT
@@ -581,7 +566,7 @@ impl ShiplyApp {
                 horizontal_row(ui, 40.0, |ui| {
                     ui.label(
                         RichText::new("Changes are saved to local database")
-                            .size(FS_MICRO)
+                            .typo(Typo::Caption)
                             .color(MD_TEXT_MUTED),
                     );
 
@@ -633,7 +618,8 @@ impl ShiplyApp {
             return;
         };
 
-        let Some(anim_t) = prepare_animated_modal(ctx, "new_env", &mut self.show_new_env_modal) else {
+        let Some(anim_t) = prepare_animated_modal(ctx, "new_env", &mut self.show_new_env_modal)
+        else {
             return;
         };
 
@@ -664,9 +650,8 @@ impl ShiplyApp {
                     .inner_margin(Margin::same(16))
                     .show(ui, |ui| {
                         ui.label(
-                            RichText::new("IMPORT ENVIRONMENT FROM .PS1 SCRIPT")
-                                .size(FS_MICRO)
-                                .strong()
+                            RichText::new("Import environment from .ps1 script")
+                                .typo(Typo::Caption)
                                 .color(ACCENT),
                         );
                         ui.add_space(SP_8);
@@ -729,9 +714,7 @@ impl ShiplyApp {
                 // Option 2: Create by Name
                 ui.label(
                     RichText::new("Or Create Custom Environment Name")
-                        .size(FS_BASE)
-                        .strong()
-                        .color(MD_TEXT),
+                        .typo(Typo::Label).color(MD_TEXT),
                 );
                 ui.add_space(SP_8);
                 modal_text_input(
@@ -746,16 +729,14 @@ impl ShiplyApp {
                     ui.add_space(SP_16);
                     ui.label(
                         RichText::new("Clone Pipeline Template From:")
-                            .size(FS_BASE)
-                            .strong()
-                            .color(MD_TEXT),
+                            .typo(Typo::Label).color(MD_TEXT),
                     );
                     ui.add_space(SP_8);
                     ui.horizontal_wrapped(|ui| {
                         for (key, name) in &existing_envs {
                             let selected = self.new_env_clone_from == *key;
                             let btn = egui::Button::new(
-                                RichText::new(name).size(FS_MICRO).strong().color(if selected {
+                                RichText::new(name).typo(Typo::Caption).color(if selected {
                                     Color32::WHITE
                                 } else {
                                     MD_TEXT
@@ -783,7 +764,7 @@ impl ShiplyApp {
                 horizontal_row(ui, 40.0, |ui| {
                     ui.label(
                         RichText::new("New environments inherit active deployment settings")
-                            .size(FS_MICRO)
+                            .typo(Typo::Caption)
                             .color(MD_TEXT_MUTED),
                     );
 
@@ -833,12 +814,15 @@ impl ShiplyApp {
     }
 
     pub(crate) fn render_github_update_modal(&mut self, ctx: &egui::Context) {
-        let Some(anim_t) = prepare_animated_modal(ctx, "github_update", &mut self.show_update_modal) else {
+        let Some(anim_t) =
+            prepare_animated_modal(ctx, "github_update", &mut self.show_update_modal)
+        else {
             return;
         };
 
         if let Some(release) = self.available_update.clone() {
-            let (window, inner_w) = animated_modal_window(ctx, "Software Update Available", anim_t, None);
+            let (window, inner_w) =
+                animated_modal_window(ctx, "Software Update Available", anim_t, None);
             window.show(ctx, |ui| {
                 ui.set_width(inner_w);
                     if render_modal_header(
@@ -865,7 +849,7 @@ impl ShiplyApp {
                             horizontal_row(ui, 26.0, |ui| {
                                 ui.label(
                                     RichText::new("Current Version:")
-                                        .size(FS_SMALL)
+                                        .typo(Typo::Small)
                                         .color(MD_TEXT_MUTED),
                                 );
                                 render_pill(
@@ -875,14 +859,12 @@ impl ShiplyApp {
                                     MD_TEXT_MUTED,
                                 );
                                 ui.label(
-                                    RichText::new("→")
-                                        .size(FS_BASE)
-                                        .strong()
+                                    RichText::new("→").typo(Typo::Body)
                                         .color(ACCENT),
                                 );
                                 ui.label(
                                     RichText::new("New Release:")
-                                        .size(FS_SMALL)
+                                        .typo(Typo::Small)
                                         .color(MD_TEXT_MUTED),
                                 );
                                 render_pill(
@@ -898,7 +880,7 @@ impl ShiplyApp {
                                     "{}  •  Published: {}",
                                     release.name, release.published_at
                                 ))
-                                .size(FS_MICRO)
+                                .typo(Typo::Caption)
                                 .color(MD_TEXT_MUTED),
                             );
                         });
@@ -907,7 +889,7 @@ impl ShiplyApp {
                         ui.add_space(SP_8);
                         egui::Frame::new()
                             .fill(BLUE_PILL_BG)
-                            .stroke(Stroke::new(1.0_f32, Color32::from_rgb(191, 219, 254)))
+                            .stroke(Stroke::new(1.0_f32, INFO_SOFT))
                             .corner_radius(R_SM)
                             .inner_margin(Margin::symmetric(12, 8))
                             .show(ui, |ui| {
@@ -917,7 +899,7 @@ impl ShiplyApp {
                                         "{active_count} active deployment{} in progress. Deployments will continue running uninterrupted and update will apply once completed.",
                                         if active_count > 1 { "s are" } else { " is" }
                                     ))
-                                    .size(FS_SMALL)
+                                    .typo(Typo::Small)
                                     .color(BLUE_PILL_TEXT),
                                 );
                             });
@@ -927,9 +909,8 @@ impl ShiplyApp {
 
                     // Release Notes / Changelog section
                     ui.label(
-                        RichText::new("RELEASE NOTES / CHANGELOG")
-                            .size(FS_MICRO)
-                            .strong()
+                        RichText::new("Release notes / changelog")
+                            .typo(Typo::Caption)
                             .color(MD_TEXT_MUTED),
                     );
                     ui.add_space(SP_4);
@@ -951,22 +932,18 @@ impl ShiplyApp {
                                             ui.add_space(SP_4);
                                             ui.label(
                                                 RichText::new(h)
-                                                    .size(FS_BASE)
-                                                    .strong()
-                                                    .color(MD_TEXT),
+                                                    .typo(Typo::Label).color(MD_TEXT),
                                             );
                                         } else if let Some(h) = trimmed.strip_prefix("## ") {
                                             ui.add_space(SP_4);
                                             ui.label(
                                                 RichText::new(h)
-                                                    .size(FS_BASE)
-                                                    .strong()
-                                                    .color(ACCENT),
+                                                    .typo(Typo::Label).color(PRIMARY_BLUE),
                                             );
                                         } else {
                                             ui.label(
                                                 RichText::new(line)
-                                                    .size(FS_SMALL)
+                                                    .typo(Typo::Small)
                                                     .color(MD_TEXT_MUTED),
                                             );
                                         }
@@ -987,8 +964,7 @@ impl ShiplyApp {
                                     &self.update_status_text
                                 }
                             ))
-                            .size(FS_SMALL)
-                            .strong()
+                            .typo(Typo::SmallMedium)
                             .color(ACCENT),
                         );
                         ui.add_space(SP_4);
@@ -1007,13 +983,13 @@ impl ShiplyApp {
                         ui.add_space(SP_8);
                         egui::Frame::new()
                             .fill(FAIL_PILL_BG)
-                            .stroke(Stroke::new(1.0_f32, Color32::from_rgb(252, 165, 165)))
+                            .stroke(Stroke::new(1.0_f32, DANGER_SOFT))
                             .corner_radius(R_SM)
                             .inner_margin(Margin::symmetric(12, 8))
                             .show(ui, |ui| {
                                 ui.label(
                                     RichText::new(err)
-                                        .size(FS_SMALL)
+                                        .typo(Typo::Small)
                                         .color(FAIL_PILL_TEXT),
                                 );
                             });
@@ -1104,22 +1080,20 @@ impl ShiplyApp {
 
                     egui::Frame::new()
                         .fill(SUCCESS_PILL_BG)
-                        .stroke(Stroke::new(1.0_f32, Color32::from_rgb(187, 247, 208)))
+                        .stroke(Stroke::new(1.0_f32, SUCCESS_SOFT))
                         .corner_radius(R_LG)
                         .inner_margin(Margin::symmetric(14, 12))
                         .show(ui, |ui| {
                             horizontal_row(ui, 24.0, |ui| {
                                 render_pill(
                                     ui,
-                                    "UP TO DATE",
+                                    "Up to date",
                                     SUCCESS,
                                     Color32::WHITE,
                                 );
                                 ui.label(
                                     RichText::new(format!("Shiply v{APP_VERSION}"))
-                                        .size(FS_BASE)
-                                        .strong()
-                                        .color(SUCCESS_PILL_TEXT),
+                                        .typo(Typo::Label).color(SUCCESS_PILL_TEXT),
                                 );
                             });
                             ui.add_space(SP_4);
@@ -1127,8 +1101,8 @@ impl ShiplyApp {
                                 RichText::new(format!(
                                     "You are running the latest version of Shiply. Update checks query {GITHUB_REPO} on startup."
                                 ))
-                                .size(FS_SMALL)
-                                .color(Color32::from_rgb(20, 83, 45)),
+                                .typo(Typo::Small)
+                                .color(SUCCESS),
                             );
                         });
 
@@ -1136,7 +1110,7 @@ impl ShiplyApp {
                         ui.add_space(SP_8);
                         ui.label(
                             RichText::new("Checking GitHub Releases...")
-                                .size(FS_SMALL)
+                                .typo(Typo::Small)
                                 .color(ACCENT),
                         );
                     }
@@ -1188,7 +1162,7 @@ impl ShiplyApp {
         let mut execute_delete = false;
         let mut dismiss = false;
 
-        let frame = modal_dialog_frame_for(ctx).stroke(Stroke::new(1.0_f32, Color32::from_rgb(252, 165, 165)));
+        let frame = modal_dialog_frame_for(ctx).stroke(Stroke::new(1.0_f32, DANGER_SOFT));
         let (window, inner_w) = animated_modal_window(ctx, "Confirm Deletion", anim_t, Some(frame));
         window.show(ctx, |ui| {
             ui.set_width(inner_w);
@@ -1266,29 +1240,27 @@ impl ShiplyApp {
 
                 egui::Frame::new()
                     .fill(FAIL_PILL_BG)
-                    .stroke(Stroke::new(1.0_f32, Color32::from_rgb(254, 202, 202)))
+                    .stroke(Stroke::new(1.0_f32, DANGER_SOFT))
                     .corner_radius(R_LG)
                     .inner_margin(Margin::same(16))
                     .show(ui, |ui| {
                         horizontal_row(ui, 24.0, |ui| {
                             render_pill(
                                 ui,
-                                "WARNING",
-                                Color32::from_rgb(239, 68, 68),
+                                "Warning",
+                                DANGER,
                                 Color32::WHITE,
                             );
                             ui.label(
                                 RichText::new(format!("Target: {item_name}"))
-                                    .size(FS_BASE)
-                                    .strong()
-                                    .color(FAIL_PILL_TEXT),
+                                    .typo(Typo::Label).color(FAIL_PILL_TEXT),
                             );
                         });
                         ui.add_space(SP_8);
                         ui.label(
                             RichText::new(warning_text)
-                                .size(FS_SMALL)
-                                .color(Color32::from_rgb(127, 29, 29)),
+                                .typo(Typo::Small)
+                                .color(DANGER),
                         );
                     });
 
@@ -1300,18 +1272,16 @@ impl ShiplyApp {
                 horizontal_row(ui, 40.0, |ui| {
                     ui.label(
                         RichText::new("Warning: This action cannot be undone.")
-                            .size(FS_MICRO)
-                            .color(Color32::from_rgb(185, 28, 28)),
+                            .typo(Typo::Caption)
+                            .color(DANGER),
                     );
 
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         let delete_btn = egui::Button::new(
-                            RichText::new("Delete Permanently")
-                                .size(FS_BASE)
-                                .strong()
-                                .color(Color32::WHITE),
+                            RichText::new("Delete permanently")
+                                .typo(Typo::Label).color(Color32::WHITE),
                         )
-                        .fill(Color32::from_rgb(220, 38, 38))
+                        .fill(DANGER)
                         .corner_radius(R_MD)
                         .min_size(Vec2::new(160.0, 40.0));
 
@@ -1400,11 +1370,8 @@ impl ShiplyApp {
                 } => {
                     if self.storage.remove_deployment(&deployment_id).is_some() {
                         if self.selected_deployment_id.as_deref() == Some(deployment_id.as_str()) {
-                            self.selected_deployment_id = self
-                                .storage
-                                .deployments
-                                .first()
-                                .map(|d| d.id.clone());
+                            self.selected_deployment_id =
+                                self.storage.deployments.first().map(|d| d.id.clone());
                         }
                         self.refresh_selected_project_metadata(false);
                         self.status_banner = Some((
@@ -1420,17 +1387,13 @@ impl ShiplyApp {
                     env_key,
                     ..
                 } => {
-                    let removed = self.storage.clear_deployment_history(
-                        project_id.as_deref(),
-                        env_key.as_deref(),
-                    );
+                    let removed = self
+                        .storage
+                        .clear_deployment_history(project_id.as_deref(), env_key.as_deref());
                     if let Some(sel_id) = &self.selected_deployment_id {
                         if !self.storage.deployments.iter().any(|d| &d.id == sel_id) {
-                            self.selected_deployment_id = self
-                                .storage
-                                .deployments
-                                .first()
-                                .map(|d| d.id.clone());
+                            self.selected_deployment_id =
+                                self.storage.deployments.first().map(|d| d.id.clone());
                         }
                     }
                     self.refresh_selected_project_metadata(false);
@@ -1449,7 +1412,9 @@ impl ShiplyApp {
         }
     }
     pub(crate) fn render_bulk_deploy_modal(&mut self, ctx: &egui::Context) {
-        let Some(anim_t) = prepare_animated_modal(ctx, "bulk_deploy", &mut self.show_bulk_deploy_modal) else {
+        let Some(anim_t) =
+            prepare_animated_modal(ctx, "bulk_deploy", &mut self.show_bulk_deploy_modal)
+        else {
             return;
         };
         let (window, inner_w) = animated_modal_window(ctx, "Bulk Deployment", anim_t, None);
@@ -1477,9 +1442,7 @@ impl ShiplyApp {
                 horizontal_row(ui, 34.0, |ui| {
                     ui.label(
                         RichText::new("Target Environment:")
-                            .size(FS_BASE)
-                            .strong()
-                            .color(MD_TEXT),
+                            .typo(Typo::Label).color(MD_TEXT),
                     );
                     let current_env_label = available_envs
                         .iter()
@@ -1496,8 +1459,7 @@ impl ShiplyApp {
                     egui::ComboBox::from_id_salt("bulk_target_env_combo")
                         .selected_text(
                             RichText::new(current_env_label)
-                                .size(FS_BASE)
-                                .strong()
+                                .typo(Typo::Label)
                                 .color(ACCENT),
                         )
                         .width(190.0)
@@ -1518,8 +1480,7 @@ impl ShiplyApp {
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         let clear_btn = egui::Button::new(
                             RichText::new("Clear All")
-                                .size(FS_MICRO)
-                                .strong()
+                                .typo(Typo::Caption)
                                 .color(MD_TEXT_MUTED),
                         )
                         .fill(MD_PANEL_BG)
@@ -1533,8 +1494,7 @@ impl ShiplyApp {
                         ui.add_space(SP_8);
                         let all_btn = egui::Button::new(
                             RichText::new("Select All")
-                                .size(FS_MICRO)
-                                .strong()
+                                .typo(Typo::Caption)
                                 .color(ACCENT),
                         )
                         .fill(ACCENT_SOFT)
@@ -1603,9 +1563,7 @@ impl ShiplyApp {
                                                 has_env,
                                                 egui::Checkbox::new(
                                                     &mut checked,
-                                                    RichText::new(&pname)
-                                                        .size(FS_BASE)
-                                                        .strong()
+                                                    RichText::new(&pname).typo(Typo::Label)
                                                         .color(MD_TEXT),
                                                 ),
                                             )
@@ -1624,7 +1582,7 @@ impl ShiplyApp {
                                         } else {
                                             render_pill(
                                                 ui,
-                                                "NO ENVIRONMENT",
+                                                "No environment",
                                                 FAIL_PILL_BG,
                                                 FAIL_PILL_TEXT,
                                             );
@@ -1645,7 +1603,7 @@ impl ShiplyApp {
                                             ui.add_space(SP_4);
                                             ui.label(
                                                 RichText::new("Version:")
-                                                    .size(FS_MICRO)
+                                                    .typo(Typo::Caption)
                                                     .color(MD_TEXT_MUTED),
                                             );
                                         });
@@ -1666,14 +1624,14 @@ impl ShiplyApp {
                     ui.checkbox(
                         &mut self.bulk_bump_pkg,
                         RichText::new("Bump package.json")
-                            .size(FS_SMALL)
+                            .typo(Typo::Small)
                             .color(MD_TEXT_MUTED),
                     );
                     ui.add_space(SP_8);
                     ui.checkbox(
                         &mut self.bulk_create_tag,
                         RichText::new("Git Tag")
-                            .size(FS_SMALL)
+                            .typo(Typo::Small)
                             .color(MD_TEXT_MUTED),
                     );
 

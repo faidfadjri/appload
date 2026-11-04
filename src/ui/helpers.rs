@@ -101,7 +101,12 @@ pub(crate) fn open_windows_credential_manager() {
         .spawn();
 }
 
-pub(crate) fn draw_elevated_card(painter: &egui::Painter, rect: Rect, fill: Color32, stroke: Stroke) {
+pub(crate) fn draw_elevated_card(
+    painter: &egui::Painter,
+    rect: Rect,
+    fill: Color32,
+    stroke: Stroke,
+) {
     let shadow_rect = rect.translate(Vec2::new(0.0, 2.0));
     painter.rect_filled(
         shadow_rect,
@@ -124,7 +129,7 @@ pub(crate) fn draw_divider(ui: &mut egui::Ui, color: Color32) {
 pub(crate) fn render_pill(ui: &mut egui::Ui, text: &str, bg: Color32, fg: Color32) {
     let galley = ui
         .painter()
-        .layout_no_wrap(text.to_string(), FontId::proportional(FONT_XS), fg);
+        .layout_no_wrap(text.to_string(), Typo::Caption.font(), fg);
     let pill_w = galley.size().x + 16.0;
     let pill_h = 22.0;
     let (rect, _) = ui.allocate_exact_size(Vec2::new(pill_w, pill_h), Sense::hover());
@@ -146,7 +151,7 @@ pub(crate) fn paint_pill_left_aligned(
     bg: Color32,
     fg: Color32,
 ) -> f32 {
-    let galley = painter.layout_no_wrap(text.to_string(), FontId::proportional(FONT_XS), fg);
+    let galley = painter.layout_no_wrap(text.to_string(), Typo::Caption.font(), fg);
     let w = galley.size().x + 16.0;
     let h = 22.0;
     let rect = Rect::from_min_size(
@@ -172,7 +177,7 @@ pub(crate) fn paint_pill_right_aligned(
     bg: Color32,
     fg: Color32,
 ) -> f32 {
-    let galley = painter.layout_no_wrap(text.to_string(), FontId::proportional(FONT_XS), fg);
+    let galley = painter.layout_no_wrap(text.to_string(), Typo::Caption.font(), fg);
     let w = galley.size().x + 16.0;
     let h = 22.0;
     let rect = Rect::from_min_size(
@@ -199,7 +204,7 @@ pub(crate) fn paint_small_sidebar_pill(
     bg: Color32,
     fg: Color32,
 ) -> f32 {
-    let galley = painter.layout_no_wrap(text.to_string(), FontId::proportional(FONT_XS), fg);
+    let galley = painter.layout_no_wrap(text.to_string(), Typo::Caption.font(), fg);
     let w = galley.size().x + 12.0;
     let h = 19.0;
     let rect = Rect::from_min_size(
@@ -245,7 +250,7 @@ pub(crate) fn paint_sidebar_env_badge(
     fg: Color32,
     max_w: Option<f32>,
 ) -> f32 {
-    let font_id = FontId::monospace(FS_MICRO);
+    let font_id = Typo::MonoSm.font();
     let pad_x = 8.0_f32;
     let h = 20.0_f32;
 
@@ -311,7 +316,7 @@ pub(crate) fn paint_running_pill_left_aligned(
     fg: Color32,
     time: f64,
 ) -> f32 {
-    let galley = painter.layout_no_wrap(text.to_string(), FontId::proportional(FONT_XS), fg);
+    let galley = painter.layout_no_wrap(text.to_string(), Typo::Caption.font(), fg);
     let spinner_r = 4.2;
     let spinner_w = spinner_r * 2.0;
     let gap = 6.0;
@@ -353,7 +358,7 @@ pub(crate) fn paint_running_pill_right_aligned(
     fg: Color32,
     time: f64,
 ) -> f32 {
-    let galley = painter.layout_no_wrap(text.to_string(), FontId::proportional(FONT_XS), fg);
+    let galley = painter.layout_no_wrap(text.to_string(), Typo::Caption.font(), fg);
     let spinner_r = 4.2;
     let spinner_w = spinner_r * 2.0;
     let gap = 6.0;
@@ -388,47 +393,43 @@ pub(crate) fn paint_running_pill_right_aligned(
 /// Renders a modern, realistic pulsating loading skeleton while switching active project.
 pub(crate) fn render_project_workspace_skeleton(ui: &mut egui::Ui, proj_name: &str) {
     ui.ctx().request_repaint();
-    let time = ui.input(|i| i.time);
+    let _time = ui.input(|i| i.time);
     let full_w = ui.available_width();
 
     // Subtle pulsating shimmer between light slate tones
-    let pulse = ((time * 4.0).sin() * 0.5 + 0.5) as f32;
-    let r = (226.0 + (242.0 - 226.0) * pulse) as u8;
-    let g = (232.0 + (246.0 - 232.0) * pulse) as u8;
-    let b = (240.0 + (250.0 - 240.0) * pulse) as u8;
-    let skel_fill = Color32::from_rgb(r, g, b);
-    let skel_border = Color32::from_rgb(
-        (215.0 + 12.0 * pulse) as u8,
-        (223.0 + 10.0 * pulse) as u8,
-        (234.0 + 8.0 * pulse) as u8,
-    );
+    let skel_fill = SUBTLE_BG;
+    let skel_border = CARD_BORDER;
 
     // 1. Top Project Header Bar Skeleton
     horizontal_row(ui, 36.0, |ui| {
         let (title_rect, _) = ui.allocate_exact_size(Vec2::new(190.0, 28.0), Sense::hover());
-        ui.painter().rect_filled(title_rect, CornerRadius::same(6), skel_fill);
+        ui.painter()
+            .rect_filled(title_rect, CornerRadius::same(6), skel_fill);
         ui.painter().text(
             Pos2::new(title_rect.left() + 10.0, title_rect.center().y),
             Align2::LEFT_CENTER,
             proj_name,
-            FontId::proportional(FONT_MD),
-            Color32::from_rgb(148, 163, 184),
+            Typo::H3.font(),
+            TEXT_MUTED,
         );
 
         ui.add_space(8.0);
         let (badge_rect, _) = ui.allocate_exact_size(Vec2::new(56.0, 20.0), Sense::hover());
-        ui.painter().rect_filled(badge_rect, CornerRadius::same(4), skel_fill);
+        ui.painter()
+            .rect_filled(badge_rect, CornerRadius::same(4), skel_fill);
 
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             // Action button skeletons
             for _ in 0..3 {
                 let (btn_rect, _) = ui.allocate_exact_size(Vec2::new(32.0, 32.0), Sense::hover());
-                ui.painter().rect_filled(btn_rect, CornerRadius::same(6), skel_fill);
+                ui.painter()
+                    .rect_filled(btn_rect, CornerRadius::same(6), skel_fill);
                 ui.add_space(4.0);
             }
             // Branch selector skeleton
             let (branch_rect, _) = ui.allocate_exact_size(Vec2::new(160.0, 32.0), Sense::hover());
-            ui.painter().rect_filled(branch_rect, CornerRadius::same(6), skel_fill);
+            ui.painter()
+                .rect_filled(branch_rect, CornerRadius::same(6), skel_fill);
         });
     });
 
@@ -436,7 +437,8 @@ pub(crate) fn render_project_workspace_skeleton(ui: &mut egui::Ui, proj_name: &s
 
     // Subtitle / directory path skeleton line
     let (sub_rect, _) = ui.allocate_exact_size(Vec2::new(320.0, 14.0), Sense::hover());
-    ui.painter().rect_filled(sub_rect, CornerRadius::same(4), skel_fill);
+    ui.painter()
+        .rect_filled(sub_rect, CornerRadius::same(4), skel_fill);
 
     ui.add_space(16.0);
 
@@ -444,8 +446,10 @@ pub(crate) fn render_project_workspace_skeleton(ui: &mut egui::Ui, proj_name: &s
     let card_w = ((full_w - 24.0) / 3.0).clamp(160.0, 240.0);
     horizontal_row(ui, ENV_CARD_HEIGHT, |ui| {
         for i in 0..3 {
-            let (card_rect, _) = ui.allocate_exact_size(Vec2::new(card_w, ENV_CARD_HEIGHT), Sense::hover());
-            ui.painter().rect_filled(card_rect, CornerRadius::same(8), CARD_BG);
+            let (card_rect, _) =
+                ui.allocate_exact_size(Vec2::new(card_w, ENV_CARD_HEIGHT), Sense::hover());
+            ui.painter()
+                .rect_filled(card_rect, CornerRadius::same(8), CARD_BG);
             ui.painter().rect_stroke(
                 card_rect,
                 CornerRadius::same(8),
@@ -454,26 +458,35 @@ pub(crate) fn render_project_workspace_skeleton(ui: &mut egui::Ui, proj_name: &s
             );
 
             // Card title skeleton badge
-            let badge_w = if i == 0 { 80.0 } else if i == 1 { 64.0 } else { 92.0 };
+            let badge_w = if i == 0 {
+                80.0
+            } else if i == 1 {
+                64.0
+            } else {
+                92.0
+            };
             let env_badge_rect = Rect::from_min_size(
                 Pos2::new(card_rect.left() + 12.0, card_rect.top() + 12.0),
                 Vec2::new(badge_w, 20.0),
             );
-            ui.painter().rect_filled(env_badge_rect, CornerRadius::same(4), skel_fill);
+            ui.painter()
+                .rect_filled(env_badge_rect, CornerRadius::same(4), skel_fill);
 
             // Version line skeleton
             let ver_rect = Rect::from_min_size(
                 Pos2::new(card_rect.left() + 12.0, card_rect.top() + 42.0),
                 Vec2::new(card_w * 0.65, 16.0),
             );
-            ui.painter().rect_filled(ver_rect, CornerRadius::same(4), skel_fill);
+            ui.painter()
+                .rect_filled(ver_rect, CornerRadius::same(4), skel_fill);
 
             // Host / server line skeleton
             let host_rect = Rect::from_min_size(
                 Pos2::new(card_rect.left() + 12.0, card_rect.top() + 68.0),
                 Vec2::new(card_w * 0.45, 12.0),
             );
-            ui.painter().rect_filled(host_rect, CornerRadius::same(3), skel_fill);
+            ui.painter()
+                .rect_filled(host_rect, CornerRadius::same(3), skel_fill);
 
             ui.add_space(10.0);
         }
@@ -485,7 +498,8 @@ pub(crate) fn render_project_workspace_skeleton(ui: &mut egui::Ui, proj_name: &s
     horizontal_row(ui, 34.0, |ui| {
         for w in [130.0, 140.0, 120.0] {
             let (tab_rect, _) = ui.allocate_exact_size(Vec2::new(w, 32.0), Sense::hover());
-            ui.painter().rect_filled(tab_rect, CornerRadius::same(6), skel_fill);
+            ui.painter()
+                .rect_filled(tab_rect, CornerRadius::same(6), skel_fill);
             ui.add_space(8.0);
         }
     });
@@ -502,10 +516,13 @@ pub(crate) fn render_project_workspace_skeleton(ui: &mut egui::Ui, proj_name: &s
             // Header inside card
             horizontal_row(ui, 28.0, |ui| {
                 let (ch_rect, _) = ui.allocate_exact_size(Vec2::new(200.0, 20.0), Sense::hover());
-                ui.painter().rect_filled(ch_rect, CornerRadius::same(4), skel_fill);
+                ui.painter()
+                    .rect_filled(ch_rect, CornerRadius::same(4), skel_fill);
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    let (act_rect, _) = ui.allocate_exact_size(Vec2::new(110.0, 28.0), Sense::hover());
-                    ui.painter().rect_filled(act_rect, CornerRadius::same(6), skel_fill);
+                    let (act_rect, _) =
+                        ui.allocate_exact_size(Vec2::new(110.0, 28.0), Sense::hover());
+                    ui.painter()
+                        .rect_filled(act_rect, CornerRadius::same(6), skel_fill);
                 });
             });
 
@@ -514,8 +531,12 @@ pub(crate) fn render_project_workspace_skeleton(ui: &mut egui::Ui, proj_name: &s
             // 3 Pipeline Step Skeletons
             for (step_title_w, step_cmd_w) in [(180.0, 0.75), (240.0, 0.9), (140.0, 0.6)] {
                 let step_card_h = 76.0;
-                let (step_rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), step_card_h), Sense::hover());
-                ui.painter().rect_filled(step_rect, CornerRadius::same(8), SUBTLE_BG);
+                let (step_rect, _) = ui.allocate_exact_size(
+                    Vec2::new(ui.available_width(), step_card_h),
+                    Sense::hover(),
+                );
+                ui.painter()
+                    .rect_filled(step_rect, CornerRadius::same(8), SUBTLE_BG);
                 ui.painter().rect_stroke(
                     step_rect,
                     CornerRadius::same(8),
@@ -532,7 +553,8 @@ pub(crate) fn render_project_workspace_skeleton(ui: &mut egui::Ui, proj_name: &s
                     Pos2::new(step_rect.left() + 42.0, step_rect.top() + 14.0),
                     Vec2::new(step_title_w, 16.0),
                 );
-                ui.painter().rect_filled(st_rect, CornerRadius::same(4), skel_fill);
+                ui.painter()
+                    .rect_filled(st_rect, CornerRadius::same(4), skel_fill);
 
                 // Step command skeleton bar
                 let cmd_w = (step_rect.width() - 56.0) * step_cmd_w;
@@ -540,7 +562,8 @@ pub(crate) fn render_project_workspace_skeleton(ui: &mut egui::Ui, proj_name: &s
                     Pos2::new(step_rect.left() + 42.0, step_rect.top() + 42.0),
                     Vec2::new(cmd_w, 20.0),
                 );
-                ui.painter().rect_filled(sc_rect, CornerRadius::same(4), skel_fill);
+                ui.painter()
+                    .rect_filled(sc_rect, CornerRadius::same(4), skel_fill);
 
                 ui.add_space(10.0);
             }
@@ -563,9 +586,7 @@ pub(crate) fn render_light_status_badge(ui: &mut egui::Ui, status: DeploymentSta
         let spinner_w = spinner_r * 2.0;
         let gap = 6.0;
         let pad_x = 8.0;
-        let galley = ui
-            .painter()
-            .layout_no_wrap(text, FontId::proportional(FONT_XS), fg);
+        let galley = ui.painter().layout_no_wrap(text, Typo::Caption.font(), fg);
         let pill_w = pad_x + spinner_w + gap + galley.size().x + pad_x;
         let pill_h = 22.0;
         let (rect, _) = ui.allocate_exact_size(Vec2::new(pill_w, pill_h), Sense::hover());
@@ -600,3 +621,31 @@ pub(crate) fn env_pastel_pill_colors(env_key: &str) -> (Color32, Color32) {
     }
 }
 
+/// Formats a UTC timestamp into a human-friendly relative time string (e.g. "just now", "5m ago", "2h ago", "3d ago").
+#[allow(dead_code)]
+pub(crate) fn format_relative_time(dt: chrono::DateTime<chrono::Utc>) -> String {
+    let now = chrono::Utc::now();
+    let diff = now.signed_duration_since(dt);
+    let secs = diff.num_seconds();
+    if secs < 60 {
+        return "just now".to_string();
+    }
+    let mins = diff.num_minutes();
+    if mins < 60 {
+        return format!("{mins}m ago");
+    }
+    let hours = diff.num_hours();
+    if hours < 24 {
+        return format!("{hours}h ago");
+    }
+    let days = diff.num_days();
+    if days < 30 {
+        return format!("{days}d ago");
+    }
+    let months = days / 30;
+    if months < 12 {
+        return format!("{months}mo ago");
+    }
+    let years = days / 365;
+    format!("{years}y ago")
+}

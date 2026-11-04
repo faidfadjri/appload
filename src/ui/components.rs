@@ -21,7 +21,7 @@ pub(crate) fn horizontal_row<R>(
 }
 
 /// Consistent text input field with white fill (`INPUT_BG`), 1px hairline/strong border (`INPUT_BORDER`),
-/// focus ring (`PRIMARY_BLUE`), structured proportional font (`FONT_MD`), and grey placeholder (`TEXT_PLACEHOLDER`).
+/// focus ring (`PRIMARY_BLUE`), structured proportional font (`Typo::Body`), and grey placeholder (`TEXT_PLACEHOLDER`).
 pub(crate) fn styled_text_edit(
     ui: &mut egui::Ui,
     id_salt: impl std::hash::Hash,
@@ -55,7 +55,8 @@ pub(crate) fn styled_text_edit_ext(
     let (outer_rect, outer_resp) = ui.allocate_exact_size(Vec2::new(width, height), Sense::click());
 
     // Single clean white background fill
-    ui.painter().rect_filled(outer_rect, CornerRadius::same(6), INPUT_BG);
+    ui.painter()
+        .rect_filled(outer_rect, CornerRadius::same(6), INPUT_BG);
 
     // Inner TextEdit child matching singleline text row height (22px) centered vertically
     let text_h = 22.0_f32;
@@ -68,32 +69,29 @@ pub(crate) fn styled_text_edit_ext(
     let mut child_ui = ui.new_child(egui::UiBuilder::new().max_rect(text_rect));
     let edit = egui::TextEdit::singleline(value)
         .id_salt(id_salt)
-        .font(FontId::proportional(FONT_MD))
-        .text_color(Color32::from_rgb(8, 8, 8))
+        .font(Typo::Body.font())
+        .text_color(TEXT_PRIMARY)
         .password(is_password)
         .frame(false)
         .margin(Margin::ZERO)
         .cursor_at_end(true)
         .desired_width(text_rect.width())
         .min_size(Vec2::new(text_rect.width(), text_h))
-        .hint_text(
-            RichText::new(placeholder_str)
-                .size(FONT_MD)
-                .color(TEXT_PLACEHOLDER),
-        );
+        .hint_text(Typo::Body.rich(placeholder_str).color(TEXT_PLACEHOLDER));
     let mut output = edit.show(&mut child_ui);
 
     if outer_resp.clicked() && !output.response.has_focus() {
         ui.memory_mut(|mem| mem.request_focus(output.response.id));
     }
 
-    let is_focused = output.response.has_focus() || ui.memory(|mem| mem.has_focus(output.response.id));
+    let is_focused =
+        output.response.has_focus() || ui.memory(|mem| mem.has_focus(output.response.id));
     let is_hovered = outer_resp.hovered() || output.response.hovered();
 
     let stroke = if is_focused {
         Stroke::new(1.5_f32, PRIMARY_BLUE)
     } else if is_hovered {
-        Stroke::new(1.0_f32, Color32::from_rgb(160, 160, 165))
+        Stroke::new(1.0_f32, INPUT_BORDER_HOVER)
     } else {
         Stroke::new(1.0_f32, INPUT_BORDER)
     };
@@ -134,7 +132,11 @@ pub(crate) fn handle_text_edit_cursor_and_selection(
         && !output.response.triple_clicked()
         && !ctx.input(|i| i.pointer.is_decidedly_dragging())
     {
-        if let Some(pos) = output.response.interact_pointer_pos().or_else(|| ctx.pointer_interact_pos()) {
+        if let Some(pos) = output
+            .response
+            .interact_pointer_pos()
+            .or_else(|| ctx.pointer_interact_pos())
+        {
             let rel_x = pos.x - output.galley_pos.x;
             let char_count = value.chars().count();
             let ccursor = if rel_x >= output.galley.size().x {
@@ -171,11 +173,17 @@ pub(crate) fn sidebar_search_text_edit(
     let (rect, outer_resp) = ui.allocate_exact_size(Vec2::new(width, height), Sense::click());
 
     // Single background fill
-    ui.painter().rect_filled(rect, CornerRadius::same(R_SM as u8), SB_SURFACE);
+    ui.painter()
+        .rect_filled(rect, CornerRadius::same(R_SM as u8), SB_SURFACE);
 
     // Left magnifying glass search icon (standard enterprise UX)
     let icon_center = Pos2::new(rect.left() + 14.0, rect.center().y);
-    draw_outline_icon(ui.painter(), icon_center, OutlineIcon::Search, SB_TEXT_FAINT);
+    draw_outline_icon(
+        ui.painter(),
+        icon_center,
+        OutlineIcon::Search,
+        SB_TEXT_FAINT,
+    );
 
     // Optional clear button on right when search is non-empty
     let has_clear = !value.is_empty();
@@ -186,9 +194,17 @@ pub(crate) fn sidebar_search_text_edit(
             Vec2::new(16.0, 16.0),
         );
         let clear_resp = ui
-            .interact(clear_rect, egui::Id::new("sidebar_search_clear_btn"), Sense::click())
+            .interact(
+                clear_rect,
+                egui::Id::new("sidebar_search_clear_btn"),
+                Sense::click(),
+            )
             .on_hover_cursor(egui::CursorIcon::PointingHand);
-        let clear_fg = if clear_resp.hovered() { SB_TEXT } else { SB_TEXT_FAINT };
+        let clear_fg = if clear_resp.hovered() {
+            SB_TEXT
+        } else {
+            SB_TEXT_FAINT
+        };
         draw_outline_icon(ui.painter(), clear_rect.center(), OutlineIcon::X, clear_fg);
         if clear_resp.clicked() {
             value.clear();
@@ -203,17 +219,13 @@ pub(crate) fn sidebar_search_text_edit(
     let mut child_ui = ui.new_child(egui::UiBuilder::new().max_rect(text_rect));
     let edit = egui::TextEdit::singleline(value)
         .id_salt(id_salt)
-        .font(FontId::proportional(FS_BASE))
+        .font(Typo::Body.font())
         .text_color(SB_TEXT)
         .frame(false)
         .desired_width(text_rect.width())
         .min_size(Vec2::new(text_rect.width(), height))
         .margin(Margin::symmetric(0, 6))
-        .hint_text(
-            RichText::new(placeholder_str)
-                .size(FS_BASE)
-                .color(SB_TEXT_FAINT),
-        );
+        .hint_text(Typo::Body.rich(placeholder_str).color(SB_TEXT_FAINT));
     let mut output = edit.show(&mut child_ui);
 
     let is_focused = output.response.has_focus();
@@ -261,30 +273,22 @@ pub(crate) fn syntax_highlighted_text_edit(
         egui::TextEdit::multiline(value)
             .desired_rows(rows)
             .id_salt(id_salt)
-            .font(FontId::proportional(FONT_MD))
+            .font(Typo::Code.font())
             .background_color(INPUT_BG)
             .desired_width(width)
             .margin(Margin::symmetric(10, 8))
             .layouter(&mut layouter)
-            .hint_text(
-                RichText::new(placeholder_str)
-                    .size(FONT_MD)
-                    .color(TEXT_PLACEHOLDER),
-            )
+            .hint_text(Typo::Code.rich(placeholder_str).color(TEXT_PLACEHOLDER))
     } else {
         egui::TextEdit::singleline(value)
             .id_salt(id_salt)
-            .font(FontId::proportional(FONT_MD))
+            .font(Typo::Code.font())
             .background_color(INPUT_BG)
             .desired_width(width)
             .min_size(Vec2::new(width, INPUT_HEIGHT))
             .margin(Margin::symmetric(10, 8))
             .layouter(&mut layouter)
-            .hint_text(
-                RichText::new(placeholder_str)
-                    .size(FONT_MD)
-                    .color(TEXT_PLACEHOLDER),
-            )
+            .hint_text(Typo::Code.rich(placeholder_str).color(TEXT_PLACEHOLDER))
     };
     let mut output = edit.show(ui);
 
@@ -296,7 +300,7 @@ pub(crate) fn syntax_highlighted_text_edit(
 pub fn build_pipeline_syntax_layout_job(text: &str) -> egui::text::LayoutJob {
     use egui::text::{LayoutJob, TextFormat};
     let mut job = LayoutJob::default();
-    let font_id = FontId::proportional(FONT_MD);
+    let font_id = Typo::Code.font();
 
     let color_template = PURPLE_PILL_TEXT; // {app_name}, {remote_dir}, etc.
     let color_keyword = BLUE_PILL_TEXT; // npm, pm2, cargo, git, ssh, etc.
@@ -317,7 +321,11 @@ pub fn build_pipeline_syntax_layout_job(text: &str) -> egui::text::LayoutJob {
             while i < len && bytes[i].is_ascii_whitespace() {
                 i += 1;
             }
-            job.append(&text[start..i], 0.0, TextFormat::simple(font_id.clone(), TEXT_PRIMARY));
+            job.append(
+                &text[start..i],
+                0.0,
+                TextFormat::simple(font_id.clone(), TEXT_PRIMARY),
+            );
             continue;
         }
 
@@ -353,7 +361,11 @@ pub fn build_pipeline_syntax_layout_job(text: &str) -> egui::text::LayoutJob {
             if i < len && bytes[i] == quote {
                 i += 1;
             }
-            job.append(&text[start..i], 0.0, TextFormat::simple(font_id.clone(), color_path));
+            job.append(
+                &text[start..i],
+                0.0,
+                TextFormat::simple(font_id.clone(), color_path),
+            );
             continue;
         }
 
@@ -475,20 +487,15 @@ pub(crate) fn render_modal_header(
         Vec2::new(32.0, 32.0),
     );
     let close_resp = ui
-        .interact(
-            close_rect,
-            ui.make_persistent_id(id_salt),
-            Sense::click(),
-        )
+        .interact(close_rect, ui.make_persistent_id(id_salt), Sense::click())
         .on_hover_cursor(egui::CursorIcon::PointingHand);
 
-    let (title_rect, _) =
-        ui.allocate_exact_size(Vec2::new(full_w - 40.0, 26.0), Sense::hover());
+    let (title_rect, _) = ui.allocate_exact_size(Vec2::new(full_w - 40.0, 26.0), Sense::hover());
     ui.painter().text(
         Pos2::new(title_rect.left(), title_rect.center().y),
         Align2::LEFT_CENTER,
         title,
-        FontId::proportional(FS_TITLE),
+        Typo::H2.font(),
         MD_TEXT,
     );
 
@@ -508,16 +515,22 @@ pub(crate) fn render_modal_header(
     let c = close_rect.center();
     let s = Stroke::new(1.6_f32, close_fg);
     ui.painter().line_segment(
-        [Pos2::new(c.x - 4.5, c.y - 4.5), Pos2::new(c.x + 4.5, c.y + 4.5)],
+        [
+            Pos2::new(c.x - 4.5, c.y - 4.5),
+            Pos2::new(c.x + 4.5, c.y + 4.5),
+        ],
         s,
     );
     ui.painter().line_segment(
-        [Pos2::new(c.x + 4.5, c.y - 4.5), Pos2::new(c.x - 4.5, c.y + 4.5)],
+        [
+            Pos2::new(c.x + 4.5, c.y - 4.5),
+            Pos2::new(c.x - 4.5, c.y + 4.5),
+        ],
         s,
     );
 
     ui.add_space(SP_4);
-    ui.label(RichText::new(subtitle).size(FS_SMALL).color(MD_TEXT_MUTED));
+    ui.label(Typo::Small.rich(subtitle).color(MD_TEXT_MUTED));
 
     close_resp.on_hover_text("Close dialog (Esc)").clicked()
 }
@@ -544,7 +557,11 @@ pub(crate) fn modal_dialog_frame_for(ctx: &egui::Context) -> egui::Frame {
     egui::Frame::new()
         .fill(MD_BG)
         .stroke(Stroke::new(1.0_f32, MD_BORDER))
-        .corner_radius(if is_sheet { CornerRadius::ZERO } else { CornerRadius::same(14) })
+        .corner_radius(if is_sheet {
+            CornerRadius::ZERO
+        } else {
+            CornerRadius::same(14)
+        })
         .shadow(if is_sheet {
             Shadow::NONE
         } else {
@@ -555,10 +572,14 @@ pub(crate) fn modal_dialog_frame_for(ctx: &egui::Context) -> egui::Frame {
                 color: Color32::from_rgba_unmultiplied(2, 6, 23, 89),
             }
         })
-        .inner_margin(if is_sheet { Margin::same(12) } else { Margin::same(24) })
+        .inner_margin(if is_sheet {
+            Margin::same(12)
+        } else {
+            Margin::same(24)
+        })
 }
 
-/// Unified modal text input (height 36px, font FS_BASE 13px, bg MD_INPUT_BG, border 1px MD_BORDER, radius R_MD 6px).
+/// Unified modal text input (height 36px, font Typo::Body 13px, bg MD_INPUT_BG, border 1px MD_BORDER, radius R_MD 6px).
 pub(crate) fn modal_text_input(
     ui: &mut egui::Ui,
     id_salt: impl std::hash::Hash,
@@ -571,7 +592,8 @@ pub(crate) fn modal_text_input(
     let (outer_rect, outer_resp) = ui.allocate_exact_size(Vec2::new(width, height), Sense::click());
 
     // Single clean modal input background fill
-    ui.painter().rect_filled(outer_rect, CornerRadius::same(R_MD as u8), MD_INPUT_BG);
+    ui.painter()
+        .rect_filled(outer_rect, CornerRadius::same(R_MD as u8), MD_INPUT_BG);
 
     // Inner TextEdit child matching singleline text row height (22px) centered vertically
     let text_h = 22.0_f32;
@@ -584,25 +606,22 @@ pub(crate) fn modal_text_input(
     let mut child_ui = ui.new_child(egui::UiBuilder::new().max_rect(text_rect));
     let edit = egui::TextEdit::singleline(value)
         .id_salt(id_salt)
-        .font(FontId::proportional(FS_BASE))
+        .font(Typo::Body.font())
         .text_color(MD_TEXT)
         .frame(false)
         .margin(Margin::ZERO)
         .cursor_at_end(true)
         .desired_width(text_rect.width())
         .min_size(Vec2::new(text_rect.width(), text_h))
-        .hint_text(
-            RichText::new(hint_str)
-                .size(FS_BASE)
-                .color(MD_TEXT_MUTED.gamma_multiply(0.7)),
-        );
+        .hint_text(Typo::Body.rich(hint_str).color(TEXT_MUTED));
     let mut output = edit.show(&mut child_ui);
 
     if outer_resp.clicked() && !output.response.has_focus() {
         ui.memory_mut(|mem| mem.request_focus(output.response.id));
     }
 
-    let is_focused = output.response.has_focus() || ui.memory(|mem| mem.has_focus(output.response.id));
+    let is_focused =
+        output.response.has_focus() || ui.memory(|mem| mem.has_focus(output.response.id));
     let is_hovered = outer_resp.hovered() || output.response.hovered();
 
     let stroke = if is_focused {
@@ -626,25 +645,16 @@ pub(crate) fn modal_text_input(
 
 /// Unified modal primary action button (height 40px, padding 0 16px, font --fs-base 14px, radius --r-md 8px, bg --accent).
 pub(crate) fn modal_primary_button(text: &str, enabled: bool) -> egui::Button<'static> {
-    egui::Button::new(
-        RichText::new(text.to_string())
-            .size(FS_BASE)
-            .strong()
-            .color(if enabled {
-                Color32::WHITE
-            } else {
-                Color32::from_rgb(148, 155, 168)
-            }),
-    )
-    .fill(if enabled {
-        ACCENT
+    egui::Button::new(Typo::Label.rich(text.to_string()).color(if enabled {
+        Color32::WHITE
     } else {
-        Color32::from_rgb(222, 226, 235)
-    })
+        TEXT_PLACEHOLDER
+    }))
+    .fill(if enabled { PRIMARY_BLUE } else { SUBTLE_BG })
     .stroke(if enabled {
         Stroke::NONE
     } else {
-        Stroke::new(1.0_f32, Color32::from_rgb(205, 212, 224))
+        Stroke::new(1.0_f32, INPUT_BORDER)
     })
     .corner_radius(R_MD)
     .min_size(Vec2::new(0.0, 40.0))
@@ -652,16 +662,11 @@ pub(crate) fn modal_primary_button(text: &str, enabled: bool) -> egui::Button<'s
 
 /// Unified modal secondary button (height 40px, padding 0 16px, font --fs-base 14px, radius --r-md 8px, white bg, border 1px --md-border, hover --md-panel-bg).
 pub(crate) fn modal_secondary_button(text: &str) -> egui::Button<'static> {
-    egui::Button::new(
-        RichText::new(text.to_string())
-            .size(FS_BASE)
-            .strong()
-            .color(MD_TEXT),
-    )
-    .fill(Color32::WHITE)
-    .stroke(Stroke::new(1.0_f32, MD_BORDER))
-    .corner_radius(R_MD)
-    .min_size(Vec2::new(0.0, 40.0))
+    egui::Button::new(Typo::Label.rich(text.to_string()).color(MD_TEXT))
+        .fill(Color32::WHITE)
+        .stroke(Stroke::new(1.0_f32, MD_BORDER))
+        .corner_radius(R_MD)
+        .min_size(Vec2::new(0.0, 40.0))
 }
 
 /// Renders a tab button with uniform horizontal padding (`16px` left & right) and consistent
@@ -675,7 +680,7 @@ pub(crate) fn render_uniform_tab_button(
 ) -> egui::Response {
     let galley = ui.painter().layout_no_wrap(
         label.to_string(),
-        FontId::proportional(FONT_MD),
+        Typo::Label.font(),
         if is_active {
             Color32::WHITE
         } else {
@@ -701,23 +706,16 @@ pub(crate) fn render_uniform_tab_button(
             PRIMARY_BLUE,
         )
     } else {
-        (
-            CARD_BG,
-            Stroke::new(1.0_f32, CARD_BORDER),
-            TEXT_SECONDARY,
-        )
+        (CARD_BG, Stroke::new(1.0_f32, CARD_BORDER), TEXT_SECONDARY)
     };
 
-    ui.painter()
-        .rect_filled(rect, CornerRadius::same(6), fill);
+    ui.painter().rect_filled(rect, CornerRadius::same(6), fill);
     ui.painter()
         .rect_stroke(rect, CornerRadius::same(6), stroke, StrokeKind::Inside);
 
-    let colored_galley = ui.painter().layout_no_wrap(
-        label.to_string(),
-        FontId::proportional(FONT_MD),
-        text_color,
-    );
+    let colored_galley =
+        ui.painter()
+            .layout_no_wrap(label.to_string(), Typo::Label.font(), text_color);
     ui.painter().galley(
         Pos2::new(
             rect.center().x - colored_galley.size().x / 2.0,
@@ -729,4 +727,3 @@ pub(crate) fn render_uniform_tab_button(
 
     resp
 }
-

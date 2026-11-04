@@ -79,7 +79,10 @@ impl ShiplyApp {
                 // Hairline right border separating sidebar from central workspace
                 let r = ui.max_rect();
                 ui.painter().line_segment(
-                    [Pos2::new(r.right(), r.top()), Pos2::new(r.right(), r.bottom())],
+                    [
+                        Pos2::new(r.right(), r.top()),
+                        Pos2::new(r.right(), r.bottom()),
+                    ],
                     Stroke::new(1.0_f32, SB_BORDER_LINE),
                 );
                 ui.visuals_mut().override_text_color = Some(SB_TEXT);
@@ -113,7 +116,7 @@ impl ShiplyApp {
                 brand_ui.painter(),
                 logo_rect,
                 6,
-                FS_TITLE,
+                Typo::H2.size(),
                 self.logo_texture.as_ref(),
             );
             brand_ui.painter().line_segment(
@@ -144,20 +147,27 @@ impl ShiplyApp {
             let center_x = footer_rect.center().x;
 
             // Sync Button
-            let sync_rect = Rect::from_center_size(Pos2::new(center_x, footer_rect.top() + 20.0), btn_size);
+            let sync_rect =
+                Rect::from_center_size(Pos2::new(center_x, footer_rect.top() + 20.0), btn_size);
             let sync_resp = footer_ui
                 .interact(sync_rect, egui::Id::new("rail_sync_btn"), Sense::click())
                 .on_hover_cursor(egui::CursorIcon::PointingHand)
                 .on_hover_text("Sync App Directory Files");
             if sync_resp.hovered() {
-                footer_ui
-                    .painter()
-                    .rect_filled(sync_rect, CornerRadius::same(R_MD as u8), SB_SURFACE_HOVER);
+                footer_ui.painter().rect_filled(
+                    sync_rect,
+                    CornerRadius::same(R_MD as u8),
+                    SB_SURFACE_HOVER,
+                );
             }
             draw_icon_refresh(
                 footer_ui.painter(),
                 sync_rect.center(),
-                if sync_resp.hovered() { SB_TEXT } else { SB_TEXT_MUTED },
+                if sync_resp.hovered() {
+                    SB_TEXT
+                } else {
+                    SB_TEXT_MUTED
+                },
             );
             if sync_resp.clicked() {
                 self.sidebar_refreshing_until = Some(Instant::now() + Duration::from_millis(400));
@@ -177,20 +187,27 @@ impl ShiplyApp {
             }
 
             // Folder Button
-            let dir_rect = Rect::from_center_size(Pos2::new(center_x, footer_rect.top() + 54.0), btn_size);
+            let dir_rect =
+                Rect::from_center_size(Pos2::new(center_x, footer_rect.top() + 54.0), btn_size);
             let dir_resp = footer_ui
                 .interact(dir_rect, egui::Id::new("rail_folder_btn"), Sense::click())
                 .on_hover_cursor(egui::CursorIcon::PointingHand)
                 .on_hover_text("Open App Folder (JSON / .ps1)");
             if dir_resp.hovered() {
-                footer_ui
-                    .painter()
-                    .rect_filled(dir_rect, CornerRadius::same(R_MD as u8), SB_SURFACE_HOVER);
+                footer_ui.painter().rect_filled(
+                    dir_rect,
+                    CornerRadius::same(R_MD as u8),
+                    SB_SURFACE_HOVER,
+                );
             }
             draw_icon_folder(
                 footer_ui.painter(),
                 dir_rect.center(),
-                if dir_resp.hovered() { SB_TEXT } else { SB_TEXT_MUTED },
+                if dir_resp.hovered() {
+                    SB_TEXT
+                } else {
+                    SB_TEXT_MUTED
+                },
             );
             if dir_resp.clicked() {
                 let dir = self.storage.app_data_dir();
@@ -199,7 +216,8 @@ impl ShiplyApp {
             }
 
             // Updates Button
-            let upd_rect = Rect::from_center_size(Pos2::new(center_x, footer_rect.top() + 88.0), btn_size);
+            let upd_rect =
+                Rect::from_center_size(Pos2::new(center_x, footer_rect.top() + 88.0), btn_size);
             let upd_resp = footer_ui
                 .interact(upd_rect, egui::Id::new("rail_upd_btn"), Sense::click())
                 .on_hover_cursor(egui::CursorIcon::PointingHand)
@@ -209,9 +227,11 @@ impl ShiplyApp {
                     "Check for Updates"
                 });
             if upd_resp.hovered() {
-                footer_ui
-                    .painter()
-                    .rect_filled(upd_rect, CornerRadius::same(R_MD as u8), SB_SURFACE_HOVER);
+                footer_ui.painter().rect_filled(
+                    upd_rect,
+                    CornerRadius::same(R_MD as u8),
+                    SB_SURFACE_HOVER,
+                );
             }
             let upd_color = if self.available_update.is_some() {
                 theme.warning
@@ -405,7 +425,7 @@ impl ShiplyApp {
                             p_avatar_rect.center(),
                             Align2::CENTER_CENTER,
                             initial,
-                            FontId::proportional(FS_BASE),
+                            Typo::Label.font(),
                             fg_color,
                         );
 
@@ -466,24 +486,23 @@ impl ShiplyApp {
                     brand_ui.painter(),
                     logo_rect,
                     6,
-                    FS_TITLE,
+                    Typo::H2.size(),
                     self.logo_texture.as_ref(),
                 );
                 brand_ui.painter().text(
                     Pos2::new(logo_rect.right() + 8.0, brand_rect.center().y),
                     Align2::LEFT_CENTER,
                     "Shiply",
-                    FontId::proportional(FS_BRAND),
+                    Typo::H2.font(),
                     SB_TEXT,
                 );
 
                 // Version badge: mono 11px, bg --sb-surface, text --sb-text-muted, radius 4px
                 let ver_text = format!("v{APP_VERSION}");
-                let ver_galley = brand_ui.painter().layout_no_wrap(
-                    ver_text,
-                    FontId::monospace(FS_MICRO),
-                    SB_TEXT_MUTED,
-                );
+                let ver_galley =
+                    brand_ui
+                        .painter()
+                        .layout_no_wrap(ver_text, Typo::MonoSm.font(), SB_TEXT_MUTED);
                 let badge_pad_x = 6.0_f32;
                 let badge_h = 20.0_f32;
                 let badge_w = ver_galley.size().x + badge_pad_x * 2.0;
@@ -494,9 +513,11 @@ impl ShiplyApp {
                     ),
                     Vec2::new(badge_w, badge_h),
                 );
-                brand_ui
-                    .painter()
-                    .rect_filled(badge_rect, CornerRadius::same(R_SM as u8), SB_SURFACE);
+                brand_ui.painter().rect_filled(
+                    badge_rect,
+                    CornerRadius::same(R_SM as u8),
+                    SB_SURFACE,
+                );
                 brand_ui.painter().galley(
                     Pos2::new(
                         badge_rect.left() + badge_pad_x,
@@ -564,7 +585,7 @@ impl ShiplyApp {
                     Pos2::new(sync_rect.left() + 30.0, sync_rect.center().y),
                     Align2::LEFT_CENTER,
                     "Sync App Files",
-                    FontId::proportional(FS_BASE),
+                    Typo::Label.font(),
                     sync_fg,
                 );
                 if sync_resp.clicked() {
@@ -591,7 +612,11 @@ impl ShiplyApp {
                     Vec2::new(full_w, 30.0),
                 );
                 let dir_resp = footer_ui
-                    .interact(dir_rect, egui::Id::new("sidebar_folder_btn"), Sense::click())
+                    .interact(
+                        dir_rect,
+                        egui::Id::new("sidebar_folder_btn"),
+                        Sense::click(),
+                    )
                     .on_hover_cursor(egui::CursorIcon::PointingHand);
                 let dir_bg = if dir_resp.hovered() {
                     SB_SURFACE_HOVER
@@ -615,7 +640,7 @@ impl ShiplyApp {
                     Pos2::new(dir_rect.left() + 30.0, dir_rect.center().y),
                     Align2::LEFT_CENTER,
                     "Open App Folder",
-                    FontId::proportional(FS_BASE),
+                    Typo::Label.font(),
                     dir_fg,
                 );
                 if dir_resp
@@ -635,13 +660,14 @@ impl ShiplyApp {
                     Vec2::new(full_w, 30.0),
                 );
                 let upd_resp = footer_ui
-                    .interact(upd_rect, egui::Id::new("sidebar_update_btn"), Sense::click())
+                    .interact(
+                        upd_rect,
+                        egui::Id::new("sidebar_update_btn"),
+                        Sense::click(),
+                    )
                     .on_hover_cursor(egui::CursorIcon::PointingHand);
                 let (upd_label, upd_fg) = if let Some(rel) = &self.available_update {
-                    (
-                        format!("Update: {}!", rel.tag_name),
-                        theme.warning,
-                    )
+                    (format!("Update: {}!", rel.tag_name), theme.warning)
                 } else if self.update_checking {
                     ("Checking Releases...".to_string(), SB_ACCENT)
                 } else if upd_resp.hovered() {
@@ -666,13 +692,11 @@ impl ShiplyApp {
                     Pos2::new(upd_rect.left() + 30.0, upd_rect.center().y),
                     Align2::LEFT_CENTER,
                     upd_label,
-                    FontId::proportional(FS_BASE),
+                    Typo::Label.font(),
                     upd_fg,
                 );
                 if upd_resp
-                    .on_hover_text(format!(
-                        "Check GitHub Releases ({GITHUB_REPO}) for updates"
-                    ))
+                    .on_hover_text(format!("Check GitHub Releases ({GITHUB_REPO}) for updates"))
                     .clicked()
                 {
                     if self.available_update.is_some() {
@@ -695,7 +719,9 @@ impl ShiplyApp {
                     InstallState::InstalledCurrent { version, .. } => {
                         (theme.success, format!("Installed v{version}"), "Reinstall")
                     }
-                    InstallState::UpdateReady { running_version, .. } => (
+                    InstallState::UpdateReady {
+                        running_version, ..
+                    } => (
                         theme.warning,
                         format!("Update to v{running_version}"),
                         "Apply",
@@ -710,7 +736,7 @@ impl ShiplyApp {
 
                 let st_galley = footer_ui.painter().layout_no_wrap(
                     status_text,
-                    FontId::monospace(FS_MICRO),
+                    Typo::MonoSm.font(),
                     SB_TEXT_MUTED,
                 );
                 footer_ui.painter().galley(
@@ -725,7 +751,7 @@ impl ShiplyApp {
                 let link_x = stat_rect.left() + 20.0 + st_galley.size().x + 8.0;
                 let link_galley = footer_ui.painter().layout_no_wrap(
                     action_text.to_string(),
-                    FontId::proportional(FS_MICRO),
+                    Typo::Caption.font(),
                     SB_TEXT_FAINT,
                 );
                 let link_rect = Rect::from_min_size(
@@ -759,7 +785,7 @@ impl ShiplyApp {
                 let don_x = link_rect.right() + 8.0;
                 let don_galley = footer_ui.painter().layout_no_wrap(
                     "Donate".to_string(),
-                    FontId::proportional(FS_MICRO),
+                    Typo::Caption.font(),
                     SB_TEXT_FAINT,
                 );
                 let don_rect = Rect::from_min_size(
@@ -773,9 +799,11 @@ impl ShiplyApp {
                         Sense::click(),
                     )
                     .on_hover_cursor(egui::CursorIcon::PointingHand)
-                    .on_hover_text("Support Shiply development on Trakteer (https://trakteer.id/faidfadjri)");
+                    .on_hover_text(
+                        "Support Shiply development on Trakteer (https://trakteer.id/faidfadjri)",
+                    );
                 let don_color = if don_resp.hovered() {
-                    Color32::from_rgb(255, 105, 135)
+                    HEART_PINK
                 } else {
                     SB_TEXT_FAINT
                 };
@@ -833,7 +861,7 @@ impl ShiplyApp {
                         Pos2::new(nav_rect.left() + 34.0, nav_rect.center().y),
                         Align2::LEFT_CENTER,
                         "All Deployments",
-                        FontId::proportional(FS_BASE),
+                        Typo::Label.font(),
                         nav_fg,
                     );
                     if nav_resp.clicked() {
@@ -872,7 +900,7 @@ impl ShiplyApp {
                             Pos2::new(bulk_rect.left() + 34.0, bulk_rect.center().y),
                             Align2::LEFT_CENTER,
                             "Bulk Deploy...",
-                            FontId::proportional(FS_BASE),
+                            Typo::Label.font(),
                             bulk_fg,
                         );
                         if bulk_resp
@@ -916,14 +944,14 @@ impl ShiplyApp {
                         Pos2::new(sec_rect.left() + 34.0, sec_rect.center().y),
                         Align2::LEFT_CENTER,
                         "Secret Management",
-                        FontId::proportional(FS_BASE),
+                        Typo::Label.font(),
                         sec_fg,
                     );
                     if !self.storage.secrets.is_empty() {
                         let count_str = self.storage.secrets.len().to_string();
                         let cg = ui.painter().layout_no_wrap(
                             count_str,
-                            FontId::monospace(FS_MICRO),
+                            Typo::MonoSm.font(),
                             if is_secrets_active {
                                 SB_ACCENT
                             } else {
@@ -976,14 +1004,14 @@ impl ShiplyApp {
                         Pos2::new(hdr_rect.left() + 2.0, hdr_rect.center().y),
                         Align2::LEFT_CENTER,
                         "PROJECTS",
-                        FontId::proportional(FS_SMALL),
+                        Typo::Small.font(),
                         SB_TEXT_FAINT,
                     );
 
                     let add_w = 46.0_f32;
                     let sort_w = 78.0_f32;
 
-                    // "+ ADD" Button
+                    // "+ Add" Button
                     let add_btn_rect = Rect::from_min_size(
                         Pos2::new(hdr_rect.right() - add_w, hdr_rect.center().y - 12.0),
                         Vec2::new(add_w, 24.0),
@@ -1011,8 +1039,8 @@ impl ShiplyApp {
                     ui.painter().text(
                         add_btn_rect.center(),
                         Align2::CENTER_CENTER,
-                        "+ ADD",
-                        FontId::proportional(FS_MICRO),
+                        "+ Add",
+                        Typo::Caption.font(),
                         SB_TEXT,
                     );
                     if add_btn_resp.clicked() {
@@ -1070,7 +1098,7 @@ impl ShiplyApp {
                         Pos2::new(sort_area_rect.left() + 8.0, sort_area_rect.center().y),
                         Align2::LEFT_CENTER,
                         sort_label,
-                        FontId::proportional(FS_MICRO),
+                        Typo::Caption.font(),
                         SB_TEXT,
                     );
                     draw_outline_icon(
@@ -1153,7 +1181,7 @@ impl ShiplyApp {
                             empty_rect.center(),
                             Align2::CENTER_CENTER,
                             "No projects yet.\nClick '+ ADD' or import .ps1",
-                            FontId::proportional(FS_SMALL),
+                            Typo::Small.font(),
                             SB_TEXT_MUTED,
                         );
                     } else {
@@ -1246,7 +1274,7 @@ impl ShiplyApp {
                                     Pos2::new(grp_rect.left() + 20.0, grp_rect.center().y),
                                     Align2::LEFT_CENTER,
                                     group_title.to_uppercase(),
-                                    FontId::proportional(FS_MICRO),
+                                    Typo::Caption.font(),
                                     SB_TEXT_FAINT,
                                 );
 
@@ -1286,9 +1314,7 @@ impl ShiplyApp {
                                 let p_resp =
                                     p_resp.on_hover_cursor(egui::CursorIcon::PointingHand);
 
-                                let fill = if is_selected || is_switching {
-                                    Color32::from_rgb(17, 30, 56)
-                                } else if p_resp.hovered() {
+                                let fill = if is_selected || is_switching || p_resp.hovered() {
                                     SB_SURFACE_HOVER
                                 } else {
                                     SB_SURFACE
@@ -1379,11 +1405,7 @@ impl ShiplyApp {
                                 }
 
                                 // Active project: 1px accent border, 2px left bar
-                                let stroke = if is_selected || is_switching {
-                                    Stroke::new(1.0_f32, Color32::from_rgb(30, 58, 102))
-                                } else {
-                                    Stroke::new(1.0_f32, SB_BORDER_LINE)
-                                };
+                                let stroke = Stroke::new(1.0_f32, SB_BORDER_LINE);
                                 ui.painter().rect_stroke(
                                     p_rect,
                                     CornerRadius::same(8),
@@ -1415,7 +1437,7 @@ impl ShiplyApp {
                                 };
                                 let mut job = egui::text::LayoutJob::simple_singleline(
                                     project.name.clone(),
-                                    FontId::proportional(FS_BASE),
+                                    Typo::Label.font(),
                                     name_color,
                                 );
                                 job.wrap.max_width = avail_name_w;
@@ -1613,13 +1635,20 @@ impl ShiplyApp {
             ProjectSortMode::NameDesc,
             ProjectSortMode::RecentDeploy,
         ];
-        let current_idx = modes.iter().position(|m| *m == self.project_sort_mode).unwrap_or(0);
+        let current_idx = modes
+            .iter()
+            .position(|m| *m == self.project_sort_mode)
+            .unwrap_or(0);
         if ctx.input(|i| i.key_pressed(egui::Key::ArrowDown)) {
             let next_idx = (current_idx + 1) % modes.len();
             self.project_sort_mode = modes[next_idx];
             self.storage.sort_projects(modes[next_idx]);
         } else if ctx.input(|i| i.key_pressed(egui::Key::ArrowUp)) {
-            let prev_idx = if current_idx == 0 { modes.len() - 1 } else { current_idx - 1 };
+            let prev_idx = if current_idx == 0 {
+                modes.len() - 1
+            } else {
+                current_idx - 1
+            };
             self.project_sort_mode = modes[prev_idx];
             self.storage.sort_projects(modes[prev_idx]);
         } else if ctx.input(|i| i.key_pressed(egui::Key::Enter)) {
@@ -1640,7 +1669,8 @@ impl ShiplyApp {
                 );
 
                 // Container: min-width 192px, bg --sb-surface, border 1px --sb-border, radius --r-md, padding 4px
-                ui.painter().rect_filled(menu_rect, CornerRadius::same(R_MD as u8), SB_SURFACE);
+                ui.painter()
+                    .rect_filled(menu_rect, CornerRadius::same(R_MD as u8), SB_SURFACE);
                 ui.painter().rect_stroke(
                     menu_rect,
                     CornerRadius::same(R_MD as u8),
@@ -1661,11 +1691,13 @@ impl ShiplyApp {
                         Pos2::new(menu_pos.x + 4.0, item_y),
                         Vec2::new(menu_w - 8.0, 32.0),
                     );
-                    let item_resp = ui.interact(
-                        item_rect,
-                        egui::Id::new(("sidebar_sort_opt", idx)),
-                        Sense::click(),
-                    ).on_hover_cursor(egui::CursorIcon::PointingHand);
+                    let item_resp = ui
+                        .interact(
+                            item_rect,
+                            egui::Id::new(("sidebar_sort_opt", idx)),
+                            Sense::click(),
+                        )
+                        .on_hover_cursor(egui::CursorIcon::PointingHand);
 
                     let is_selected = self.project_sort_mode == *mode;
                     let (bg, text_color, check_color) = if is_selected {
@@ -1676,14 +1708,15 @@ impl ShiplyApp {
                         (Color32::TRANSPARENT, SB_TEXT_MUTED, Color32::TRANSPARENT)
                     };
 
-                    ui.painter().rect_filled(item_rect, CornerRadius::same(R_SM as u8), bg);
+                    ui.painter()
+                        .rect_filled(item_rect, CornerRadius::same(R_SM as u8), bg);
 
                     // Text: --fs-small
                     ui.painter().text(
                         Pos2::new(item_rect.left() + 10.0, item_rect.center().y),
                         Align2::LEFT_CENTER,
                         *label,
-                        FontId::proportional(FS_SMALL),
+                        Typo::Small.font(),
                         text_color,
                     );
 
@@ -1708,7 +1741,12 @@ impl ShiplyApp {
             None => return,
         };
 
-        let project = match self.storage.projects.iter().find(|p| p.id == state.project_id) {
+        let project = match self
+            .storage
+            .projects
+            .iter()
+            .find(|p| p.id == state.project_id)
+        {
             Some(p) => p.clone(),
             None => {
                 self.sidebar_context_menu = None;
@@ -1717,7 +1755,12 @@ impl ShiplyApp {
         };
 
         let total_projects = self.storage.projects.len();
-        let proj_idx = self.storage.projects.iter().position(|p| p.id == state.project_id).unwrap_or(0);
+        let proj_idx = self
+            .storage
+            .projects
+            .iter()
+            .position(|p| p.id == state.project_id)
+            .unwrap_or(0);
 
         let can_move_up = proj_idx > 0;
         let can_move_down = proj_idx + 1 < total_projects;
@@ -1728,8 +1771,12 @@ impl ShiplyApp {
 
         // Calculate menu height:
         let mut items_count = 4; // Edit Project, Set Group..., Duplicate Project, Refresh Metadata
-        if can_move_up { items_count += 1; }
-        if can_move_down { items_count += 1; }
+        if can_move_up {
+            items_count += 1;
+        }
+        if can_move_down {
+            items_count += 1;
+        }
         items_count += 1; // Delete Project
 
         let seps_count = if has_move_sep { 2 } else { 1 };
@@ -1758,8 +1805,13 @@ impl ShiplyApp {
 
         // Submenu geometry (if open):
         let submenu_w = 190.0_f32;
-        let submenu_items_count = existing_groups.len() + if project.group.is_some() { 1 } else { 0 };
-        let submenu_seps = if project.group.is_some() && !existing_groups.is_empty() { 1 } else { 0 };
+        let submenu_items_count =
+            existing_groups.len() + if project.group.is_some() { 1 } else { 0 };
+        let submenu_seps = if project.group.is_some() && !existing_groups.is_empty() {
+            1
+        } else {
+            0
+        };
         let submenu_h = 8.0 + (submenu_items_count as f32 * 32.0) + (submenu_seps as f32 * 9.0);
 
         let sub_x = if menu_rect.right() + 4.0 + submenu_w <= screen.right() - 8.0 {
@@ -1768,7 +1820,8 @@ impl ShiplyApp {
             (menu_rect.left() - 4.0 - submenu_w).max(screen.left() + 8.0)
         };
         // Align submenu y to Set Group item
-        let set_group_y_offset = 4.0 + (if can_move_up { 32.0 } else { 0.0 })
+        let set_group_y_offset = 4.0
+            + (if can_move_up { 32.0 } else { 0.0 })
             + (if can_move_down { 32.0 } else { 0.0 })
             + (if has_move_sep { 9.0 } else { 0.0 })
             + 32.0; // after Edit Project
@@ -1776,7 +1829,8 @@ impl ShiplyApp {
         if sub_y + submenu_h > screen.bottom() - 8.0 {
             sub_y = (screen.bottom() - 8.0 - submenu_h).max(screen.top() + 8.0);
         }
-        let submenu_rect = Rect::from_min_size(Pos2::new(sub_x, sub_y), Vec2::new(submenu_w, submenu_h));
+        let submenu_rect =
+            Rect::from_min_size(Pos2::new(sub_x, sub_y), Vec2::new(submenu_w, submenu_h));
 
         // Outside click handling:
         if ctx.input(|i| i.pointer.any_pressed()) {
@@ -1824,7 +1878,8 @@ impl ShiplyApp {
                 );
 
                 // Container
-                ui.painter().rect_filled(menu_rect, CornerRadius::same(R_MD as u8), SB_SURFACE);
+                ui.painter()
+                    .rect_filled(menu_rect, CornerRadius::same(R_MD as u8), SB_SURFACE);
                 ui.painter().rect_stroke(
                     menu_rect,
                     CornerRadius::same(R_MD as u8),
@@ -1836,32 +1891,81 @@ impl ShiplyApp {
 
                 // Move Up
                 if can_move_up {
-                    let r = Rect::from_min_size(Pos2::new(menu_rect.left() + 4.0, cur_y), Vec2::new(menu_w - 8.0, 32.0));
-                    let resp = ui.interact(r, egui::Id::new("ctx_move_up"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
-                    let bg = if resp.hovered() { SB_SURFACE_HOVER } else { Color32::TRANSPARENT };
-                    ui.painter().rect_filled(r, CornerRadius::same(R_SM as u8), bg);
-                    draw_outline_icon(ui.painter(), Pos2::new(r.left() + 16.0, r.center().y), OutlineIcon::ArrowUp, SB_TEXT);
-                    ui.painter().text(Pos2::new(r.left() + 32.0, r.center().y), Align2::LEFT_CENTER, "Move Up", FontId::proportional(FS_SMALL), SB_TEXT);
-                    if resp.clicked() { action_move_up = true; }
+                    let r = Rect::from_min_size(
+                        Pos2::new(menu_rect.left() + 4.0, cur_y),
+                        Vec2::new(menu_w - 8.0, 32.0),
+                    );
+                    let resp = ui
+                        .interact(r, egui::Id::new("ctx_move_up"), Sense::click())
+                        .on_hover_cursor(egui::CursorIcon::PointingHand);
+                    let bg = if resp.hovered() {
+                        SB_SURFACE_HOVER
+                    } else {
+                        Color32::TRANSPARENT
+                    };
+                    ui.painter()
+                        .rect_filled(r, CornerRadius::same(R_SM as u8), bg);
+                    draw_outline_icon(
+                        ui.painter(),
+                        Pos2::new(r.left() + 16.0, r.center().y),
+                        OutlineIcon::ArrowUp,
+                        SB_TEXT,
+                    );
+                    ui.painter().text(
+                        Pos2::new(r.left() + 32.0, r.center().y),
+                        Align2::LEFT_CENTER,
+                        "Move Up",
+                        Typo::Small.font(),
+                        SB_TEXT,
+                    );
+                    if resp.clicked() {
+                        action_move_up = true;
+                    }
                     cur_y += 32.0;
                 }
 
                 // Move Down
                 if can_move_down {
-                    let r = Rect::from_min_size(Pos2::new(menu_rect.left() + 4.0, cur_y), Vec2::new(menu_w - 8.0, 32.0));
-                    let resp = ui.interact(r, egui::Id::new("ctx_move_down"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
-                    let bg = if resp.hovered() { SB_SURFACE_HOVER } else { Color32::TRANSPARENT };
-                    ui.painter().rect_filled(r, CornerRadius::same(R_SM as u8), bg);
-                    draw_outline_icon(ui.painter(), Pos2::new(r.left() + 16.0, r.center().y), OutlineIcon::ArrowDown, SB_TEXT);
-                    ui.painter().text(Pos2::new(r.left() + 32.0, r.center().y), Align2::LEFT_CENTER, "Move Down", FontId::proportional(FS_SMALL), SB_TEXT);
-                    if resp.clicked() { action_move_down = true; }
+                    let r = Rect::from_min_size(
+                        Pos2::new(menu_rect.left() + 4.0, cur_y),
+                        Vec2::new(menu_w - 8.0, 32.0),
+                    );
+                    let resp = ui
+                        .interact(r, egui::Id::new("ctx_move_down"), Sense::click())
+                        .on_hover_cursor(egui::CursorIcon::PointingHand);
+                    let bg = if resp.hovered() {
+                        SB_SURFACE_HOVER
+                    } else {
+                        Color32::TRANSPARENT
+                    };
+                    ui.painter()
+                        .rect_filled(r, CornerRadius::same(R_SM as u8), bg);
+                    draw_outline_icon(
+                        ui.painter(),
+                        Pos2::new(r.left() + 16.0, r.center().y),
+                        OutlineIcon::ArrowDown,
+                        SB_TEXT,
+                    );
+                    ui.painter().text(
+                        Pos2::new(r.left() + 32.0, r.center().y),
+                        Align2::LEFT_CENTER,
+                        "Move Down",
+                        Typo::Small.font(),
+                        SB_TEXT,
+                    );
+                    if resp.clicked() {
+                        action_move_down = true;
+                    }
                     cur_y += 32.0;
                 }
 
                 if has_move_sep {
                     cur_y += 4.0;
                     ui.painter().line_segment(
-                        [Pos2::new(menu_rect.left() + 8.0, cur_y), Pos2::new(menu_rect.right() - 8.0, cur_y)],
+                        [
+                            Pos2::new(menu_rect.left() + 8.0, cur_y),
+                            Pos2::new(menu_rect.right() - 8.0, cur_y),
+                        ],
                         Stroke::new(1.0_f32, SB_BORDER),
                     );
                     cur_y += 5.0;
@@ -1869,19 +1973,45 @@ impl ShiplyApp {
 
                 // Edit Project
                 {
-                    let r = Rect::from_min_size(Pos2::new(menu_rect.left() + 4.0, cur_y), Vec2::new(menu_w - 8.0, 32.0));
-                    let resp = ui.interact(r, egui::Id::new("ctx_edit"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
-                    let bg = if resp.hovered() { SB_SURFACE_HOVER } else { Color32::TRANSPARENT };
-                    ui.painter().rect_filled(r, CornerRadius::same(R_SM as u8), bg);
-                    draw_outline_icon(ui.painter(), Pos2::new(r.left() + 16.0, r.center().y), OutlineIcon::Edit, SB_TEXT);
-                    ui.painter().text(Pos2::new(r.left() + 32.0, r.center().y), Align2::LEFT_CENTER, "Edit Project", FontId::proportional(FS_SMALL), SB_TEXT);
-                    if resp.clicked() { action_edit = true; }
+                    let r = Rect::from_min_size(
+                        Pos2::new(menu_rect.left() + 4.0, cur_y),
+                        Vec2::new(menu_w - 8.0, 32.0),
+                    );
+                    let resp = ui
+                        .interact(r, egui::Id::new("ctx_edit"), Sense::click())
+                        .on_hover_cursor(egui::CursorIcon::PointingHand);
+                    let bg = if resp.hovered() {
+                        SB_SURFACE_HOVER
+                    } else {
+                        Color32::TRANSPARENT
+                    };
+                    ui.painter()
+                        .rect_filled(r, CornerRadius::same(R_SM as u8), bg);
+                    draw_outline_icon(
+                        ui.painter(),
+                        Pos2::new(r.left() + 16.0, r.center().y),
+                        OutlineIcon::Edit,
+                        SB_TEXT,
+                    );
+                    ui.painter().text(
+                        Pos2::new(r.left() + 32.0, r.center().y),
+                        Align2::LEFT_CENTER,
+                        "Edit Project",
+                        Typo::Small.font(),
+                        SB_TEXT,
+                    );
+                    if resp.clicked() {
+                        action_edit = true;
+                    }
                     cur_y += 32.0;
                 }
 
                 // Set Group...
                 {
-                    let r = Rect::from_min_size(Pos2::new(menu_rect.left() + 4.0, cur_y), Vec2::new(menu_w - 8.0, 32.0));
+                    let r = Rect::from_min_size(
+                        Pos2::new(menu_rect.left() + 4.0, cur_y),
+                        Vec2::new(menu_w - 8.0, 32.0),
+                    );
                     let resp = if is_set_group_disabled {
                         ui.interact(r, egui::Id::new("ctx_set_group"), Sense::hover())
                             .on_hover_cursor(egui::CursorIcon::NotAllowed)
@@ -1896,7 +2026,8 @@ impl ShiplyApp {
                     } else {
                         Color32::TRANSPARENT
                     };
-                    ui.painter().rect_filled(r, CornerRadius::same(R_SM as u8), bg);
+                    ui.painter()
+                        .rect_filled(r, CornerRadius::same(R_SM as u8), bg);
 
                     let fg = if is_set_group_disabled {
                         Color32::from_rgba_premultiplied(55, 60, 69, 102) // opacity 0.4
@@ -1904,9 +2035,25 @@ impl ShiplyApp {
                         SB_TEXT
                     };
 
-                    draw_outline_icon(ui.painter(), Pos2::new(r.left() + 16.0, r.center().y), OutlineIcon::Folder, fg);
-                    ui.painter().text(Pos2::new(r.left() + 32.0, r.center().y), Align2::LEFT_CENTER, "Set Group...", FontId::proportional(FS_SMALL), fg);
-                    draw_outline_icon(ui.painter(), Pos2::new(r.right() - 14.0, r.center().y), OutlineIcon::ChevronRight, fg);
+                    draw_outline_icon(
+                        ui.painter(),
+                        Pos2::new(r.left() + 16.0, r.center().y),
+                        OutlineIcon::Folder,
+                        fg,
+                    );
+                    ui.painter().text(
+                        Pos2::new(r.left() + 32.0, r.center().y),
+                        Align2::LEFT_CENTER,
+                        "Set Group...",
+                        Typo::Small.font(),
+                        fg,
+                    );
+                    draw_outline_icon(
+                        ui.painter(),
+                        Pos2::new(r.right() - 14.0, r.center().y),
+                        OutlineIcon::ChevronRight,
+                        fg,
+                    );
 
                     if !is_set_group_disabled && (resp.hovered() || resp.clicked()) {
                         next_submenu_open = true;
@@ -1916,41 +2063,99 @@ impl ShiplyApp {
 
                 // Duplicate Project
                 {
-                    let r = Rect::from_min_size(Pos2::new(menu_rect.left() + 4.0, cur_y), Vec2::new(menu_w - 8.0, 32.0));
-                    let resp = ui.interact(r, egui::Id::new("ctx_dup"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
-                    let bg = if resp.hovered() { SB_SURFACE_HOVER } else { Color32::TRANSPARENT };
-                    ui.painter().rect_filled(r, CornerRadius::same(R_SM as u8), bg);
-                    draw_outline_icon(ui.painter(), Pos2::new(r.left() + 16.0, r.center().y), OutlineIcon::Copy, SB_TEXT);
-                    ui.painter().text(Pos2::new(r.left() + 32.0, r.center().y), Align2::LEFT_CENTER, "Duplicate Project", FontId::proportional(FS_SMALL), SB_TEXT);
-                    if resp.clicked() { action_duplicate = true; }
+                    let r = Rect::from_min_size(
+                        Pos2::new(menu_rect.left() + 4.0, cur_y),
+                        Vec2::new(menu_w - 8.0, 32.0),
+                    );
+                    let resp = ui
+                        .interact(r, egui::Id::new("ctx_dup"), Sense::click())
+                        .on_hover_cursor(egui::CursorIcon::PointingHand);
+                    let bg = if resp.hovered() {
+                        SB_SURFACE_HOVER
+                    } else {
+                        Color32::TRANSPARENT
+                    };
+                    ui.painter()
+                        .rect_filled(r, CornerRadius::same(R_SM as u8), bg);
+                    draw_outline_icon(
+                        ui.painter(),
+                        Pos2::new(r.left() + 16.0, r.center().y),
+                        OutlineIcon::Copy,
+                        SB_TEXT,
+                    );
+                    ui.painter().text(
+                        Pos2::new(r.left() + 32.0, r.center().y),
+                        Align2::LEFT_CENTER,
+                        "Duplicate Project",
+                        Typo::Small.font(),
+                        SB_TEXT,
+                    );
+                    if resp.clicked() {
+                        action_duplicate = true;
+                    }
                     cur_y += 32.0;
                 }
 
                 // Refresh Metadata
                 {
-                    let r = Rect::from_min_size(Pos2::new(menu_rect.left() + 4.0, cur_y), Vec2::new(menu_w - 8.0, 32.0));
-                    let resp = ui.interact(r, egui::Id::new("ctx_refresh"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
-                    let bg = if resp.hovered() { SB_SURFACE_HOVER } else { Color32::TRANSPARENT };
-                    let fg = if resp.hovered() { SB_TEXT } else { SB_TEXT_MUTED };
-                    ui.painter().rect_filled(r, CornerRadius::same(R_SM as u8), bg);
-                    draw_outline_icon(ui.painter(), Pos2::new(r.left() + 16.0, r.center().y), OutlineIcon::Refresh, fg);
-                    ui.painter().text(Pos2::new(r.left() + 32.0, r.center().y), Align2::LEFT_CENTER, "Refresh Metadata", FontId::proportional(FS_SMALL), fg);
-                    if resp.clicked() { action_refresh = true; }
+                    let r = Rect::from_min_size(
+                        Pos2::new(menu_rect.left() + 4.0, cur_y),
+                        Vec2::new(menu_w - 8.0, 32.0),
+                    );
+                    let resp = ui
+                        .interact(r, egui::Id::new("ctx_refresh"), Sense::click())
+                        .on_hover_cursor(egui::CursorIcon::PointingHand);
+                    let bg = if resp.hovered() {
+                        SB_SURFACE_HOVER
+                    } else {
+                        Color32::TRANSPARENT
+                    };
+                    let fg = if resp.hovered() {
+                        SB_TEXT
+                    } else {
+                        SB_TEXT_MUTED
+                    };
+                    ui.painter()
+                        .rect_filled(r, CornerRadius::same(R_SM as u8), bg);
+                    draw_outline_icon(
+                        ui.painter(),
+                        Pos2::new(r.left() + 16.0, r.center().y),
+                        OutlineIcon::Refresh,
+                        fg,
+                    );
+                    ui.painter().text(
+                        Pos2::new(r.left() + 32.0, r.center().y),
+                        Align2::LEFT_CENTER,
+                        "Refresh Metadata",
+                        Typo::Small.font(),
+                        fg,
+                    );
+                    if resp.clicked() {
+                        action_refresh = true;
+                    }
                     cur_y += 32.0;
                 }
 
                 // Separator before Delete
                 cur_y += 4.0;
                 ui.painter().line_segment(
-                    [Pos2::new(menu_rect.left() + 8.0, cur_y), Pos2::new(menu_rect.right() - 8.0, cur_y)],
+                    [
+                        Pos2::new(menu_rect.left() + 8.0, cur_y),
+                        Pos2::new(menu_rect.right() - 8.0, cur_y),
+                    ],
                     Stroke::new(1.0_f32, SB_BORDER),
                 );
                 cur_y += 5.0;
 
                 // Delete Project
                 {
-                    let r = Rect::from_min_size(Pos2::new(menu_rect.left() + 4.0, cur_y), Vec2::new(menu_w - 8.0, 32.0));
-                    let resp = ui.interact(r, egui::Id::new("ctx_delete"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
+                    let r = Rect::from_min_size(
+                        Pos2::new(menu_rect.left() + 4.0, cur_y),
+                        Vec2::new(menu_w - 8.0, 32.0),
+                    );
+                    let resp = ui
+                        .interact(r, egui::Id::new("ctx_delete"), Sense::click())
+                        .on_hover_cursor(egui::CursorIcon::PointingHand);
                     let bg = if resp.is_pointer_button_down_on() {
                         DESTRUCTIVE_ACTIVE_BG
                     } else if resp.hovered() {
@@ -1958,10 +2163,24 @@ impl ShiplyApp {
                     } else {
                         Color32::TRANSPARENT
                     };
-                    ui.painter().rect_filled(r, CornerRadius::same(R_SM as u8), bg);
-                    draw_outline_icon(ui.painter(), Pos2::new(r.left() + 16.0, r.center().y), OutlineIcon::Trash, DESTRUCTIVE_TEXT);
-                    ui.painter().text(Pos2::new(r.left() + 32.0, r.center().y), Align2::LEFT_CENTER, "Delete Project", FontId::proportional(FS_SMALL), DESTRUCTIVE_TEXT);
-                    if resp.clicked() { action_delete = true; }
+                    ui.painter()
+                        .rect_filled(r, CornerRadius::same(R_SM as u8), bg);
+                    draw_outline_icon(
+                        ui.painter(),
+                        Pos2::new(r.left() + 16.0, r.center().y),
+                        OutlineIcon::Trash,
+                        DESTRUCTIVE_TEXT,
+                    );
+                    ui.painter().text(
+                        Pos2::new(r.left() + 32.0, r.center().y),
+                        Align2::LEFT_CENTER,
+                        "Delete Project",
+                        Typo::Small.font(),
+                        DESTRUCTIVE_TEXT,
+                    );
+                    if resp.clicked() {
+                        action_delete = true;
+                    }
                 }
             });
 
@@ -1980,7 +2199,11 @@ impl ShiplyApp {
                     );
 
                     // Submenu container
-                    ui.painter().rect_filled(submenu_rect, CornerRadius::same(R_MD as u8), SB_SURFACE);
+                    ui.painter().rect_filled(
+                        submenu_rect,
+                        CornerRadius::same(R_MD as u8),
+                        SB_SURFACE,
+                    );
                     ui.painter().rect_stroke(
                         submenu_rect,
                         CornerRadius::same(R_MD as u8),
@@ -1990,17 +2213,40 @@ impl ShiplyApp {
 
                     let mut sub_cur_y = submenu_rect.top() + 4.0;
                     for (g_idx, grp) in existing_groups.iter().enumerate() {
-                        let r = Rect::from_min_size(Pos2::new(submenu_rect.left() + 4.0, sub_cur_y), Vec2::new(submenu_w - 8.0, 32.0));
-                        let resp = ui.interact(r, egui::Id::new(("ctx_sub_grp", g_idx)), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
+                        let r = Rect::from_min_size(
+                            Pos2::new(submenu_rect.left() + 4.0, sub_cur_y),
+                            Vec2::new(submenu_w - 8.0, 32.0),
+                        );
+                        let resp = ui
+                            .interact(r, egui::Id::new(("ctx_sub_grp", g_idx)), Sense::click())
+                            .on_hover_cursor(egui::CursorIcon::PointingHand);
                         let is_cur = project.group.as_deref() == Some(grp.as_str());
-                        let bg = if resp.hovered() { SB_SURFACE_HOVER } else if is_cur { ACCENT_SOFT } else { Color32::TRANSPARENT };
+                        let bg = if resp.hovered() {
+                            SB_SURFACE_HOVER
+                        } else if is_cur {
+                            ACCENT_SOFT
+                        } else {
+                            Color32::TRANSPARENT
+                        };
                         let fg = if is_cur { ACCENT } else { SB_TEXT };
 
-                        ui.painter().rect_filled(r, CornerRadius::same(R_SM as u8), bg);
+                        ui.painter()
+                            .rect_filled(r, CornerRadius::same(R_SM as u8), bg);
                         if is_cur {
-                            draw_outline_icon(ui.painter(), Pos2::new(r.left() + 16.0, r.center().y), OutlineIcon::Check, ACCENT);
+                            draw_outline_icon(
+                                ui.painter(),
+                                Pos2::new(r.left() + 16.0, r.center().y),
+                                OutlineIcon::Check,
+                                ACCENT,
+                            );
                         }
-                        ui.painter().text(Pos2::new(r.left() + 32.0, r.center().y), Align2::LEFT_CENTER, grp, FontId::proportional(FS_SMALL), fg);
+                        ui.painter().text(
+                            Pos2::new(r.left() + 32.0, r.center().y),
+                            Align2::LEFT_CENTER,
+                            grp,
+                            Typo::Small.font(),
+                            fg,
+                        );
                         if resp.clicked() {
                             action_set_group = Some(Some(grp.clone()));
                         }
@@ -2011,18 +2257,42 @@ impl ShiplyApp {
                         if !existing_groups.is_empty() {
                             sub_cur_y += 4.0;
                             ui.painter().line_segment(
-                                [Pos2::new(submenu_rect.left() + 8.0, sub_cur_y), Pos2::new(submenu_rect.right() - 8.0, sub_cur_y)],
+                                [
+                                    Pos2::new(submenu_rect.left() + 8.0, sub_cur_y),
+                                    Pos2::new(submenu_rect.right() - 8.0, sub_cur_y),
+                                ],
                                 Stroke::new(1.0_f32, SB_BORDER),
                             );
                             sub_cur_y += 5.0;
                         }
 
-                        let r = Rect::from_min_size(Pos2::new(submenu_rect.left() + 4.0, sub_cur_y), Vec2::new(submenu_w - 8.0, 32.0));
-                        let resp = ui.interact(r, egui::Id::new("ctx_sub_remove_grp"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
-                        let bg = if resp.hovered() { SB_SURFACE_HOVER } else { Color32::TRANSPARENT };
-                        ui.painter().rect_filled(r, CornerRadius::same(R_SM as u8), bg);
-                        draw_outline_icon(ui.painter(), Pos2::new(r.left() + 16.0, r.center().y), OutlineIcon::X, SB_TEXT_MUTED);
-                        ui.painter().text(Pos2::new(r.left() + 32.0, r.center().y), Align2::LEFT_CENTER, "Remove from Group", FontId::proportional(FS_SMALL), SB_TEXT_MUTED);
+                        let r = Rect::from_min_size(
+                            Pos2::new(submenu_rect.left() + 4.0, sub_cur_y),
+                            Vec2::new(submenu_w - 8.0, 32.0),
+                        );
+                        let resp = ui
+                            .interact(r, egui::Id::new("ctx_sub_remove_grp"), Sense::click())
+                            .on_hover_cursor(egui::CursorIcon::PointingHand);
+                        let bg = if resp.hovered() {
+                            SB_SURFACE_HOVER
+                        } else {
+                            Color32::TRANSPARENT
+                        };
+                        ui.painter()
+                            .rect_filled(r, CornerRadius::same(R_SM as u8), bg);
+                        draw_outline_icon(
+                            ui.painter(),
+                            Pos2::new(r.left() + 16.0, r.center().y),
+                            OutlineIcon::X,
+                            SB_TEXT_MUTED,
+                        );
+                        ui.painter().text(
+                            Pos2::new(r.left() + 32.0, r.center().y),
+                            Align2::LEFT_CENTER,
+                            "Remove from Group",
+                            Typo::Small.font(),
+                            SB_TEXT_MUTED,
+                        );
                         if resp.clicked() {
                             action_set_group = Some(None);
                         }
@@ -2071,5 +2341,4 @@ impl ShiplyApp {
             self.sidebar_context_menu = None;
         }
     }
-
 }

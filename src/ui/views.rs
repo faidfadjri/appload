@@ -25,8 +25,7 @@ impl ShiplyApp {
                     ui.add_space(12.0);
                     ui.label(
                         RichText::new("Welcome to Shiply")
-                            .size(FONT_XL)
-                            .strong()
+                            .typo(Typo::H1)
                             .color(TEXT_PRIMARY),
                     );
                     ui.add_space(4.0);
@@ -34,7 +33,7 @@ impl ShiplyApp {
                         RichText::new(
                             "No projects or environments configured yet. Auto-import a PowerShell deployment script (.ps1),\ncreate a project manually, or paste your shiply_state.json into the app directory.",
                         )
-                        .size(FONT_MD)
+                        .typo(Typo::Body)
                         .color(TEXT_SECONDARY),
                     );
                     ui.add_space(22.0);
@@ -48,8 +47,7 @@ impl ShiplyApp {
 
                         let import_btn = egui::Button::new(
                             RichText::new("Auto-Import deploy.ps1 Script")
-                                .size(FONT_MD)
-                                .strong()
+                                .typo(Typo::Label)
                                 .color(Color32::WHITE),
                         )
                         .fill(PRIMARY_BLUE)
@@ -68,8 +66,7 @@ impl ShiplyApp {
 
                         let add_btn = egui::Button::new(
                             RichText::new("+ Add Project")
-                                .size(FONT_MD)
-                                .strong()
+                                .typo(Typo::Label)
                                 .color(TEXT_PRIMARY),
                         )
                         .fill(SUBTLE_BG)
@@ -85,8 +82,7 @@ impl ShiplyApp {
 
                         let folder_btn = egui::Button::new(
                             RichText::new("Open App Folder")
-                                .size(FONT_MD)
-                                .strong()
+                                .typo(Typo::Label)
                                 .color(TEXT_SECONDARY),
                         )
                         .fill(CARD_BG)
@@ -111,12 +107,8 @@ impl ShiplyApp {
     pub(crate) fn render_all_deployments_overview(&mut self, ui: &mut egui::Ui) {
         let mut open_bulk_modal = false;
         let mut toggle_select_all = false;
-        let all_project_ids: Vec<String> = self
-            .storage
-            .projects
-            .iter()
-            .map(|p| p.id.clone())
-            .collect();
+        let all_project_ids: Vec<String> =
+            self.storage.projects.iter().map(|p| p.id.clone()).collect();
         let all_selected = !all_project_ids.is_empty()
             && all_project_ids
                 .iter()
@@ -132,8 +124,7 @@ impl ShiplyApp {
         horizontal_row(ui, 38.0, |ui| {
             ui.label(
                 RichText::new("All Deployments")
-                    .size(FONT_XL)
-                    .strong()
+                    .typo(Typo::H1)
                     .color(TEXT_PRIMARY),
             );
             if selected_count > 0 && !is_compact_overview_hdr {
@@ -161,24 +152,40 @@ impl ShiplyApp {
                 };
                 let bulk_btn = egui::Button::new(
                     RichText::new(bulk_label)
-                        .size(if is_compact_overview_hdr { FONT_SM } else { FONT_MD })
-                        .strong()
+                        .typo(if is_compact_overview_hdr {
+                            Typo::SmallMedium
+                        } else {
+                            Typo::Label
+                        })
                         .color(Color32::WHITE),
                 )
                 .fill(PRIMARY_BLUE)
                 .corner_radius(7.0)
-                .min_size(Vec2::new(if is_compact_overview_hdr { 120.0 } else { 190.0 }, 34.0));
+                .min_size(Vec2::new(
+                    if is_compact_overview_hdr {
+                        120.0
+                    } else {
+                        190.0
+                    },
+                    34.0,
+                ));
 
                 if ui
                     .add(bulk_btn)
-                    .on_hover_text("Deploy multiple selected projects sequentially with auto-bumped versions")
+                    .on_hover_text(
+                        "Deploy multiple selected projects sequentially with auto-bumped versions",
+                    )
                     .clicked()
                 {
                     open_bulk_modal = true;
                 }
 
                 let sel_btn_label = if is_compact_overview_hdr {
-                    if all_selected { "Clear" } else { "Select All" }
+                    if all_selected {
+                        "Clear"
+                    } else {
+                        "Select All"
+                    }
                 } else if all_selected {
                     "Clear Selection"
                 } else {
@@ -186,14 +193,16 @@ impl ShiplyApp {
                 };
                 let sel_btn = egui::Button::new(
                     RichText::new(sel_btn_label)
-                        .size(FONT_SM)
-                        .strong()
+                        .typo(Typo::SmallMedium)
                         .color(TEXT_SECONDARY),
                 )
                 .fill(CARD_BG)
                 .stroke(Stroke::new(1.0_f32, CARD_BORDER))
                 .corner_radius(7.0)
-                .min_size(Vec2::new(if is_compact_overview_hdr { 80.0 } else { 128.0 }, 34.0));
+                .min_size(Vec2::new(
+                    if is_compact_overview_hdr { 80.0 } else { 128.0 },
+                    34.0,
+                ));
 
                 if ui.add(sel_btn).clicked() {
                     toggle_select_all = true;
@@ -218,7 +227,7 @@ impl ShiplyApp {
             RichText::new(
                 "Select projects below to run a Bulk Deployment, or click a project card to open its workspace.",
             )
-            .size(FONT_MD)
+            .typo(Typo::Body)
             .color(TEXT_SECONDARY),
         );
         ui.add_space(14.0);
@@ -255,8 +264,7 @@ impl ShiplyApp {
                             RichText::new(format!(
                                 "BULK DEPLOYMENT IN PROGRESS — Running {current_idx} of {total} ({remaining} queued)"
                             ))
-                            .size(FONT_SM)
-                            .strong()
+                            .typo(Typo::SmallMedium)
                             .color(BLUE_PILL_TEXT),
                         );
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -268,8 +276,8 @@ impl ShiplyApp {
                                     Some("Cancel Remaining Queue"),
                                     FAIL_PILL_TEXT,
                                     FAIL_PILL_BG,
-                                    Color32::from_rgb(254, 202, 202),
-                                    Color32::from_rgb(252, 165, 165),
+                                    DANGER_SOFT,
+                                    DANGER_SOFT,
                                     true,
                                 )
                                 .clicked()
@@ -313,8 +321,7 @@ impl ShiplyApp {
             ui.spacing_mut().item_spacing = Vec2::new(spacing, 14.0);
             for project in &self.storage.projects {
                 let is_checked = self.bulk_selected_projects.contains(&project.id);
-                let (rect, resp) =
-                    ui.allocate_exact_size(Vec2::new(card_w, 108.0), Sense::click());
+                let (rect, resp) = ui.allocate_exact_size(Vec2::new(card_w, 108.0), Sense::click());
                 let resp = resp.on_hover_cursor(egui::CursorIcon::PointingHand);
 
                 // Checkbox hit target in top-right of the project card
@@ -375,21 +382,24 @@ impl ShiplyApp {
 
                 let text_clip = Rect::from_min_max(
                     Pos2::new(rect.left() + 14.0, rect.top() + 8.0),
-                    Pos2::new((chk_rect.left() - 8.0).max(rect.left() + 40.0), rect.top() + 62.0),
+                    Pos2::new(
+                        (chk_rect.left() - 8.0).max(rect.left() + 40.0),
+                        rect.top() + 62.0,
+                    ),
                 );
                 let clipped_painter = ui.painter().with_clip_rect(text_clip);
                 clipped_painter.text(
                     Pos2::new(rect.left() + 18.0, rect.top() + 24.0),
                     Align2::LEFT_CENTER,
                     &project.name,
-                    FontId::proportional(FONT_LG),
+                    Typo::H3.font(),
                     TEXT_PRIMARY,
                 );
                 clipped_painter.text(
                     Pos2::new(rect.left() + 18.0, rect.top() + 46.0),
                     Align2::LEFT_CENTER,
                     &project.local_path,
-                    FontId::proportional(FONT_SM),
+                    Typo::Small.font(),
                     TEXT_MUTED,
                 );
 
@@ -420,13 +430,7 @@ impl ShiplyApp {
                             .last_succeeded_deployment(&project.id, &env.key)
                             .map(|d| format!("{badge}: v{}", d.version))
                             .unwrap_or_else(|| format!("{badge}: —"));
-                        paint_pill_left_aligned(
-                            ui.painter(),
-                            Pos2::new(px, py),
-                            &ver_label,
-                            bg,
-                            fg,
-                        )
+                        paint_pill_left_aligned(ui.painter(), Pos2::new(px, py), &ver_label, bg, fg)
                     };
                     px += w + 6.0;
                 }
@@ -471,11 +475,10 @@ impl ShiplyApp {
             .inner_margin(Margin::symmetric(20, 14))
             .show(ui, |ui| {
                 horizontal_row(ui, 30.0, |ui| {
-                    render_pill(ui, "ONBOARDING", BLUE_PILL_BG, BLUE_PILL_TEXT);
+                    render_pill(ui, "Onboarding", BLUE_PILL_BG, BLUE_PILL_TEXT);
                     ui.label(
-                        RichText::new("QUICK-START DEPLOYMENT GUIDELINE")
-                            .size(FONT_MD)
-                            .strong()
+                        RichText::new("Quick-start deployment guideline")
+                            .typo(Typo::Label)
                             .color(TEXT_PRIMARY),
                     );
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -486,8 +489,7 @@ impl ShiplyApp {
                         };
                         let btn = egui::Button::new(
                             RichText::new(toggle_lbl)
-                                .size(FONT_XS)
-                                .strong()
+                                .typo(Typo::Caption)
                                 .color(TEXT_SECONDARY),
                         )
                         .fill(SUBTLE_BG)
@@ -510,28 +512,28 @@ impl ShiplyApp {
 
                 let steps = [
                     (
-                        "STEP 1",
+                        "Step 1",
                         "Add or Auto-Import Project",
                         "Click '+ ADD' in the sidebar or auto-import a deploy-*.ps1 script to populate project directories, remote server configs, and steps.",
                         BLUE_PILL_BG,
                         BLUE_PILL_TEXT,
                     ),
                     (
-                        "STEP 2",
+                        "Step 2",
                         "Setup OS Credentials",
                         "Store your SSH password securely in Windows Credential Manager, Linux libsecret, or macOS Keychain — zero plain text passwords.",
                         TEAL_PILL_BG,
                         TEAL_PILL_TEXT,
                     ),
                     (
-                        "STEP 3",
+                        "Step 3",
                         "Configure Pipeline Steps",
                         "Customize Local Command, Verify Path, SCP Upload, and Remote SSH steps with real-time syntax highlighting and {template} variables.",
                         PURPLE_PILL_BG,
                         PURPLE_PILL_TEXT,
                     ),
                     (
-                        "STEP 4",
+                        "Step 4",
                         "Deploy, Bulk Deploy & Rollback",
                         "Pick target Git branches, verify auto-bumped versions, run sequential Bulk Deployments, or perform 1-click Rollback anytime.",
                         SUCCESS_PILL_BG,
@@ -569,13 +571,12 @@ impl ShiplyApp {
                                 ui.add_space(6.0);
                                 ui.label(
                                     RichText::new(title)
-                                        .size(FONT_MD)
-                                        .strong()
+                                        .typo(Typo::Label)
                                         .color(TEXT_PRIMARY),
                                 );
                                 ui.add_space(4.0);
                                 ui.label(
-                                    RichText::new(desc).size(FONT_SM).color(TEXT_SECONDARY),
+                                    RichText::new(desc).typo(Typo::Small).color(TEXT_SECONDARY),
                                 );
                             });
                     }
@@ -598,7 +599,7 @@ impl ShiplyApp {
 
         egui::Frame::new()
             .fill(CARD_BG)
-            .stroke(Stroke::new(1.0_f32, Color32::from_rgb(191, 219, 254)))
+            .stroke(Stroke::new(1.0_f32, INFO_SOFT))
             .corner_radius(10.0)
             .inner_margin(Margin::symmetric(20, 14))
             .show(ui, |ui| {
@@ -608,20 +609,19 @@ impl ShiplyApp {
                         ui.allocate_exact_size(Vec2::new(20.0, 20.0), Sense::hover());
                     draw_outline_icon(ui.painter(), ic_r.center(), OutlineIcon::Key, PRIMARY_BLUE);
                     let cred_title = if cred_avail_w < 580.0 {
-                        "OS CREDENTIALS SETUP GUIDELINE"
+                        "OS credentials setup guideline"
                     } else {
                         "OS CREDENTIALS SETUP GUIDELINE (WINDOWS | LINUX | MAC)"
                     };
                     ui.label(
                         RichText::new(cred_title)
-                            .size(FONT_MD)
-                            .strong()
+                            .typo(Typo::Label)
                             .color(PRIMARY_BLUE),
                     );
                     if vault_ready && cred_avail_w >= 640.0 {
                         render_pill(
                             ui,
-                            "TARGET FOUND IN VAULT",
+                            "Target found in vault",
                             SUCCESS_PILL_BG,
                             SUCCESS_PILL_TEXT,
                         );
@@ -635,8 +635,7 @@ impl ShiplyApp {
                         };
                         let btn = egui::Button::new(
                             RichText::new(toggle_lbl)
-                                .size(FONT_XS)
-                                .strong()
+                                .typo(Typo::Caption)
                                 .color(TEXT_SECONDARY),
                         )
                         .fill(SUBTLE_BG)
@@ -658,7 +657,7 @@ impl ShiplyApp {
                     RichText::new(
                         "Shiply reads your SSH password securely from your operating system's native credential vault so you never hardcode passwords in scripts or config files.",
                     )
-                    .size(FONT_SM)
+                    .typo(Typo::Small)
                     .color(TEXT_SECONDARY),
                 );
                 ui.add_space(10.0);
@@ -668,8 +667,7 @@ impl ShiplyApp {
                     ui.spacing_mut().item_spacing = Vec2::new(6.0, 6.0);
                     ui.label(
                         RichText::new("Vault Target:")
-                            .size(FONT_SM)
-                            .strong()
+                            .typo(Typo::SmallMedium)
                             .color(TEXT_SECONDARY),
                     );
                     styled_text_edit(
@@ -682,8 +680,7 @@ impl ShiplyApp {
                     ui.add_space(4.0);
                     ui.label(
                         RichText::new("SSH User:")
-                            .size(FONT_SM)
-                            .strong()
+                            .typo(Typo::SmallMedium)
                             .color(TEXT_SECONDARY),
                     );
                     styled_text_edit(
@@ -765,8 +762,7 @@ impl ShiplyApp {
                             horizontal_row(ui, 30.0, |ui| {
                                 ui.label(
                                     RichText::new("Option 1 — Windows Credential Manager (GUI):")
-                                        .size(FONT_SM)
-                                        .strong()
+                                        .typo(Typo::SmallMedium)
                                         .color(TEXT_PRIMARY),
                                 );
                                 #[cfg(windows)]
@@ -774,8 +770,7 @@ impl ShiplyApp {
                                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                                         let open_cm_btn = egui::Button::new(
                                             RichText::new("Open Windows Credential Manager")
-                                                .size(FONT_XS)
-                                                .strong()
+                                                .typo(Typo::Caption)
                                                 .color(Color32::WHITE),
                                         )
                                         .fill(PRIMARY_BLUE)
@@ -791,14 +786,13 @@ impl ShiplyApp {
                                 RichText::new(format!(
                                     "  1. Open Control Panel -> User Accounts -> Credential Manager -> Windows Credentials.\n  2. Under 'Generic Credentials', click 'Add a generic credential'.\n  3. Set Internet or network address = '{target_example}', User name = '{user_example}', and Password = your SSH password.\n  4. Click OK, then click 'Verify in OS Vault' above."
                                 ))
-                                .size(FONT_SM)
+                                .typo(Typo::Small)
                                 .color(TEXT_SECONDARY),
                             );
                             ui.add_space(8.0);
                             ui.label(
                                 RichText::new("Option 2 — PowerShell / CMD One-Line Command:")
-                                    .size(FONT_SM)
-                                    .strong()
+                                    .typo(Typo::SmallMedium)
                                     .color(TEXT_PRIMARY),
                             );
                             ui.add_space(4.0);
@@ -813,8 +807,7 @@ impl ShiplyApp {
                                 );
                                 let copy_btn = egui::Button::new(
                                     RichText::new("Copy Command")
-                                        .size(FONT_SM)
-                                        .strong()
+                                        .typo(Typo::SmallMedium)
                                         .color(TEXT_PRIMARY),
                                 )
                                 .fill(CARD_BG)
@@ -836,15 +829,14 @@ impl ShiplyApp {
                             );
                             ui.label(
                                 RichText::new("Linux Secret Service (libsecret / GNOME Keyring / KWallet):")
-                                    .size(FONT_SM)
-                                    .strong()
+                                    .typo(Typo::SmallMedium)
                                     .color(TEXT_PRIMARY),
                             );
                             ui.label(
                                 RichText::new(format!(
                                     "  1. Ensure libsecret-tools is installed (Debian/Ubuntu: sudo apt install libsecret-tools | Fedora: sudo dnf install libsecret).\n  2. Run the command below in your terminal and enter your SSH password when prompted.\n  3. In your Project's Environment & SSH Settings, set OS Credential Vault Target = '{target_example}'."
                                 ))
-                                .size(FONT_SM)
+                                .typo(Typo::Small)
                                 .color(TEXT_SECONDARY),
                             );
                             ui.add_space(8.0);
@@ -859,8 +851,7 @@ impl ShiplyApp {
                                 );
                                 let copy_btn = egui::Button::new(
                                     RichText::new("Copy Command")
-                                        .size(FONT_SM)
-                                        .strong()
+                                        .typo(Typo::SmallMedium)
                                         .color(TEXT_PRIMARY),
                                 )
                                 .fill(CARD_BG)
@@ -882,15 +873,14 @@ impl ShiplyApp {
                             );
                             ui.label(
                                 RichText::new("macOS Keychain Access (GUI or Terminal CLI):")
-                                    .size(FONT_SM)
-                                    .strong()
+                                    .typo(Typo::SmallMedium)
                                     .color(TEXT_PRIMARY),
                             );
                             ui.label(
                                 RichText::new(format!(
                                     "  1. GUI: Open Keychain Access -> File -> New Password Item. Set Keychain Item Name = '{target_example}', Account Name = '{user_example}', and enter your SSH password.\n  2. CLI: Or run the one-line macOS security command below in Terminal.\n  3. In your Project's Environment & SSH Settings, set OS Credential Vault Target = '{target_example}'."
                                 ))
-                                .size(FONT_SM)
+                                .typo(Typo::Small)
                                 .color(TEXT_SECONDARY),
                             );
                             ui.add_space(8.0);
@@ -905,8 +895,7 @@ impl ShiplyApp {
                                 );
                                 let copy_btn = egui::Button::new(
                                     RichText::new("Copy Command")
-                                        .size(FONT_SM)
-                                        .strong()
+                                        .typo(Typo::SmallMedium)
                                         .color(TEXT_PRIMARY),
                                 )
                                 .fill(CARD_BG)
@@ -979,13 +968,8 @@ impl ShiplyApp {
 
         horizontal_row(ui, 36.0, |ui| {
             let title_resp = ui.add(
-                egui::Label::new(
-                    RichText::new(&proj_name)
-                        .size(FONT_XL)
-                        .strong()
-                        .color(TEXT_PRIMARY),
-                )
-                .sense(Sense::click()),
+                egui::Label::new(RichText::new(&proj_name).typo(Typo::H1).color(TEXT_PRIMARY))
+                    .sense(Sense::click()),
             );
             title_resp.context_menu(|ui| {
                 ui.set_min_width(180.0);
@@ -996,7 +980,7 @@ impl ShiplyApp {
                     .add(
                         egui::Button::new(
                             RichText::new("✎  Edit Project")
-                                .size(POPUP_FONT_SIZE)
+                                .typo(Typo::Label)
                                 .color(TEXT_PRIMARY),
                         )
                         .fill(CARD_BG),
@@ -1011,7 +995,7 @@ impl ShiplyApp {
                     .add(
                         egui::Button::new(
                             RichText::new("⧉  Duplicate Project")
-                                .size(POPUP_FONT_SIZE)
+                                .typo(Typo::Label)
                                 .color(TEXT_PRIMARY),
                         )
                         .fill(CARD_BG),
@@ -1026,7 +1010,7 @@ impl ShiplyApp {
                     .add(
                         egui::Button::new(
                             RichText::new("↻  Refresh Metadata")
-                                .size(POPUP_FONT_SIZE)
+                                .typo(Typo::Label)
                                 .color(TEXT_SECONDARY),
                         )
                         .fill(CARD_BG),
@@ -1043,7 +1027,7 @@ impl ShiplyApp {
                     .add(
                         egui::Button::new(
                             RichText::new("🗑  Delete Project")
-                                .size(POPUP_FONT_SIZE)
+                                .typo(Typo::Label)
                                 .color(FAIL_PILL_TEXT),
                         )
                         .fill(CARD_BG),
@@ -1058,7 +1042,7 @@ impl ShiplyApp {
             let (r_txt, r_bg, r_fg) = if path_exists {
                 ("READY", SUCCESS_PILL_BG, SUCCESS_PILL_TEXT)
             } else {
-                ("PATH MISSING", FAIL_PILL_BG, FAIL_PILL_TEXT)
+                ("Path missing", FAIL_PILL_BG, FAIL_PILL_TEXT)
             };
             render_pill(ui, r_txt, r_bg, r_fg);
 
@@ -1099,7 +1083,7 @@ impl ShiplyApp {
                                 .add(
                                     egui::Button::new(
                                         RichText::new("✎  Edit Project")
-                                            .size(POPUP_FONT_SIZE)
+                                            .typo(Typo::Label)
                                             .color(theme.text),
                                     )
                                     .fill(theme.surface),
@@ -1114,7 +1098,7 @@ impl ShiplyApp {
                                 .add(
                                     egui::Button::new(
                                         RichText::new("⧉  Duplicate Project")
-                                            .size(POPUP_FONT_SIZE)
+                                            .typo(Typo::Label)
                                             .color(theme.text),
                                     )
                                     .fill(theme.surface),
@@ -1129,7 +1113,7 @@ impl ShiplyApp {
                                 .add(
                                     egui::Button::new(
                                         RichText::new("↻  Refresh Metadata")
-                                            .size(POPUP_FONT_SIZE)
+                                            .typo(Typo::Label)
                                             .color(theme.text_muted),
                                     )
                                     .fill(theme.surface),
@@ -1146,7 +1130,7 @@ impl ShiplyApp {
                                 .add(
                                     egui::Button::new(
                                         RichText::new("🗑  Delete Project")
-                                            .size(POPUP_FONT_SIZE)
+                                            .typo(Typo::Label)
                                             .color(theme.danger),
                                     )
                                     .fill(theme.surface),
@@ -1162,7 +1146,11 @@ impl ShiplyApp {
                             ui,
                             ("hdr_delete_proj", project_id),
                             OutlineIcon::Trash,
-                            if is_icon_only_header { None } else { Some("Delete") },
+                            if is_icon_only_header {
+                                None
+                            } else {
+                                Some("Delete")
+                            },
                             theme.danger,
                             theme.danger_soft,
                             theme.danger_soft,
@@ -1179,7 +1167,11 @@ impl ShiplyApp {
                             ui,
                             ("hdr_refresh_proj", project_id),
                             OutlineIcon::Refresh,
-                            if is_icon_only_header { None } else { Some("Refresh") },
+                            if is_icon_only_header {
+                                None
+                            } else {
+                                Some("Refresh")
+                            },
                             theme.text_muted,
                             theme.surface,
                             theme.surface_2,
@@ -1196,7 +1188,11 @@ impl ShiplyApp {
                             ui,
                             ("hdr_dup_proj", project_id),
                             OutlineIcon::Copy,
-                            if is_icon_only_header { None } else { Some("Duplicate") },
+                            if is_icon_only_header {
+                                None
+                            } else {
+                                Some("Duplicate")
+                            },
                             theme.text,
                             theme.surface,
                             theme.surface_2,
@@ -1213,7 +1209,11 @@ impl ShiplyApp {
                             ui,
                             ("hdr_edit_proj", project_id),
                             OutlineIcon::Edit,
-                            if is_icon_only_header { None } else { Some("Edit Project") },
+                            if is_icon_only_header {
+                                None
+                            } else {
+                                Some("Edit Project")
+                            },
                             theme.text,
                             theme.surface,
                             theme.surface_2,
@@ -1254,8 +1254,7 @@ impl ShiplyApp {
                             egui::ComboBox::from_id_salt("header_git_branch_selector")
                                 .selected_text(
                                     RichText::new(format!("Branch: {current_b}{commit_suffix}"))
-                                        .size(FONT_SM)
-                                        .strong()
+                                        .typo(Typo::SmallMedium)
                                         .color(theme.text),
                                 )
                                 .width(branch_combo_w)
@@ -1318,16 +1317,12 @@ impl ShiplyApp {
         ui.add_space(6.0);
 
         // 2. Sub-header description & folder path row (Responsive single or two-row layout)
-        let desc_galley = ui.painter().layout_no_wrap(
-            proj_desc,
-            FontId::proportional(FONT_SM),
-            TEXT_SECONDARY,
-        );
-        let path_galley = ui.painter().layout_no_wrap(
-            proj_path.clone(),
-            FontId::proportional(FONT_SM),
-            TEXT_SECONDARY,
-        );
+        let desc_galley =
+            ui.painter()
+                .layout_no_wrap(proj_desc, Typo::Small.font(), TEXT_SECONDARY);
+        let path_galley =
+            ui.painter()
+                .layout_no_wrap(proj_path.clone(), Typo::Small.font(), TEXT_SECONDARY);
         let desc_w = desc_galley.size().x;
         let path_w = path_galley.size().x;
         let stack_subheader = 22.0 + desc_w + 46.0 + path_w > avail_w;
@@ -1422,10 +1417,8 @@ impl ShiplyApp {
                 let last_ok = self.storage.last_succeeded_deployment(project_id, env_key);
                 let latest_any = self.storage.latest_deployment(project_id, env_key);
 
-                let (card_rect, card_resp) = ui.allocate_exact_size(
-                    Vec2::new(card_w, ENV_CARD_HEIGHT),
-                    Sense::click(),
-                );
+                let (card_rect, card_resp) =
+                    ui.allocate_exact_size(Vec2::new(card_w, ENV_CARD_HEIGHT), Sense::click());
                 let card_resp = card_resp.on_hover_cursor(egui::CursorIcon::PointingHand);
 
                 // Outline Trash delete button rect at top-right of the card
@@ -1466,7 +1459,7 @@ impl ShiplyApp {
                     pill_fg,
                 );
 
-                // Top-right (left of delete button): Status pill or "NOT DEPLOYED"
+                // Top-right (left of delete button): Status pill or "Not deployed"
                 if let Some(latest) = latest_any {
                     let (s_bg, s_fg) = status_pill_colors(latest.status);
                     if latest.status == DeploymentStatus::Running {
@@ -1493,8 +1486,8 @@ impl ShiplyApp {
                     ui.painter().text(
                         Pos2::new(del_rect.left() - 8.0, card_rect.top() + 24.0),
                         Align2::RIGHT_CENTER,
-                        "NOT DEPLOYED",
-                        FontId::proportional(FONT_XS),
+                        "Not deployed",
+                        Typo::Caption.font(),
                         theme.text_muted,
                     );
                 }
@@ -1539,14 +1532,14 @@ impl ShiplyApp {
                         Pos2::new(card_rect.left() + 16.0, card_rect.top() + 58.0),
                         Align2::LEFT_CENTER,
                         format!("Active: v{}", ok_dep.version),
-                        FontId::proportional(FONT_LG),
+                        Typo::H3.font(),
                         theme.text,
                     );
                     ui.painter().text(
                         Pos2::new(card_rect.left() + 16.0, card_rect.top() + 78.0),
                         Align2::LEFT_CENTER,
-                        "CURRENT VERSION",
-                        FontId::monospace(FONT_XS),
+                        "Current version",
+                        Typo::MonoSm.font(),
                         theme.text_muted,
                     );
                 } else {
@@ -1554,7 +1547,7 @@ impl ShiplyApp {
                         Pos2::new(card_rect.left() + 16.0, card_rect.top() + 62.0),
                         Align2::LEFT_CENTER,
                         "No Active Build",
-                        FontId::proportional(FONT_LG),
+                        Typo::H3.font(),
                         theme.text_subtle,
                     );
                 }
@@ -1567,10 +1560,8 @@ impl ShiplyApp {
             }
 
             // "+ ADD / IMPORT ENVIRONMENT" Card with exact same 96px height!
-            let (add_rect, add_resp) = ui.allocate_exact_size(
-                Vec2::new(card_w, ENV_CARD_HEIGHT),
-                Sense::click(),
-            );
+            let (add_rect, add_resp) =
+                ui.allocate_exact_size(Vec2::new(card_w, ENV_CARD_HEIGHT), Sense::click());
             let add_resp = add_resp.on_hover_cursor(egui::CursorIcon::PointingHand);
             let add_bg = if add_resp.hovered() {
                 theme.surface
@@ -1596,8 +1587,8 @@ impl ShiplyApp {
             ui.painter().text(
                 Pos2::new(add_rect.center().x, add_rect.center().y + 14.0),
                 Align2::CENTER_CENTER,
-                "ADD / IMPORT ENVIRONMENT",
-                FontId::proportional(FONT_SM),
+                "Add environment",
+                Typo::Small.font(),
                 theme.text_muted,
             );
 
@@ -1631,8 +1622,7 @@ impl ShiplyApp {
                     ui.vertical_centered(|ui| {
                         ui.label(
                             RichText::new("No Environments in This Project Yet")
-                                .size(FONT_LG)
-                                .strong()
+                                .typo(Typo::H3)
                                 .color(TEXT_PRIMARY),
                         );
                         ui.add_space(4.0);
@@ -1640,7 +1630,7 @@ impl ShiplyApp {
                             RichText::new(
                                 "Click 'ADD / IMPORT ENVIRONMENT' above to import a deploy-dev.ps1 / deploy-prod.ps1 script or add a custom environment.",
                             )
-                            .size(FONT_MD)
+                            .typo(Typo::Body)
                             .color(TEXT_SECONDARY),
                         );
                     });
@@ -1759,9 +1749,9 @@ impl ShiplyApp {
             {
                 let ver = dep.version.trim().to_string();
                 if !ver.is_empty()
-                    && !candidates
-                        .iter()
-                        .any(|c: &SyncVersionCandidate| c.version == ver && c.source_name == env.name)
+                    && !candidates.iter().any(|c: &SyncVersionCandidate| {
+                        c.version == ver && c.source_name == env.name
+                    })
                 {
                     candidates.push(SyncVersionCandidate {
                         source_name: env.name.clone(),
@@ -1776,10 +1766,7 @@ impl ShiplyApp {
         // 2. Fall back to package.json if present and not already in candidates
         if let Some(pkg_ver) = &self.cached_pkg_version {
             let ver = pkg_ver.trim().to_string();
-            if !ver.is_empty()
-                && ver != "0.0.0"
-                && !candidates.iter().any(|c| c.version == ver)
-            {
+            if !ver.is_empty() && ver != "0.0.0" && !candidates.iter().any(|c| c.version == ver) {
                 candidates.push(SyncVersionCandidate {
                     source_name: "package.json".to_string(),
                     env_key: None,
@@ -1817,7 +1804,11 @@ impl ShiplyApp {
     pub fn apply_synced_version(&mut self, version: &str, source_name: &str) {
         self.deploy_version_input = version.trim().to_string();
         self.status_banner = Some((
-            format!("Synced version to v{} from {}.", version.trim(), source_name),
+            format!(
+                "Synced version to v{} from {}.",
+                version.trim(),
+                source_name
+            ),
             true,
         ));
         self.sync_version_dropdown_open = false;
@@ -1837,7 +1828,11 @@ impl ShiplyApp {
         let item_h = 32.0_f32;
         let header_h = 28.0_f32;
         let pad = 6.0_f32;
-        let row_count = if candidates.is_empty() { 1 } else { candidates.len() };
+        let row_count = if candidates.is_empty() {
+            1
+        } else {
+            candidates.len()
+        };
         let menu_w = 270.0_f32;
         let menu_h = pad * 2.0
             + header_h
@@ -1883,7 +1878,8 @@ impl ShiplyApp {
                     Color32::from_black_alpha(45),
                 );
 
-                ui.painter().rect_filled(menu_rect, CornerRadius::same(8), CARD_BG);
+                ui.painter()
+                    .rect_filled(menu_rect, CornerRadius::same(8), CARD_BG);
                 ui.painter().rect_stroke(
                     menu_rect,
                     CornerRadius::same(8),
@@ -1900,9 +1896,8 @@ impl ShiplyApp {
                 horizontal_row(&mut child, 22.0, |ui| {
                     ui.add_space(4.0);
                     ui.label(
-                        RichText::new("SYNC VERSION ACROSS ENVIRONMENTS")
-                            .size(FONT_XS)
-                            .strong()
+                        RichText::new("Sync version across environments")
+                            .typo(Typo::Caption)
                             .color(TEXT_MUTED),
                     );
                 });
@@ -1915,7 +1910,7 @@ impl ShiplyApp {
                         ui.add_space(8.0);
                         ui.label(
                             RichText::new("No other deployed versions found.")
-                                .size(FONT_SM)
+                                .typo(Typo::Small)
                                 .color(TEXT_MUTED),
                         );
                     });
@@ -1930,7 +1925,7 @@ impl ShiplyApp {
                         let bg = if resp.hovered() {
                             SUBTLE_BG
                         } else if cand.is_latest {
-                            Color32::from_rgb(239, 246, 255)
+                            INFO_SOFT
                         } else {
                             Color32::TRANSPARENT
                         };
@@ -1963,7 +1958,7 @@ impl ShiplyApp {
                             Pos2::new(rect.left() + 32.0, rect.center().y),
                             Align2::LEFT_CENTER,
                             name_text,
-                            FontId::proportional(FONT_SM),
+                            Typo::Small.font(),
                             if cand.is_latest {
                                 PRIMARY_BLUE
                             } else {
@@ -1973,16 +1968,12 @@ impl ShiplyApp {
 
                         // Version badge on right
                         let ver_text = format!("v{}", cand.version);
-                        let ver_color = if is_current {
-                            Color32::from_rgb(22, 163, 74)
-                        } else {
-                            TEXT_PRIMARY
-                        };
+                        let ver_color = if is_current { SUCCESS } else { TEXT_PRIMARY };
                         child.painter().text(
                             Pos2::new(rect.right() - 10.0, rect.center().y),
                             Align2::RIGHT_CENTER,
                             ver_text,
-                            FontId::proportional(FONT_SM),
+                            Typo::Small.font(),
                             ver_color,
                         );
 
@@ -2030,11 +2021,9 @@ impl ShiplyApp {
             }
         };
 
-        let deploy_galley = ui.painter().layout_no_wrap(
-            btn_text,
-            FontId::proportional(FS_BASE),
-            Color32::WHITE,
-        );
+        let deploy_galley =
+            ui.painter()
+                .layout_no_wrap(btn_text, Typo::Body.font(), Color32::WHITE);
         let deploy_icon_w = 14.0;
         let deploy_gap = 8.0;
         let deploy_pad_x = 16.0;
@@ -2043,11 +2032,9 @@ impl ShiplyApp {
 
         let rollback_info = rollback_candidate.as_ref().map(|prev_dep| {
             let rb_text = format!("Rollback v{}", prev_dep.version);
-            let rb_galley = ui.painter().layout_no_wrap(
-                rb_text,
-                FontId::proportional(FONT_SM),
-                theme.warning,
-            );
+            let rb_galley = ui
+                .painter()
+                .layout_no_wrap(rb_text, Typo::Small.font(), theme.warning);
             let rb_icon_w = 14.0;
             let rb_gap = 6.0;
             let rb_pad_x = 12.0;
@@ -2057,8 +2044,16 @@ impl ShiplyApp {
         });
 
         let natural_deploy_w = (deploy_content_w + deploy_pad_x * 2.0).max(180.0);
-        let natural_rb_w = rollback_info.as_ref().map(|(_, _, _, _, w)| *w).unwrap_or(0.0);
-        let right_btns_w = natural_deploy_w + if natural_rb_w > 0.0 { natural_rb_w + 10.0 } else { 0.0 };
+        let natural_rb_w = rollback_info
+            .as_ref()
+            .map(|(_, _, _, _, w)| *w)
+            .unwrap_or(0.0);
+        let right_btns_w = natural_deploy_w
+            + if natural_rb_w > 0.0 {
+                natural_rb_w + 10.0
+            } else {
+                0.0
+            };
         let left_controls_w = 575.0;
 
         let is_two_rows = screen_w < 900.0 || avail_w < (left_controls_w + right_btns_w + 48.0);
@@ -2083,8 +2078,8 @@ impl ShiplyApp {
         ui.painter().text(
             Pos2::new(bar_rect.left() + 20.0, bar_rect.top() + 16.0),
             Align2::LEFT_CENTER,
-            "VERSION CONTROL & RELEASE",
-            FontId::monospace(FONT_XS),
+            "Release",
+            Typo::MonoSm.font(),
             theme.text_muted,
         );
 
@@ -2123,16 +2118,14 @@ impl ShiplyApp {
             ("+Minor", VersionBump::Minor),
             ("+Major", VersionBump::Major),
         ] {
-            let b = egui::Button::new(
-                RichText::new(lbl)
-                    .size(FONT_SM)
-                    .strong()
-                    .color(theme.text),
-            )
-            .fill(theme.surface)
-            .stroke(Stroke::new(1.0_f32, theme.border_strong))
-            .corner_radius(R_MD as u8)
-            .min_size(Vec2::new(if is_compact_controls { 48.0 } else { 54.0 }, BTN_HEIGHT));
+            let b = egui::Button::new(RichText::new(lbl).typo(Typo::SmallMedium).color(theme.text))
+                .fill(theme.surface)
+                .stroke(Stroke::new(1.0_f32, theme.border_strong))
+                .corner_radius(R_MD as u8)
+                .min_size(Vec2::new(
+                    if is_compact_controls { 48.0 } else { 54.0 },
+                    BTN_HEIGHT,
+                ));
             if child.add(b).clicked() {
                 self.deploy_version_input = bump_semver(&self.deploy_version_input, bump);
             }
@@ -2202,16 +2195,14 @@ impl ShiplyApp {
             chk_ui.checkbox(
                 &mut self.bump_package_json,
                 RichText::new("Bump package.json")
-                    .size(FONT_SM)
-                    .strong()
+                    .typo(Typo::SmallMedium)
                     .color(theme.text),
             );
             chk_ui.add_space(12.0);
             chk_ui.checkbox(
                 &mut self.create_git_tag,
                 RichText::new("Git Tag")
-                    .size(FONT_SM)
-                    .strong()
+                    .typo(Typo::SmallMedium)
                     .color(theme.text_muted),
             );
         } else {
@@ -2229,16 +2220,14 @@ impl ShiplyApp {
             child.checkbox(
                 &mut self.bump_package_json,
                 RichText::new("Bump package.json")
-                    .size(FONT_SM)
-                    .strong()
+                    .typo(Typo::SmallMedium)
                     .color(theme.text),
             );
             child.add_space(8.0);
             child.checkbox(
                 &mut self.create_git_tag,
                 RichText::new("Git Tag")
-                    .size(FONT_SM)
-                    .strong()
+                    .typo(Typo::SmallMedium)
                     .color(theme.text_muted),
             );
         }
@@ -2253,7 +2242,10 @@ impl ShiplyApp {
             if is_mobile_deploy {
                 // Full width deploy button below 600px
                 let w = bar_rect.width() - 40.0;
-                let b_rect = Rect::from_min_size(Pos2::new(bar_rect.left() + 20.0, row2_y), Vec2::new(w, btn_h));
+                let b_rect = Rect::from_min_size(
+                    Pos2::new(bar_rect.left() + 20.0, row2_y),
+                    Vec2::new(w, btn_h),
+                );
                 (b_rect, None)
             } else {
                 let b_w = natural_deploy_w;
@@ -2264,7 +2256,10 @@ impl ShiplyApp {
                 );
                 let r_rect = if rb_w > 0.0 {
                     Some(Rect::from_min_size(
-                        Pos2::new(b_rect.left() - 10.0 - rb_w, row2_y + (btn_h - BTN_HEIGHT) / 2.0),
+                        Pos2::new(
+                            b_rect.left() - 10.0 - rb_w,
+                            row2_y + (btn_h - BTN_HEIGHT) / 2.0,
+                        ),
                         Vec2::new(rb_w, BTN_HEIGHT),
                     ))
                 } else {
@@ -2282,12 +2277,18 @@ impl ShiplyApp {
                 b_w = (b_w - (total_needed - max_r_w)).max(140.0);
             }
             let b_rect = Rect::from_min_size(
-                Pos2::new(bar_rect.right() - 20.0 - b_w, bar_rect.center().y - btn_h / 2.0),
+                Pos2::new(
+                    bar_rect.right() - 20.0 - b_w,
+                    bar_rect.center().y - btn_h / 2.0,
+                ),
                 Vec2::new(b_w, btn_h),
             );
             let r_rect = if rb_w > 0.0 {
                 Some(Rect::from_min_size(
-                    Pos2::new(b_rect.left() - 10.0 - rb_w, bar_rect.center().y - BTN_HEIGHT / 2.0),
+                    Pos2::new(
+                        b_rect.left() - 10.0 - rb_w,
+                        bar_rect.center().y - BTN_HEIGHT / 2.0,
+                    ),
                     Vec2::new(rb_w, BTN_HEIGHT),
                 ))
             } else {
@@ -2297,7 +2298,11 @@ impl ShiplyApp {
         };
 
         let btn_resp = ui
-            .interact(btn_rect, egui::Id::new("primary_deploy_btn"), Sense::click())
+            .interact(
+                btn_rect,
+                egui::Id::new("primary_deploy_btn"),
+                Sense::click(),
+            )
             .on_hover_cursor(if is_busy {
                 egui::CursorIcon::NotAllowed
             } else {
@@ -2316,8 +2321,8 @@ impl ShiplyApp {
             .rect_filled(btn_rect, CornerRadius::same(R_MD as u8), btn_bg);
 
         // Center icon and text together
-        let deploy_start_x = (btn_rect.center().x - deploy_content_w / 2.0)
-            .max(btn_rect.left() + 10.0);
+        let deploy_start_x =
+            (btn_rect.center().x - deploy_content_w / 2.0).max(btn_rect.left() + 10.0);
         draw_icon_send(
             ui.painter(),
             Pos2::new(deploy_start_x + deploy_icon_w / 2.0, btn_rect.center().y),
@@ -2334,15 +2339,14 @@ impl ShiplyApp {
         }
 
         // Quick Rollback Button
-        if let (Some(prev_dep), Some(rb_rect), Some((rb_galley, rb_icon_w, rb_gap, rb_content_w, _))) =
-            (rollback_candidate, rb_rect_opt, rollback_info)
+        if let (
+            Some(prev_dep),
+            Some(rb_rect),
+            Some((rb_galley, rb_icon_w, rb_gap, rb_content_w, _)),
+        ) = (rollback_candidate, rb_rect_opt, rollback_info)
         {
             let rb_resp = ui
-                .interact(
-                    rb_rect,
-                    egui::Id::new("quick_rollback_btn"),
-                    Sense::click(),
-                )
+                .interact(rb_rect, egui::Id::new("quick_rollback_btn"), Sense::click())
                 .on_hover_cursor(if is_busy {
                     egui::CursorIcon::NotAllowed
                 } else {
@@ -2353,11 +2357,8 @@ impl ShiplyApp {
             } else {
                 theme.surface
             };
-            ui.painter().rect_filled(
-                rb_rect,
-                CornerRadius::same(R_MD as u8),
-                rb_bg,
-            );
+            ui.painter()
+                .rect_filled(rb_rect, CornerRadius::same(R_MD as u8), rb_bg);
             ui.painter().rect_stroke(
                 rb_rect,
                 CornerRadius::same(R_MD as u8),
@@ -2365,8 +2366,7 @@ impl ShiplyApp {
                 StrokeKind::Inside,
             );
 
-            let rb_start_x = (rb_rect.center().x - rb_content_w / 2.0)
-                .max(rb_rect.left() + 8.0);
+            let rb_start_x = (rb_rect.center().x - rb_content_w / 2.0).max(rb_rect.left() + 8.0);
             draw_outline_icon(
                 ui.painter(),
                 Pos2::new(rb_start_x + rb_icon_w / 2.0, rb_rect.center().y),
@@ -2417,57 +2417,55 @@ impl ShiplyApp {
         let mut add_scp = false;
         let mut add_remote = false;
 
-        let render_add_step_buttons = |ui: &mut egui::Ui,
-                                       add_local: &mut bool,
-                                       add_verify: &mut bool,
-                                       add_scp: &mut bool,
-                                       add_remote: &mut bool| {
-            let local_btn = egui::Button::new(
-                RichText::new("+ Local Command")
-                    .size(FONT_SM)
-                    .strong()
-                    .color(BLUE_PILL_TEXT),
-            )
-            .fill(BLUE_PILL_BG)
-            .stroke(Stroke::new(1.0_f32, BLUE_PILL_TEXT))
-            .corner_radius(6.0);
-            if ui
-                .add(local_btn)
-                .on_hover_text("Add a local shell command step (e.g. npm run build)")
-                .clicked()
-            {
-                *add_local = true;
-            }
-
-            let verify_btn = egui::Button::new(
-                RichText::new("+ Verify Path")
-                    .size(FONT_SM)
-                    .strong()
-                    .color(WARN_PILL_TEXT),
-            )
-            .fill(WARN_PILL_BG)
-            .stroke(Stroke::new(1.0_f32, WARN_PILL_TEXT))
-            .corner_radius(6.0);
-            if ui
-                .add(verify_btn)
-                .on_hover_text(
-                    "Add a local file/folder verification guard (e.g. ./dist/server.js)",
+        let render_add_step_buttons =
+            |ui: &mut egui::Ui,
+             add_local: &mut bool,
+             add_verify: &mut bool,
+             add_scp: &mut bool,
+             add_remote: &mut bool| {
+                let local_btn = egui::Button::new(
+                    RichText::new("+ Local Command")
+                        .typo(Typo::SmallMedium)
+                        .color(BLUE_PILL_TEXT),
                 )
-                .clicked()
-            {
-                *add_verify = true;
-            }
+                .fill(BLUE_PILL_BG)
+                .stroke(Stroke::new(1.0_f32, BLUE_PILL_TEXT))
+                .corner_radius(6.0);
+                if ui
+                    .add(local_btn)
+                    .on_hover_text("Add a local shell command step (e.g. npm run build)")
+                    .clicked()
+                {
+                    *add_local = true;
+                }
 
-            let scp_btn = egui::Button::new(
-                RichText::new("+ SCP Upload")
-                    .size(FONT_SM)
-                    .strong()
-                    .color(PURPLE_PILL_TEXT),
-            )
-            .fill(PURPLE_PILL_BG)
-            .stroke(Stroke::new(1.0_f32, PURPLE_PILL_TEXT))
-            .corner_radius(6.0);
-            if ui
+                let verify_btn = egui::Button::new(
+                    RichText::new("+ Verify Path")
+                        .typo(Typo::SmallMedium)
+                        .color(WARN_PILL_TEXT),
+                )
+                .fill(WARN_PILL_BG)
+                .stroke(Stroke::new(1.0_f32, WARN_PILL_TEXT))
+                .corner_radius(6.0);
+                if ui
+                    .add(verify_btn)
+                    .on_hover_text(
+                        "Add a local file/folder verification guard (e.g. ./dist/server.js)",
+                    )
+                    .clicked()
+                {
+                    *add_verify = true;
+                }
+
+                let scp_btn = egui::Button::new(
+                    RichText::new("+ SCP Upload")
+                        .typo(Typo::SmallMedium)
+                        .color(PURPLE_PILL_TEXT),
+                )
+                .fill(PURPLE_PILL_BG)
+                .stroke(Stroke::new(1.0_f32, PURPLE_PILL_TEXT))
+                .corner_radius(6.0);
+                if ui
                 .add(scp_btn)
                 .on_hover_text(
                     "Add an SCP file upload step (transfers local files & optional staged .env to {remote_dir})",
@@ -2477,30 +2475,28 @@ impl ShiplyApp {
                 *add_scp = true;
             }
 
-            let remote_btn = egui::Button::new(
-                RichText::new("+ Remote SSH")
-                    .size(FONT_SM)
-                    .strong()
-                    .color(TEAL_PILL_TEXT),
-            )
-            .fill(TEAL_PILL_BG)
-            .stroke(Stroke::new(1.0_f32, TEAL_PILL_TEXT))
-            .corner_radius(6.0);
-            if ui
-                .add(remote_btn)
-                .on_hover_text("Add a Remote SSH command step executed on target servers")
-                .clicked()
-            {
-                *add_remote = true;
-            }
-        };
+                let remote_btn = egui::Button::new(
+                    RichText::new("+ Remote SSH")
+                        .typo(Typo::SmallMedium)
+                        .color(TEAL_PILL_TEXT),
+                )
+                .fill(TEAL_PILL_BG)
+                .stroke(Stroke::new(1.0_f32, TEAL_PILL_TEXT))
+                .corner_radius(6.0);
+                if ui
+                    .add(remote_btn)
+                    .on_hover_text("Add a Remote SSH command step executed on target servers")
+                    .clicked()
+                {
+                    *add_remote = true;
+                }
+            };
 
         if stack_step_buttons {
             horizontal_row(ui, 28.0, |ui| {
                 ui.label(
                     RichText::new(format!("{} PIPELINE STEPS", env_name.to_uppercase()))
-                        .size(FONT_MD)
-                        .strong()
+                        .typo(Typo::Label)
                         .color(TEXT_PRIMARY),
                 );
             });
@@ -2519,14 +2515,13 @@ impl ShiplyApp {
             horizontal_row(ui, 36.0, |ui| {
                 ui.label(
                     RichText::new(format!("{} PIPELINE STEPS", env_name.to_uppercase()))
-                        .size(FONT_MD)
-                        .strong()
+                        .typo(Typo::Label)
                         .color(TEXT_PRIMARY),
                 );
                 if show_step_subtitle {
                     ui.label(
                         RichText::new("— Add or customize any step type:")
-                            .size(FONT_SM)
+                            .typo(Typo::Small)
                             .color(TEXT_MUTED),
                     );
                 }
@@ -2535,8 +2530,7 @@ impl ShiplyApp {
                     ui.spacing_mut().item_spacing = Vec2::new(6.0, 0.0);
                     let remote_btn = egui::Button::new(
                         RichText::new("+ Remote SSH")
-                            .size(FONT_SM)
-                            .strong()
+                            .typo(Typo::SmallMedium)
                             .color(TEAL_PILL_TEXT),
                     )
                     .fill(TEAL_PILL_BG)
@@ -2552,8 +2546,7 @@ impl ShiplyApp {
 
                     let scp_btn = egui::Button::new(
                         RichText::new("+ SCP Upload")
-                            .size(FONT_SM)
-                            .strong()
+                            .typo(Typo::SmallMedium)
                             .color(PURPLE_PILL_TEXT),
                     )
                     .fill(PURPLE_PILL_BG)
@@ -2571,8 +2564,7 @@ impl ShiplyApp {
 
                     let verify_btn = egui::Button::new(
                         RichText::new("+ Verify Path")
-                            .size(FONT_SM)
-                            .strong()
+                            .typo(Typo::SmallMedium)
                             .color(WARN_PILL_TEXT),
                     )
                     .fill(WARN_PILL_BG)
@@ -2590,8 +2582,7 @@ impl ShiplyApp {
 
                     let local_btn = egui::Button::new(
                         RichText::new("+ Local Command")
-                            .size(FONT_SM)
-                            .strong()
+                            .typo(Typo::SmallMedium)
                             .color(BLUE_PILL_TEXT),
                     )
                     .fill(BLUE_PILL_BG)
@@ -2659,7 +2650,7 @@ impl ShiplyApp {
             RichText::new(
                 "Available template variables: {remote_dir}, {remote_user}, {app_name}, {http_proxy}, {env_source}, {version}",
             )
-            .size(FONT_SM)
+            .typo(Typo::Small)
             .color(TEXT_MUTED),
         );
         ui.add_space(10.0);
@@ -2698,15 +2689,18 @@ impl ShiplyApp {
                 theme.border
             };
             let step_accent_color = match &step.kind {
-                StepKind::LocalCommand { .. } => Color32::from_rgb(20, 110, 245), // local #146EF5
-                StepKind::VerifyLocalPath { .. } => Color32::from_rgb(245, 158, 11), // verify #F59E0B
-                StepKind::TransferFiles { .. } => Color32::from_rgb(122, 61, 255), // scp #7A3DFF
-                StepKind::RemoteCommand { .. } => Color32::from_rgb(20, 184, 166), // ssh #14B8A6
+                StepKind::LocalCommand { .. } => STEP_LOCAL_ACCENT,
+                StepKind::VerifyLocalPath { .. } => STEP_VERIFY_ACCENT,
+                StepKind::TransferFiles { .. } => STEP_SCP_ACCENT,
+                StepKind::RemoteCommand { .. } => STEP_SSH_ACCENT,
             };
 
             let frame_resp = egui::Frame::new()
                 .fill(card_fill)
-                .stroke(Stroke::new(if is_being_dragged { 2.0_f32 } else { 1.0_f32 }, step_border_color))
+                .stroke(Stroke::new(
+                    if is_being_dragged { 2.0_f32 } else { 1.0_f32 },
+                    step_border_color,
+                ))
                 .corner_radius(10.0)
                 .inner_margin(Margin::symmetric(16, 12))
                 .show(ui, |ui| {
@@ -2714,7 +2708,8 @@ impl ShiplyApp {
                     horizontal_row(ui, 32.0, |ui| {
                         // Drag Handle: Vertical grip dots
                         let handle_size = Vec2::new(18.0, 26.0);
-                        let (handle_rect, handle_resp) = ui.allocate_exact_size(handle_size, Sense::drag());
+                        let (handle_rect, handle_resp) =
+                            ui.allocate_exact_size(handle_size, Sense::drag());
                         let handle_resp = handle_resp.on_hover_cursor(if is_being_dragged {
                             egui::CursorIcon::Grabbing
                         } else {
@@ -2743,7 +2738,12 @@ impl ShiplyApp {
                         } else {
                             TEXT_MUTED
                         };
-                        draw_outline_icon(ui.painter(), handle_rect.center(), OutlineIcon::GripVertical, handle_color);
+                        draw_outline_icon(
+                            ui.painter(),
+                            handle_rect.center(),
+                            OutlineIcon::GripVertical,
+                            handle_color,
+                        );
                         handle_resp.on_hover_text("Drag to reorder this pipeline step");
                         ui.add_space(3.0);
 
@@ -2752,20 +2752,19 @@ impl ShiplyApp {
                         }
                         ui.label(
                             RichText::new(format!("#{:02}", idx + 1))
-                                .size(FONT_SM)
-                                .strong()
+                                .typo(Typo::SmallMedium)
                                 .color(TEXT_MUTED),
                         );
 
                         let (type_label, _bg, fg) = match &step.kind {
                             StepKind::LocalCommand { .. } => {
-                                ("LOCAL", BLUE_PILL_BG, BLUE_PILL_TEXT)
+                                ("Local", BLUE_PILL_BG, BLUE_PILL_TEXT)
                             }
                             StepKind::VerifyLocalPath { .. } => {
-                                ("VERIFY PATH", WARN_PILL_BG, WARN_PILL_TEXT)
+                                ("Verify path", WARN_PILL_BG, WARN_PILL_TEXT)
                             }
                             StepKind::TransferFiles { .. } => {
-                                ("SCP UPLOAD", PURPLE_PILL_BG, PURPLE_PILL_TEXT)
+                                ("SCP upload", PURPLE_PILL_BG, PURPLE_PILL_TEXT)
                             }
                             StepKind::RemoteCommand { .. } => {
                                 ("REMOTE SSH", TEAL_PILL_BG, TEAL_PILL_TEXT)
@@ -2774,9 +2773,7 @@ impl ShiplyApp {
 
                         // Interactive Step Type Selector Dropdown so user can switch step type anytime!
                         egui::ComboBox::from_id_salt(("step_kind_selector", &step.id))
-                            .selected_text(
-                                RichText::new(type_label).size(FONT_XS).strong().color(fg),
-                            )
+                            .selected_text(RichText::new(type_label).typo(Typo::Caption).color(fg))
                             .width(120.0)
                             .show_ui(ui, |ui| {
                                 let is_local = matches!(step.kind, StepKind::LocalCommand { .. });
@@ -2823,8 +2820,7 @@ impl ShiplyApp {
                                     config_changed = true;
                                 }
 
-                                let is_remote =
-                                    matches!(step.kind, StepKind::RemoteCommand { .. });
+                                let is_remote = matches!(step.kind, StepKind::RemoteCommand { .. });
                                 if ui
                                     .selectable_label(is_remote, "REMOTE SSH — Server Command")
                                     .clicked()
@@ -2849,7 +2845,8 @@ impl ShiplyApp {
                             StepKind::TransferFiles { .. } => 235.0,
                             _ => 120.0,
                         };
-                        let name_input_w = (rem_w - reserved_for_opts_and_actions).clamp(96.0, 320.0);
+                        let name_input_w =
+                            (rem_w - reserved_for_opts_and_actions).clamp(96.0, 320.0);
 
                         if styled_text_edit(
                             ui,
@@ -2873,7 +2870,7 @@ impl ShiplyApp {
                                 egui::ComboBox::from_id_salt(("step_shell_selector", &step.id))
                                     .selected_text(
                                         RichText::new(current_shell.display_name())
-                                            .size(FONT_XS)
+                                            .typo(Typo::Caption)
                                             .color(TEXT_SECONDARY),
                                     )
                                     .width(88.0)
@@ -2901,7 +2898,7 @@ impl ShiplyApp {
                                     .checkbox(
                                         allow_failure,
                                         RichText::new(allow_fail_lbl)
-                                            .size(FONT_SM)
+                                            .typo(Typo::Small)
                                             .color(TEXT_SECONDARY),
                                     )
                                     .changed()
@@ -2915,7 +2912,7 @@ impl ShiplyApp {
                                     .checkbox(
                                         stage_env_file,
                                         RichText::new("Stage .env file")
-                                            .size(FONT_SM)
+                                            .typo(Typo::Small)
                                             .color(TEXT_SECONDARY),
                                     )
                                     .changed()
@@ -2936,8 +2933,8 @@ impl ShiplyApp {
                                 None,
                                 FAIL_PILL_TEXT,
                                 FAIL_PILL_BG,
-                                Color32::from_rgb(254, 202, 202),
-                                Color32::from_rgb(252, 165, 165),
+                                DANGER_SOFT,
+                                DANGER_SOFT,
                                 true,
                             )
                             .on_hover_text("Delete step")
@@ -2999,30 +2996,24 @@ impl ShiplyApp {
                     // Row 2: Full-width Command / Path / SCP Sources field
                     horizontal_row(ui, 34.0, |ui| {
                         let (field_label, placeholder) = match &step.kind {
-                            StepKind::LocalCommand { .. } => (
-                                "Command:",
-                                "e.g. npm run build",
-                            ),
-                            StepKind::VerifyLocalPath { .. } => (
-                                "Verify Path:",
-                                "e.g. ./dist/index.js or ./dist",
-                            ),
+                            StepKind::LocalCommand { .. } => ("Command:", "e.g. npm run build"),
+                            StepKind::VerifyLocalPath { .. } => {
+                                ("Verify Path:", "e.g. ./dist/index.js or ./dist")
+                            }
                             StepKind::TransferFiles { .. } => (
                                 "SCP Sources:",
                                 "e.g. ./dist, ./package.json, ./package-lock.json",
                             ),
-                            StepKind::RemoteCommand { .. } => (
-                                "Remote SSH:",
-                                "e.g. pm2 restart {app_name} --update-env",
-                            ),
+                            StepKind::RemoteCommand { .. } => {
+                                ("Remote SSH:", "e.g. pm2 restart {app_name} --update-env")
+                            }
                         };
 
                         ui.add_sized(
                             [88.0, 24.0],
                             egui::Label::new(
                                 RichText::new(field_label)
-                                    .size(FONT_SM)
-                                    .strong()
+                                    .typo(Typo::SmallMedium)
                                     .color(TEXT_SECONDARY),
                             ),
                         );
@@ -3098,8 +3089,17 @@ impl ShiplyApp {
             );
             ui.painter().rect_filled(
                 bar_rect,
-                CornerRadius { nw: 0, ne: 3, se: 3, sw: 0 },
-                if step.enabled { step_accent_color } else { theme.text_subtle },
+                CornerRadius {
+                    nw: 0,
+                    ne: 3,
+                    se: 3,
+                    sw: 0,
+                },
+                if step.enabled {
+                    step_accent_color
+                } else {
+                    theme.text_subtle
+                },
             );
             if is_being_dragged {
                 let shadow_rect = card_rect.translate(Vec2::new(0.0, 4.0)).expand(1.0);
@@ -3128,10 +3128,8 @@ impl ShiplyApp {
                                 insert_line,
                                 Stroke::new(5.0_f32, PRIMARY_BLUE.gamma_multiply(0.4)),
                             );
-                            ui.painter().line_segment(
-                                insert_line,
-                                Stroke::new(2.5_f32, PRIMARY_BLUE),
-                            );
+                            ui.painter()
+                                .line_segment(insert_line, Stroke::new(2.5_f32, PRIMARY_BLUE));
                             ui.painter().circle_filled(
                                 Pos2::new(card_rect.left() + 6.0, line_y),
                                 4.0,
@@ -3203,12 +3201,7 @@ impl ShiplyApp {
 
         let render_vault_badge = |ui: &mut egui::Ui, found: bool| {
             if found {
-                render_pill(
-                    ui,
-                    "OS CREDENTIAL VAULT READY",
-                    SUCCESS_PILL_BG,
-                    SUCCESS_PILL_TEXT,
-                );
+                render_pill(ui, "Vault ready", SUCCESS_PILL_BG, SUCCESS_PILL_TEXT);
             } else {
                 render_pill(
                     ui,
@@ -3226,8 +3219,7 @@ impl ShiplyApp {
                         "{} — ENVIRONMENT & SSH SETTINGS",
                         current_env_name.to_uppercase()
                     ))
-                    .size(FONT_MD)
-                    .strong()
+                    .typo(Typo::Label)
                     .color(TEXT_PRIMARY),
                 );
             });
@@ -3242,7 +3234,7 @@ impl ShiplyApp {
                     Some("Credential Guide"),
                     PRIMARY_BLUE,
                     BLUE_PILL_BG,
-                    Color32::from_rgb(191, 219, 254),
+                    INFO_SOFT,
                     PRIMARY_BLUE,
                     true,
                 )
@@ -3258,8 +3250,8 @@ impl ShiplyApp {
                     Some("Delete"),
                     FAIL_PILL_TEXT,
                     FAIL_PILL_BG,
-                    Color32::from_rgb(254, 202, 202),
-                    Color32::from_rgb(252, 165, 165),
+                    DANGER_SOFT,
+                    DANGER_SOFT,
                     true,
                 )
                 .on_hover_text("Delete this environment")
@@ -3275,8 +3267,7 @@ impl ShiplyApp {
                         "{} — ENVIRONMENT & SSH SETTINGS",
                         current_env_name.to_uppercase()
                     ))
-                    .size(FONT_MD)
-                    .strong()
+                    .typo(Typo::Label)
                     .color(TEXT_PRIMARY),
                 );
                 render_vault_badge(ui, self.cached_vault_found);
@@ -3296,8 +3287,8 @@ impl ShiplyApp {
                         Some(del_lbl),
                         FAIL_PILL_TEXT,
                         FAIL_PILL_BG,
-                        Color32::from_rgb(254, 202, 202),
-                        Color32::from_rgb(252, 165, 165),
+                        DANGER_SOFT,
+                        DANGER_SOFT,
                         true,
                     )
                     .on_hover_text("Delete this environment")
@@ -3318,7 +3309,7 @@ impl ShiplyApp {
                         Some(guide_lbl),
                         PRIMARY_BLUE,
                         BLUE_PILL_BG,
-                        Color32::from_rgb(191, 219, 254),
+                        INFO_SOFT,
                         PRIMARY_BLUE,
                         true,
                     )
@@ -3349,9 +3340,8 @@ impl ShiplyApp {
                     .show(ui, |ui| {
                         ui.label(
                             RichText::new("Local Project Directory:")
-                                .size(FONT_MD)
-                                .color(TEXT_SECONDARY)
-                                .strong(),
+                                .typo(Typo::Label)
+                                .color(TEXT_SECONDARY),
                         );
                         if !is_two_col {
                             ui.end_row();
@@ -3374,9 +3364,7 @@ impl ShiplyApp {
                         if let Some(env_cfg) = project.get_env_mut(&env_key) {
                             ui.label(
                                 RichText::new("Environment Display Name:")
-                                    .size(FONT_MD)
-                                    .color(TEXT_SECONDARY)
-                                    .strong(),
+                                    .typo(Typo::Label).color(TEXT_SECONDARY),
                             );
                             if !is_two_col {
                                 ui.end_row();
@@ -3398,9 +3386,7 @@ impl ShiplyApp {
 
                             ui.label(
                                 RichText::new("Application Name (PM2 / Dir):")
-                                    .size(FONT_MD)
-                                    .color(TEXT_SECONDARY)
-                                    .strong(),
+                                    .typo(Typo::Label).color(TEXT_SECONDARY),
                             );
                             if !is_two_col {
                                 ui.end_row();
@@ -3422,9 +3408,7 @@ impl ShiplyApp {
 
                             ui.label(
                                 RichText::new("Target Servers (comma-separated):")
-                                    .size(FONT_MD)
-                                    .color(TEXT_SECONDARY)
-                                    .strong(),
+                                    .typo(Typo::Label).color(TEXT_SECONDARY),
                             );
                             if !is_two_col {
                                 ui.end_row();
@@ -3459,9 +3443,7 @@ impl ShiplyApp {
 
                             ui.label(
                                 RichText::new("Remote Directory Path:")
-                                    .size(FONT_MD)
-                                    .color(TEXT_SECONDARY)
-                                    .strong(),
+                                    .typo(Typo::Label).color(TEXT_SECONDARY),
                             );
                             if !is_two_col {
                                 ui.end_row();
@@ -3483,9 +3465,7 @@ impl ShiplyApp {
 
                             ui.label(
                                 RichText::new("Remote SSH Username:")
-                                    .size(FONT_MD)
-                                    .color(TEXT_SECONDARY)
-                                    .strong(),
+                                    .typo(Typo::Label).color(TEXT_SECONDARY),
                             );
                             if !is_two_col {
                                 ui.end_row();
@@ -3507,9 +3487,7 @@ impl ShiplyApp {
 
                             ui.label(
                                 RichText::new("OS Credential Vault Target:")
-                                    .size(FONT_MD)
-                                    .color(TEXT_SECONDARY)
-                                    .strong(),
+                                    .typo(Typo::Label).color(TEXT_SECONDARY),
                             );
                             if !is_two_col {
                                 ui.end_row();
@@ -3549,7 +3527,7 @@ impl ShiplyApp {
                                     Some("Set Secret"),
                                     PRIMARY_BLUE,
                                     BLUE_PILL_BG,
-                                    Color32::from_rgb(191, 219, 254),
+                                    INFO_SOFT,
                                     PRIMARY_BLUE,
                                     true,
                                 )
@@ -3567,9 +3545,7 @@ impl ShiplyApp {
 
                             ui.label(
                                 RichText::new("SSH Password Override:")
-                                    .size(FONT_MD)
-                                    .color(TEXT_SECONDARY)
-                                    .strong(),
+                                    .typo(Typo::Label).color(TEXT_SECONDARY),
                             );
                             if !is_two_col {
                                 ui.end_row();
@@ -3589,9 +3565,7 @@ impl ShiplyApp {
 
                             ui.label(
                                 RichText::new("Environment File Source (.env):")
-                                    .size(FONT_MD)
-                                    .color(TEXT_SECONDARY)
-                                    .strong(),
+                                    .typo(Typo::Label).color(TEXT_SECONDARY),
                             );
                             if !is_two_col {
                                 ui.end_row();
@@ -3626,9 +3600,7 @@ impl ShiplyApp {
 
                             ui.label(
                                 RichText::new("Outbound HTTP Proxy:")
-                                    .size(FONT_MD)
-                                    .color(TEXT_SECONDARY)
-                                    .strong(),
+                                    .typo(Typo::Label).color(TEXT_SECONDARY),
                             );
                             if !is_two_col {
                                 ui.end_row();
@@ -3672,11 +3644,7 @@ impl ShiplyApp {
                 "SSH Vault target for {} ({})",
                 self.storage.projects[proj_idx].name, current_env_name
             );
-            self.open_secret_management_for_target(
-                &guide_vault_target,
-                &guide_remote_user,
-                &desc,
-            );
+            self.open_secret_management_for_target(&guide_vault_target, &guide_remote_user, &desc);
         } else if verify_vault_clicked {
             let _ = self.storage.save();
             self.refresh_selected_project_metadata(false);
@@ -3708,17 +3676,19 @@ impl ShiplyApp {
                     .map(|e| e.key.clone())
                     .unwrap_or_default();
                 self.refresh_selected_project_metadata(true);
-                self.status_banner = Some((
-                    format!("Removed environment '{current_env_name}'."),
-                    true,
-                ));
+                self.status_banner =
+                    Some((format!("Removed environment '{current_env_name}'."), true));
             }
         } else if config_changed {
             self.mark_config_dirty();
         }
     }
 
-    pub(crate) fn render_history_and_logs_view(&mut self, ui: &mut egui::Ui, project_filter: Option<&str>) {
+    pub(crate) fn render_history_and_logs_view(
+        &mut self,
+        ui: &mut egui::Ui,
+        project_filter: Option<&str>,
+    ) {
         let is_project_view = project_filter.is_some();
         let project_envs: Vec<(String, String)> = if let Some(pid) = project_filter {
             self.storage
@@ -3776,9 +3746,8 @@ impl ShiplyApp {
         let mut trigger_clear_history = false;
         horizontal_row(ui, 34.0, |ui| {
             ui.label(
-                RichText::new("DEPLOYMENT HISTORY")
-                    .size(FONT_MD)
-                    .strong()
+                RichText::new("Deployment history")
+                    .typo(Typo::Label)
                     .color(theme.text),
             );
 
@@ -3794,8 +3763,8 @@ impl ShiplyApp {
                             if show_label { Some("Clear History") } else { None },
                             FAIL_PILL_TEXT,
                             FAIL_PILL_BG,
-                            Color32::from_rgb(254, 202, 202),
-                            Color32::from_rgb(252, 165, 165),
+                            DANGER_SOFT,
+                            DANGER_SOFT,
                             true,
                         )
                         .on_hover_text(format!(
@@ -3809,7 +3778,7 @@ impl ShiplyApp {
                     for (env_name, env_key) in project_envs.iter().cloned().rev() {
                         let is_active = self.selected_env_key == env_key;
                         let btn = egui::Button::new(
-                            RichText::new(env_name).size(FONT_SM).strong().color(if is_active {
+                            RichText::new(env_name).typo(Typo::SmallMedium).color(if is_active {
                                 theme.ink_fg
                             } else {
                                 theme.text_muted
@@ -3838,8 +3807,8 @@ impl ShiplyApp {
                             if show_label { Some("Clear History") } else { None },
                             FAIL_PILL_TEXT,
                             FAIL_PILL_BG,
-                            Color32::from_rgb(254, 202, 202),
-                            Color32::from_rgb(252, 165, 165),
+                            DANGER_SOFT,
+                            DANGER_SOFT,
                             true,
                         )
                         .on_hover_text(format!(
@@ -3853,7 +3822,7 @@ impl ShiplyApp {
                     for (label, filter_val) in filter_options.into_iter().rev() {
                         let is_active = self.history_env_filter == filter_val;
                         let btn = egui::Button::new(
-                            RichText::new(label).size(FONT_SM).strong().color(if is_active {
+                            RichText::new(label).typo(Typo::SmallMedium).color(if is_active {
                                 theme.ink_fg
                             } else {
                                 theme.text_muted
@@ -3938,7 +3907,8 @@ impl ShiplyApp {
         let mut cancel_target: Option<String> = None;
         let mut delete_target: Option<DeploymentRecord> = None;
 
-        let is_stacked_view = ui.ctx().screen_rect().width() < 860.0 || ui.available_width() < 640.0;
+        let is_stacked_view =
+            ui.ctx().screen_rect().width() < 860.0 || ui.available_width() < 640.0;
         let total_count = filtered.len();
         let visible_count = total_count.min(self.history_visible_limit.max(5));
 
@@ -3951,43 +3921,38 @@ impl ShiplyApp {
             .show(ui, |ui| {
                 let table_avail_w = ui.available_width();
                 // Fixed columns: STATUS (110) + ENV (80) + VERSION (95) + TIMESTAMP (155) + ACTIONS (~250)
-                let details_col_w = (table_avail_w - (110.0 + 80.0 + 95.0 + 155.0 + 250.0)).max(140.0);
+                let details_col_w =
+                    (table_avail_w - (110.0 + 80.0 + 95.0 + 155.0 + 250.0)).max(140.0);
 
                 if !is_stacked_view {
                     horizontal_row(ui, 22.0, |ui| {
                         ui.add_sized(
                             [110.0, 20.0],
                             egui::Label::new(
-                                RichText::new("STATUS")
-                                    .size(FONT_XS)
-                                    .strong()
+                                RichText::new("Status")
+                                    .typo(Typo::Caption)
                                     .color(TEXT_MUTED),
                             ),
                         );
                         ui.add_sized(
                             [80.0, 20.0],
                             egui::Label::new(
-                                RichText::new("ENV")
-                                    .size(FONT_XS)
-                                    .strong()
-                                    .color(TEXT_MUTED),
+                                RichText::new("ENV").typo(Typo::Caption).color(TEXT_MUTED),
                             ),
                         );
                         ui.add_sized(
                             [95.0, 20.0],
                             egui::Label::new(
-                                RichText::new("VERSION")
-                                    .size(FONT_XS)
-                                    .strong()
+                                RichText::new("Version")
+                                    .typo(Typo::Caption)
                                     .color(TEXT_MUTED),
                             ),
                         );
                         ui.add_sized(
                             [details_col_w, 20.0],
                             egui::Label::new(
-                                RichText::new("DETAILS & GIT CHANGES")
-                                    .size(FONT_XS)
-                                    .strong()
+                                RichText::new("Details & git changes")
+                                    .typo(Typo::Caption)
                                     .color(TEXT_MUTED),
                             ),
                         );
@@ -3995,16 +3960,14 @@ impl ShiplyApp {
                             [155.0, 20.0],
                             egui::Label::new(
                                 RichText::new("TIMESTAMP (LOCAL)")
-                                    .size(FONT_XS)
-                                    .strong()
+                                    .typo(Typo::Caption)
                                     .color(TEXT_MUTED),
                             ),
                         );
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             ui.label(
-                                RichText::new("ACTIONS")
-                                    .size(FONT_XS)
-                                    .strong()
+                                RichText::new("Actions")
+                                    .typo(Typo::Caption)
                                     .color(TEXT_MUTED),
                             );
                         });
@@ -4018,15 +3981,14 @@ impl ShiplyApp {
                     ui.vertical_centered(|ui| {
                         ui.add_space(20.0);
                         let msg = if is_project_view {
-                            format!("No deployments recorded for '{}' yet.", self.selected_env_key)
+                            format!(
+                                "No deployments recorded for '{}' yet.",
+                                self.selected_env_key
+                            )
                         } else {
                             "No deployments recorded yet.".to_string()
                         };
-                        ui.label(
-                            RichText::new(msg)
-                                .size(FONT_MD)
-                                .color(TEXT_MUTED),
-                        );
+                        ui.label(RichText::new(msg).typo(Typo::Body).color(TEXT_MUTED));
                         ui.add_space(20.0);
                     });
                 }
@@ -4069,23 +4031,20 @@ impl ShiplyApp {
                             let (_, env_fg) = env_pastel_pill_colors(&dep.environment);
                             ui.label(
                                 RichText::new(format_env_badge(&dep.environment))
-                                    .size(FONT_SM)
-                                    .strong()
+                                    .typo(Typo::SmallMedium)
                                     .color(env_fg),
                             );
 
                             ui.label(
                                 RichText::new(format!("v{}", dep.version))
-                                    .size(FONT_MD)
-                                    .strong()
+                                    .typo(Typo::Label)
                                     .color(TEXT_PRIMARY),
                             );
 
                             if dep.is_rollback {
                                 ui.label(
-                                    RichText::new("ROLLBACK")
-                                        .size(FONT_XS)
-                                        .strong()
+                                    RichText::new("Rollback")
+                                        .typo(Typo::Caption)
                                         .color(WARN_PILL_TEXT),
                                 );
                             }
@@ -4093,14 +4052,16 @@ impl ShiplyApp {
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                                 let ts_resp = ui.label(
                                     RichText::new(dep.format_started_at_local("%Y-%m-%d %H:%M"))
-                                        .size(FONT_SM)
+                                        .typo(Typo::Small)
                                         .color(TEXT_MUTED),
                                 );
                                 let mut hover_msg = format!(
                                     "Started (Local): {}",
                                     dep.format_started_at_local("%Y-%m-%d %H:%M:%S %:z")
                                 );
-                                if let Some(fin) = dep.format_finished_at_local("%Y-%m-%d %H:%M:%S %:z") {
+                                if let Some(fin) =
+                                    dep.format_finished_at_local("%Y-%m-%d %H:%M:%S %:z")
+                                {
                                     hover_msg.push_str(&format!("\nFinished (Local): {fin}"));
                                 }
                                 ts_resp.on_hover_text(hover_msg);
@@ -4124,7 +4085,7 @@ impl ShiplyApp {
                             };
                             ui.label(
                                 RichText::new(git_line)
-                                    .size(FONT_SM)
+                                    .typo(Typo::Small)
                                     .color(TEXT_SECONDARY),
                             );
 
@@ -4135,14 +4096,17 @@ impl ShiplyApp {
                                 .unwrap_or_else(|| dep.servers.join(", "));
                             let max_chars = ((table_avail_w - 180.0) / 7.2).max(18.0) as usize;
                             let truncated = if sub_detail.chars().count() > max_chars {
-                                let s: String = sub_detail.chars().take(max_chars.saturating_sub(2)).collect();
+                                let s: String = sub_detail
+                                    .chars()
+                                    .take(max_chars.saturating_sub(2))
+                                    .collect();
                                 format!("{s}…")
                             } else {
                                 sub_detail
                             };
                             let det_resp = ui.label(
                                 RichText::new(format!("— {truncated}"))
-                                    .size(FONT_SM)
+                                    .typo(Typo::Small)
                                     .color(TEXT_MUTED),
                             );
                             if !dep.git_changes.is_empty() {
@@ -4162,11 +4126,7 @@ impl ShiplyApp {
                                 .duration_ms
                                 .map(|ms| format!("took {:.1}s", ms as f64 / 1000.0))
                                 .unwrap_or_else(|| "running...".to_string());
-                            ui.label(
-                                RichText::new(dur_str)
-                                    .size(FONT_SM)
-                                    .color(TEXT_MUTED),
-                            );
+                            ui.label(RichText::new(dur_str).typo(Typo::Small).color(TEXT_MUTED));
 
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                                 ui.spacing_mut().item_spacing = Vec2::new(6.0, 0.0);
@@ -4222,8 +4182,8 @@ impl ShiplyApp {
                                         Some("Cancel"),
                                         FAIL_PILL_TEXT,
                                         FAIL_PILL_BG,
-                                        Color32::from_rgb(254, 202, 202),
-                                        Color32::from_rgb(252, 165, 165),
+                                        DANGER_SOFT,
+                                        DANGER_SOFT,
                                         true,
                                     )
                                     .on_hover_text("Cancel this running deployment")
@@ -4240,8 +4200,8 @@ impl ShiplyApp {
                                         Some("Rollback"),
                                         WARN_PILL_TEXT,
                                         WARN_PILL_BG,
-                                        Color32::from_rgb(253, 230, 138),
-                                        Color32::from_rgb(251, 191, 36),
+                                        WARNING_SOFT,
+                                        WARNING,
                                         !is_busy,
                                     )
                                     .on_hover_text(format!(
@@ -4260,8 +4220,7 @@ impl ShiplyApp {
                                     } else {
                                         "View Logs"
                                     })
-                                    .size(FONT_SM)
-                                    .strong()
+                                    .typo(Typo::SmallMedium)
                                     .color(TEXT_PRIMARY),
                                 )
                                 .fill(if is_selected {
@@ -4324,7 +4283,7 @@ impl ShiplyApp {
                                 Pos2::new(e_rect.left(), e_rect.center().y),
                                 Align2::LEFT_CENTER,
                                 format_env_badge(&dep.environment),
-                                FontId::proportional(FONT_MD),
+                                Typo::Body.font(),
                                 env_fg,
                             );
 
@@ -4342,22 +4301,24 @@ impl ShiplyApp {
                                 ),
                                 Align2::LEFT_CENTER,
                                 format!("v{}", dep.version),
-                                FontId::proportional(FONT_MD),
+                                Typo::Body.font(),
                                 TEXT_PRIMARY,
                             );
                             if dep.is_rollback {
                                 ui.painter().text(
                                     Pos2::new(v_rect.left(), v_rect.top() + 32.0),
                                     Align2::LEFT_CENTER,
-                                    "ROLLBACK",
-                                    FontId::proportional(FONT_XS),
+                                    "Rollback",
+                                    Typo::Caption.font(),
                                     WARN_PILL_TEXT,
                                 );
                             }
 
                             // DETAILS & GIT CHANGES column (Feature #10, responsive width)
-                            let (d_rect, d_resp) =
-                                ui.allocate_exact_size(Vec2::new(details_col_w, row_h), Sense::hover());
+                            let (d_rect, d_resp) = ui.allocate_exact_size(
+                                Vec2::new(details_col_w, row_h),
+                                Sense::hover(),
+                            );
                             draw_icon_git_branch(
                                 ui.painter(),
                                 Pos2::new(d_rect.left() + 6.0, d_rect.top() + 14.0),
@@ -4371,7 +4332,7 @@ impl ShiplyApp {
                                 Pos2::new(d_rect.left() + 18.0, d_rect.top() + 14.0),
                                 Align2::LEFT_CENTER,
                                 git_line,
-                                FontId::proportional(FONT_SM),
+                                Typo::Small.font(),
                                 TEXT_SECONDARY,
                             );
 
@@ -4381,9 +4342,14 @@ impl ShiplyApp {
                                 .first()
                                 .cloned()
                                 .unwrap_or_else(|| dep.servers.join(", "));
-                            let max_detail_chars = ((details_col_w - 16.0) / 6.8).max(18.0) as usize;
-                            let truncated_detail = if sub_detail.chars().count() > max_detail_chars {
-                                let s: String = sub_detail.chars().take(max_detail_chars.saturating_sub(2)).collect();
+                            let max_detail_chars =
+                                ((details_col_w - 16.0) / 6.8).max(18.0) as usize;
+                            let truncated_detail = if sub_detail.chars().count() > max_detail_chars
+                            {
+                                let s: String = sub_detail
+                                    .chars()
+                                    .take(max_detail_chars.saturating_sub(2))
+                                    .collect();
                                 format!("{s}…")
                             } else {
                                 sub_detail
@@ -4392,7 +4358,7 @@ impl ShiplyApp {
                                 Pos2::new(d_rect.left() + 6.0, d_rect.top() + 33.0),
                                 Align2::LEFT_CENTER,
                                 truncated_detail,
-                                FontId::proportional(FONT_SM),
+                                Typo::Small.font(),
                                 TEXT_MUTED,
                             );
                             if !dep.git_changes.is_empty() {
@@ -4410,7 +4376,7 @@ impl ShiplyApp {
                                 Pos2::new(t_rect.left(), t_rect.top() + 14.0),
                                 Align2::LEFT_CENTER,
                                 dep.format_started_at_local("%Y-%m-%d %H:%M:%S"),
-                                FontId::proportional(FONT_SM),
+                                Typo::Small.font(),
                                 TEXT_PRIMARY,
                             );
                             let dur_str = dep
@@ -4421,14 +4387,15 @@ impl ShiplyApp {
                                 Pos2::new(t_rect.left(), t_rect.top() + 33.0),
                                 Align2::LEFT_CENTER,
                                 dur_str,
-                                FontId::proportional(FONT_SM),
+                                Typo::Small.font(),
                                 TEXT_MUTED,
                             );
                             let mut hover_msg = format!(
                                 "Started (Local): {}",
                                 dep.format_started_at_local("%Y-%m-%d %H:%M:%S %:z")
                             );
-                            if let Some(fin) = dep.format_finished_at_local("%Y-%m-%d %H:%M:%S %:z") {
+                            if let Some(fin) = dep.format_finished_at_local("%Y-%m-%d %H:%M:%S %:z")
+                            {
                                 hover_msg.push_str(&format!("\nFinished (Local): {fin}"));
                             }
                             t_resp.on_hover_text(hover_msg);
@@ -4488,8 +4455,8 @@ impl ShiplyApp {
                                         Some("Cancel"),
                                         FAIL_PILL_TEXT,
                                         FAIL_PILL_BG,
-                                        Color32::from_rgb(254, 202, 202),
-                                        Color32::from_rgb(252, 165, 165),
+                                        DANGER_SOFT,
+                                        DANGER_SOFT,
                                         true,
                                     )
                                     .on_hover_text("Cancel this running deployment")
@@ -4506,8 +4473,8 @@ impl ShiplyApp {
                                         Some("Rollback"),
                                         WARN_PILL_TEXT,
                                         WARN_PILL_BG,
-                                        Color32::from_rgb(253, 230, 138),
-                                        Color32::from_rgb(251, 191, 36),
+                                        WARNING_SOFT,
+                                        WARNING,
                                         !is_busy,
                                     )
                                     .on_hover_text(format!(
@@ -4526,8 +4493,7 @@ impl ShiplyApp {
                                     } else {
                                         "View Logs"
                                     })
-                                    .size(FONT_SM)
-                                    .strong()
+                                    .typo(Typo::SmallMedium)
                                     .color(TEXT_PRIMARY),
                                 )
                                 .fill(if is_selected {
@@ -4556,11 +4522,11 @@ impl ShiplyApp {
                     ui.vertical_centered(|ui| {
                         let remaining = total_count - visible_count;
                         let next_chunk = remaining.min(10);
-                        let btn_text = format!("Show More (+{next_chunk} of {remaining} remaining)...");
+                        let btn_text =
+                            format!("Show More (+{next_chunk} of {remaining} remaining)...");
                         let show_more_btn = egui::Button::new(
                             RichText::new(btn_text)
-                                .size(FONT_SM)
-                                .strong()
+                                .typo(Typo::SmallMedium)
                                 .color(PRIMARY_BLUE),
                         )
                         .fill(SUBTLE_BG)
@@ -4573,7 +4539,8 @@ impl ShiplyApp {
                             .on_hover_cursor(egui::CursorIcon::PointingHand)
                             .clicked()
                         {
-                            self.history_visible_limit = self.history_visible_limit.saturating_add(10);
+                            self.history_visible_limit =
+                                self.history_visible_limit.saturating_add(10);
                         }
                     });
                     ui.add_space(4.0);
@@ -4583,13 +4550,15 @@ impl ShiplyApp {
                     ui.vertical_centered(|ui| {
                         horizontal_row(ui, 24.0, |ui| {
                             ui.label(
-                                RichText::new(format!("Showing all {total_count} deployment records."))
-                                    .size(FONT_XS)
-                                    .color(TEXT_MUTED),
+                                RichText::new(format!(
+                                    "Showing all {total_count} deployment records."
+                                ))
+                                .typo(Typo::Caption)
+                                .color(TEXT_MUTED),
                             );
                             let collapse_btn = egui::Button::new(
                                 RichText::new("Collapse to Last 5")
-                                    .size(FONT_XS)
+                                    .typo(Typo::Caption)
                                     .color(TEXT_SECONDARY),
                             )
                             .fill(Color32::TRANSPARENT)
@@ -4716,8 +4685,7 @@ impl ShiplyApp {
                         ui.add_space(18.0);
                         let hdr_btn = egui::Button::new(
                             RichText::new(&hdr_title)
-                                .size(FONT_SM)
-                                .strong()
+                                .typo(Typo::SmallMedium)
                                 .color(TEXT_PRIMARY),
                         )
                         .fill(Color32::TRANSPARENT)
@@ -4734,7 +4702,7 @@ impl ShiplyApp {
                         for change_line in &changes_lines {
                             ui.label(
                                 RichText::new(format!("• {change_line}"))
-                                    .size(FONT_SM)
+                                    .typo(Typo::Small)
                                     .color(TEXT_SECONDARY),
                             );
                         }
@@ -4759,9 +4727,8 @@ impl ShiplyApp {
                 );
                 let title_resp = ui.add(
                     egui::Button::new(
-                        RichText::new("CONSOLE OUTPUT")
-                            .size(FONT_MD)
-                            .strong()
+                        RichText::new("Console output")
+                            .typo(Typo::Label)
                             .color(TEXT_PRIMARY),
                     )
                     .fill(Color32::TRANSPARENT)
@@ -4779,28 +4746,23 @@ impl ShiplyApp {
                             format_env_badge(&dep.environment),
                             dep.version
                         ))
-                        .size(FONT_SM)
-                        .strong()
+                        .typo(Typo::SmallMedium)
                         .color(TEXT_MUTED),
                     );
                 } else {
                     ui.label(
                         RichText::new(format!("v{}", dep.version))
-                            .size(FONT_SM)
-                            .strong()
+                            .typo(Typo::SmallMedium)
                             .color(TEXT_MUTED),
                     );
                 }
                 render_light_status_badge(ui, dep.status);
 
-                if dep.status == DeploymentStatus::Running
-                    || self.is_deployment_active(&dep.id)
-                {
+                if dep.status == DeploymentStatus::Running || self.is_deployment_active(&dep.id) {
                     ui.add_space(8.0);
                     ui.ctx().request_repaint();
                     let time = ui.input(|i| i.time);
-                    let (spin_r, _) =
-                        ui.allocate_exact_size(Vec2::new(14.0, 14.0), Sense::hover());
+                    let (spin_r, _) = ui.allocate_exact_size(Vec2::new(14.0, 14.0), Sense::hover());
                     draw_circle_loading_spinner(
                         ui.painter(),
                         spin_r.center(),
@@ -4811,8 +4773,7 @@ impl ShiplyApp {
                     if !compact_console_hdr {
                         ui.label(
                             RichText::new("Pipeline running...")
-                                .size(FONT_SM)
-                                .strong()
+                                .typo(Typo::SmallMedium)
                                 .color(PRIMARY_BLUE),
                         );
                     }
@@ -4832,8 +4793,7 @@ impl ShiplyApp {
                     };
                     let btn = egui::Button::new(
                         RichText::new(toggle_lbl)
-                            .size(FONT_SM)
-                            .strong()
+                            .typo(Typo::SmallMedium)
                             .color(TEXT_SECONDARY),
                     )
                     .fill(CARD_BG)
@@ -4858,8 +4818,7 @@ impl ShiplyApp {
                         };
                         let steps_btn = egui::Button::new(
                             RichText::new(steps_btn_lbl)
-                                .size(FONT_SM)
-                                .strong()
+                                .typo(Typo::SmallMedium)
                                 .color(TEXT_SECONDARY),
                         )
                         .fill(CARD_BG)
@@ -4885,7 +4844,7 @@ impl ShiplyApp {
     pub(crate) fn render_terminal_window(&mut self, ui: &mut egui::Ui, dep: &DeploymentRecord) {
         egui::Frame::new()
             .fill(TERM_BODY_BG)
-            .stroke(Stroke::new(1.0_f32, Color32::from_rgb(30, 41, 59)))
+            .stroke(Stroke::new(1.0_f32, SB_BORDER_LINE))
             .corner_radius(10.0)
             .shadow(Shadow {
                 offset: [0, 4],
@@ -4919,20 +4878,18 @@ impl ShiplyApp {
                 ui.painter().text(
                     Pos2::new(dot_x + 8.0, top_rect.center().y),
                     Align2::LEFT_CENTER,
-                    "TERMINAL OUTPUT",
-                    FontId::proportional(FONT_XS),
+                    "Terminal output",
+                    Typo::Caption.font(),
                     SIDEBAR_TEXT_MUTED,
                 );
 
-                if dep.status == DeploymentStatus::Running
-                    || self.is_deployment_active(&dep.id)
-                {
+                if dep.status == DeploymentStatus::Running || self.is_deployment_active(&dep.id) {
                     ui.ctx().request_repaint();
                     let time = ui.input(|i| i.time);
                     let running_lbl_galley = ui.painter().layout_no_wrap(
-                        "RUNNING PIPELINE".to_string(),
-                        FontId::proportional(FONT_XS),
-                        Color32::from_rgb(56, 189, 248),
+                        "Running pipeline".to_string(),
+                        Typo::Caption.font(),
+                        SB_ACCENT,
                     );
                     let r_text_w = running_lbl_galley.size().x;
                     let r_spinner_r = 4.2;
@@ -4942,7 +4899,7 @@ impl ShiplyApp {
                         ui.painter(),
                         r_spinner_c,
                         r_spinner_r,
-                        Color32::from_rgb(56, 189, 248),
+                        SB_ACCENT,
                         time,
                     );
                     ui.painter().galley(
@@ -4951,7 +4908,7 @@ impl ShiplyApp {
                             top_rect.center().y - running_lbl_galley.size().y / 2.0,
                         ),
                         running_lbl_galley,
-                        Color32::from_rgb(56, 189, 248),
+                        SB_ACCENT,
                     );
                 }
 
@@ -4969,7 +4926,7 @@ impl ShiplyApp {
                         if dep.step_logs.is_empty() {
                             ui.label(
                                 RichText::new("Initializing deployment pipeline...")
-                                    .size(FONT_SM)
+                                    .typo(Typo::Small)
                                     .color(SIDEBAR_TEXT_MUTED),
                             );
                         }
@@ -5009,14 +4966,13 @@ impl ShiplyApp {
                                         dep.step_logs.len(),
                                         step_log.step_name
                                     ))
-                                    .size(FONT_MD)
-                                    .strong()
+                                    .typo(Typo::Label)
                                     .color(color),
                                 );
                                 ui.label(
                                     RichText::new(format!("({} ms)", step_log.duration_ms))
-                                        .size(FONT_SM)
-                                        .color(Color32::from_rgb(100, 116, 139)),
+                                        .typo(Typo::Small)
+                                        .color(SB_TEXT_FAINT),
                                 );
 
                                 let (ch_r, _) =
@@ -5025,7 +4981,7 @@ impl ShiplyApp {
                                     ui.painter(),
                                     ch_r.center(),
                                     !is_step_collapsed,
-                                    Color32::from_rgb(100, 116, 139),
+                                    SB_TEXT_FAINT,
                                 );
                             })
                             .response
@@ -5047,8 +5003,8 @@ impl ShiplyApp {
                                 ui.indent(format!("term_step_indent_{i}"), |ui| {
                                     ui.label(
                                         RichText::new(format!("$ {}", step_log.command_summary))
-                                            .size(FONT_SM)
-                                            .color(Color32::from_rgb(100, 116, 139)),
+                                            .typo(Typo::Small)
+                                            .color(SB_TEXT_FAINT),
                                     );
                                     for line in step_log.output.lines() {
                                         let trimmed = line.trim();
@@ -5061,10 +5017,12 @@ impl ShiplyApp {
                                         {
                                             TERM_RED
                                         } else {
-                                            Color32::from_rgb(226, 232, 240)
+                                            SB_TEXT
                                         };
                                         ui.label(
-                                            RichText::new(trimmed).size(FONT_SM).color(line_color),
+                                            RichText::new(trimmed)
+                                                .typo(Typo::Small)
+                                                .color(line_color),
                                         );
                                     }
                                 });
@@ -5085,7 +5043,7 @@ impl ShiplyApp {
                                     ui.painter(),
                                     ic_r.center(),
                                     5.0,
-                                    Color32::from_rgb(56, 189, 248),
+                                    SB_ACCENT,
                                     time,
                                 );
                                 let active_step_name = dep
@@ -5093,16 +5051,16 @@ impl ShiplyApp {
                                     .last()
                                     .map(|s| s.step_name.as_str())
                                     .unwrap_or("Running pipeline");
-                                 ui.label(
-                                     RichText::new(format!("Executing: {active_step_name}..."))
-                                         .size(FONT_MD)
-                                         .color(Color32::from_rgb(56, 189, 248)),
-                                 );
-                             });
-                         }
-                     });
-             });
-     }
+                                ui.label(
+                                    RichText::new(format!("Executing: {active_step_name}..."))
+                                        .typo(Typo::Body)
+                                        .color(SB_ACCENT),
+                                );
+                            });
+                        }
+                    });
+            });
+    }
 
     pub(crate) fn render_secret_management_view(&mut self, ui: &mut egui::Ui) {
         if self.storage.sync_project_vault_targets_to_secrets() {
@@ -5122,8 +5080,7 @@ impl ShiplyApp {
         horizontal_row(ui, 38.0, |ui| {
             ui.label(
                 RichText::new("Secret Management")
-                    .size(FONT_XL)
-                    .strong()
+                    .typo(Typo::H1)
                     .color(TEXT_PRIMARY),
             );
             if !is_compact_hdr {
@@ -5164,8 +5121,7 @@ impl ShiplyApp {
                     } else {
                         "+ New Secret"
                     })
-                    .size(FONT_SM)
-                    .strong()
+                    .typo(Typo::SmallMedium)
                     .color(Color32::WHITE),
                 )
                 .fill(PRIMARY_BLUE)
@@ -5190,7 +5146,7 @@ impl ShiplyApp {
             RichText::new(
                 "Add or update SSH credentials, passwords, and API tokens like GitHub Actions Secrets. Secret values are encrypted directly in your OS Credential Manager and never stored in plaintext in Shiply's database.",
             )
-            .size(FONT_MD)
+            .typo(Typo::Body)
             .color(TEXT_SECONDARY),
         );
         ui.add_space(16.0);
@@ -5222,12 +5178,11 @@ impl ShiplyApp {
                     ui.add_space(20.0);
                     ui.label(
                         RichText::new(if self.secret_form_editing_existing {
-                            "UPDATE SECRET IN OS CREDENTIAL MANAGER"
+                            "Update secret in OS Credential Manager"
                         } else {
-                            "ADD NEW SECRET TO OS CREDENTIAL MANAGER"
+                            "Add new secret to OS Credential Manager"
                         })
-                        .size(FONT_SM)
-                        .strong()
+                        .typo(Typo::SmallMedium)
                         .color(TEXT_PRIMARY),
                     );
                 });
@@ -5240,8 +5195,7 @@ impl ShiplyApp {
                             ui.set_width(col_w);
                             ui.label(
                                 RichText::new("Secret Name / Target Key *")
-                                    .size(FONT_SM)
-                                    .strong()
+                                    .typo(Typo::SmallMedium)
                                     .color(TEXT_SECONDARY),
                             );
                             ui.add_space(4.0);
@@ -5257,8 +5211,7 @@ impl ShiplyApp {
                             ui.set_width(col_w);
                             ui.label(
                                 RichText::new("Username / Account (Optional)")
-                                    .size(FONT_SM)
-                                    .strong()
+                                    .typo(Typo::SmallMedium)
                                     .color(TEXT_SECONDARY),
                             );
                             ui.add_space(4.0);
@@ -5278,8 +5231,7 @@ impl ShiplyApp {
                             ui.set_width(col_w);
                             ui.label(
                                 RichText::new("Secret Value / Password *")
-                                    .size(FONT_SM)
-                                    .strong()
+                                    .typo(Typo::SmallMedium)
                                     .color(TEXT_SECONDARY),
                             );
                             ui.add_space(4.0);
@@ -5295,8 +5247,7 @@ impl ShiplyApp {
                             ui.set_width(col_w);
                             ui.label(
                                 RichText::new("Description / Note (Optional)")
-                                    .size(FONT_SM)
-                                    .strong()
+                                    .typo(Typo::SmallMedium)
                                     .color(TEXT_SECONDARY),
                             );
                             ui.add_space(4.0);
@@ -5312,8 +5263,7 @@ impl ShiplyApp {
                 } else {
                     ui.label(
                         RichText::new("Secret Name / Target Key *")
-                            .size(FONT_SM)
-                            .strong()
+                            .typo(Typo::SmallMedium)
                             .color(TEXT_SECONDARY),
                     );
                     ui.add_space(4.0);
@@ -5328,8 +5278,7 @@ impl ShiplyApp {
 
                     ui.label(
                         RichText::new("Username / Account (Optional)")
-                            .size(FONT_SM)
-                            .strong()
+                            .typo(Typo::SmallMedium)
                             .color(TEXT_SECONDARY),
                     );
                     ui.add_space(4.0);
@@ -5344,8 +5293,7 @@ impl ShiplyApp {
 
                     ui.label(
                         RichText::new("Secret Value / Password *")
-                            .size(FONT_SM)
-                            .strong()
+                            .typo(Typo::SmallMedium)
                             .color(TEXT_SECONDARY),
                     );
                     ui.add_space(4.0);
@@ -5360,8 +5308,7 @@ impl ShiplyApp {
 
                     ui.label(
                         RichText::new("Description / Note (Optional)")
-                            .size(FONT_SM)
-                            .strong()
+                            .typo(Typo::SmallMedium)
                             .color(TEXT_SECONDARY),
                     );
                     ui.add_space(4.0);
@@ -5392,7 +5339,7 @@ impl ShiplyApp {
                             RichText::new(format!(
                                 "Pipeline syntax: ${{{{ secrets.{preview_key} }}}}  |  SSH Target: {preview_key}"
                             ))
-                            .size(FONT_XS)
+                            .typo(Typo::Caption)
                             .monospace()
                             .color(TEXT_MUTED),
                         );
@@ -5407,18 +5354,17 @@ impl ShiplyApp {
                         };
                         let save_btn = egui::Button::new(
                             RichText::new(save_lbl)
-                                .size(FONT_SM)
-                                .strong()
+                                .typo(Typo::SmallMedium)
                                 .color(if can_save {
                                     Color32::WHITE
                                 } else {
-                                    Color32::from_rgb(148, 163, 184)
+                                    SB_TEXT_MUTED
                                 }),
                         )
                         .fill(if can_save {
                             PRIMARY_BLUE
                         } else {
-                            Color32::from_rgb(226, 232, 240)
+                            SB_TEXT
                         })
                         .corner_radius(7.0)
                         .min_size(Vec2::new(165.0, 34.0));
@@ -5435,8 +5381,7 @@ impl ShiplyApp {
                                 .add(
                                     egui::Button::new(
                                         RichText::new("Clear")
-                                            .size(FONT_SM)
-                                            .strong()
+                                            .typo(Typo::SmallMedium)
                                             .color(TEXT_SECONDARY),
                                     )
                                     .fill(SUBTLE_BG)
@@ -5485,13 +5430,9 @@ impl ShiplyApp {
 
         horizontal_row(ui, 34.0, |ui| {
             ui.label(
-                RichText::new(format!(
-                    "CONFIGURED SECRETS ({})",
-                    filtered_secrets.len()
-                ))
-                .size(FONT_MD)
-                .strong()
-                .color(TEXT_PRIMARY),
+                RichText::new(format!("CONFIGURED SECRETS ({})", filtered_secrets.len()))
+                    .typo(Typo::Label)
+                    .color(TEXT_PRIMARY),
             );
 
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -5530,36 +5471,32 @@ impl ShiplyApp {
                         ui.add_sized(
                             [key_col_w, 20.0],
                             egui::Label::new(
-                                RichText::new("SECRET / TARGET KEY")
-                                    .size(FONT_XS)
-                                    .strong()
+                                RichText::new("Secret / target key")
+                                    .typo(Typo::Caption)
                                     .color(TEXT_MUTED),
                             ),
                         );
                         ui.add_sized(
                             [120.0, 20.0],
                             egui::Label::new(
-                                RichText::new("USERNAME")
-                                    .size(FONT_XS)
-                                    .strong()
+                                RichText::new("Username")
+                                    .typo(Typo::Caption)
                                     .color(TEXT_MUTED),
                             ),
                         );
                         ui.add_sized(
                             [145.0, 20.0],
                             egui::Label::new(
-                                RichText::new("OS VAULT STATUS")
-                                    .size(FONT_XS)
-                                    .strong()
+                                RichText::new("OS vault status")
+                                    .typo(Typo::Caption)
                                     .color(TEXT_MUTED),
                             ),
                         );
                         ui.add_sized(
                             [180.0, 20.0],
                             egui::Label::new(
-                                RichText::new("USED BY")
-                                    .size(FONT_XS)
-                                    .strong()
+                                RichText::new("Used by")
+                                    .typo(Typo::Caption)
                                     .color(TEXT_MUTED),
                             ),
                         );
@@ -5567,16 +5504,14 @@ impl ShiplyApp {
                             [135.0, 20.0],
                             egui::Label::new(
                                 RichText::new("UPDATED (LOCAL)")
-                                    .size(FONT_XS)
-                                    .strong()
+                                    .typo(Typo::Caption)
                                     .color(TEXT_MUTED),
                             ),
                         );
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             ui.label(
-                                RichText::new("ACTIONS")
-                                    .size(FONT_XS)
-                                    .strong()
+                                RichText::new("Actions")
+                                    .typo(Typo::Caption)
                                     .color(TEXT_MUTED),
                             );
                         });
@@ -5592,7 +5527,7 @@ impl ShiplyApp {
                             RichText::new(
                                 "No secrets configured yet. Use the form above to save a secret directly to your OS Credential Manager.",
                             )
-                            .size(FONT_MD)
+                            .typo(Typo::Body)
                             .color(TEXT_MUTED),
                         );
                         ui.add_space(20.0);
@@ -5622,29 +5557,27 @@ impl ShiplyApp {
                         horizontal_row(ui, 24.0, |ui| {
                             ui.label(
                                 RichText::new(&sec.key)
-                                    .size(FONT_MD)
-                                    .monospace()
-                                    .strong()
+                                    .typo(Typo::Mono)
                                     .color(TEXT_PRIMARY),
                             );
                             let (s_txt, s_bg, s_fg) = if in_vault {
-                                ("STORED IN OS VAULT", SUCCESS_PILL_BG, SUCCESS_PILL_TEXT)
+                                ("Stored in OS vault", SUCCESS_PILL_BG, SUCCESS_PILL_TEXT)
                             } else {
-                                ("MISSING IN VAULT", WARN_PILL_BG, WARN_PILL_TEXT)
+                                ("Missing in vault", WARN_PILL_BG, WARN_PILL_TEXT)
                             };
                             render_pill(ui, s_txt, s_bg, s_fg);
                         });
                         if !sec.description.is_empty() {
                             ui.label(
                                 RichText::new(&sec.description)
-                                    .size(FONT_SM)
+                                    .typo(Typo::Small)
                                     .color(TEXT_SECONDARY),
                             );
                         }
                         horizontal_row(ui, 28.0, |ui| {
                             ui.label(
                                 RichText::new(format!("User: {effective_user}  •  {used_by_str}"))
-                                    .size(FONT_XS)
+                                    .typo(Typo::Caption)
                                     .color(TEXT_MUTED),
                             );
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -5691,7 +5624,7 @@ impl ShiplyApp {
                                     Some(if in_vault { "Update" } else { "Set Value" }),
                                     PRIMARY_BLUE,
                                     BLUE_PILL_BG,
-                                    Color32::from_rgb(191, 219, 254),
+                                    INFO_SOFT,
                                     PRIMARY_BLUE,
                                     true,
                                 )
@@ -5723,7 +5656,7 @@ impl ShiplyApp {
                                 ),
                                 Align2::LEFT_CENTER,
                                 &sec.key,
-                                FontId::monospace(FONT_MD),
+                                Typo::Mono.font(),
                                 TEXT_PRIMARY,
                             );
                             if !sec.description.is_empty() {
@@ -5731,7 +5664,7 @@ impl ShiplyApp {
                                     Pos2::new(k_rect.left(), k_rect.top() + 33.0),
                                     Align2::LEFT_CENTER,
                                     &sec.description,
-                                    FontId::proportional(FONT_SM),
+                                    Typo::Small.font(),
                                     TEXT_MUTED,
                                 );
                             }
@@ -5743,7 +5676,7 @@ impl ShiplyApp {
                                 Pos2::new(u_rect.left(), u_rect.center().y),
                                 Align2::LEFT_CENTER,
                                 &effective_user,
-                                FontId::proportional(FONT_SM),
+                                Typo::Small.font(),
                                 TEXT_SECONDARY,
                             );
 
@@ -5751,9 +5684,9 @@ impl ShiplyApp {
                             let (s_rect, _) =
                                 ui.allocate_exact_size(Vec2::new(145.0, row_h), Sense::hover());
                             let (s_txt, s_bg, s_fg) = if in_vault {
-                                ("STORED IN VAULT", SUCCESS_PILL_BG, SUCCESS_PILL_TEXT)
+                                ("Stored in vault", SUCCESS_PILL_BG, SUCCESS_PILL_TEXT)
                             } else {
-                                ("MISSING IN VAULT", WARN_PILL_BG, WARN_PILL_TEXT)
+                                ("Missing in vault", WARN_PILL_BG, WARN_PILL_TEXT)
                             };
                             paint_pill_left_aligned(
                                 ui.painter(),
@@ -5770,7 +5703,7 @@ impl ShiplyApp {
                                 Pos2::new(ub_rect.left(), ub_rect.center().y),
                                 Align2::LEFT_CENTER,
                                 &used_by_str,
-                                FontId::proportional(FONT_SM),
+                                Typo::Small.font(),
                                 TEXT_SECONDARY,
                             );
                             ub_resp.on_hover_text(&used_by_str);
@@ -5782,7 +5715,7 @@ impl ShiplyApp {
                                 Pos2::new(t_rect.left(), t_rect.center().y),
                                 Align2::LEFT_CENTER,
                                 sec.format_updated_at_local("%Y-%m-%d %H:%M"),
-                                FontId::proportional(FONT_SM),
+                                Typo::Small.font(),
                                 TEXT_MUTED,
                             );
 

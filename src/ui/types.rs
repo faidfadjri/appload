@@ -1,5 +1,14 @@
-use eframe::egui::Pos2;
 use crate::version::GitMetadata;
+use eframe::egui::Pos2;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum UiFont {
+    #[default]
+    Inter,
+    SegoeUi,
+}
+
+pub const UI_FONT: UiFont = UiFont::Inter;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum SidebarSelection {

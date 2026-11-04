@@ -138,6 +138,7 @@ pub struct ShiplyApp {
     pub(crate) server_env_source_buffer: Option<(String, String)>,
     pub(crate) server_http_proxy_buffer: Option<(String, String)>,
     pub refresh_anim_start: Option<Instant>,
+    pub(crate) dpi_diagnostics_logged: bool,
 }
 impl ShiplyApp {
     pub fn new(storage: AppStorage) -> Self {
@@ -271,6 +272,7 @@ impl ShiplyApp {
             server_env_source_buffer: None,
             server_http_proxy_buffer: None,
             refresh_anim_start: None,
+            dpi_diagnostics_logged: false,
             git_inspect_tx,
             git_inspect_rx,
         };
@@ -376,17 +378,15 @@ impl ShiplyApp {
         self.active_deployments
             .keys()
             .any(|(p, e)| p == project_id && e == env_key)
-            || self
-                .storage
-                .deployments
-                .iter()
-                .any(|d| d.project_id == project_id && d.environment == env_key && d.status == DeploymentStatus::Running)
+            || self.storage.deployments.iter().any(|d| {
+                d.project_id == project_id
+                    && d.environment == env_key
+                    && d.status == DeploymentStatus::Running
+            })
     }
 
     pub fn is_project_deploying(&self, project_id: &str) -> bool {
-        self.active_deployments
-            .keys()
-            .any(|(p, _)| p == project_id)
+        self.active_deployments.keys().any(|(p, _)| p == project_id)
             || self.active_deployment_id.as_ref().is_some_and(|dep_id| {
                 self.storage
                     .deployments
@@ -409,7 +409,11 @@ impl ShiplyApp {
                 self.storage
                     .deployments
                     .iter()
-                    .find(|d| d.project_id == project_id && d.environment == env_key && d.status == DeploymentStatus::Running)
+                    .find(|d| {
+                        d.project_id == project_id
+                            && d.environment == env_key
+                            && d.status == DeploymentStatus::Running
+                    })
                     .map(|d| d.id.clone())
             })
     }
@@ -429,7 +433,9 @@ impl ShiplyApp {
     }
 
     pub fn is_deployment_active(&self, deployment_id: &str) -> bool {
-        self.active_deployments.values().any(|id| id == deployment_id)
+        self.active_deployments
+            .values()
+            .any(|id| id == deployment_id)
             || self.active_deployment_id.as_deref() == Some(deployment_id)
             || self
                 .storage
@@ -486,37 +492,182 @@ impl ShiplyApp {
         }
     }
 
-    /// Configures system fonts: proportional UI text (`Segoe UI`) and monospace (`Consolas`) on Windows.
-    pub(crate) fn install_system_fonts(ctx: &egui::Context) {
+    /// Configures typography fonts: bundles Inter (Regular, Medium, SemiBold) and JetBrains Mono
+    /// with system Segoe UI fallback on Windows. Supports runtime Font A/B testing via `SHIPLY_UI_FONT`.
+    pub(crate) fn install_fonts(ctx: &egui::Context) {
         #[allow(unused_mut)]
         let mut fonts = FontDefinitions::default();
 
+        let active_font = if let Ok(val) = std::env::var("SHIPLY_UI_FONT") {
+            if val.eq_ignore_ascii_case("segoeui") || val.eq_ignore_ascii_case("segoe") {
+                UiFont::SegoeUi
+            } else {
+                UiFont::Inter
+            }
+        } else {
+            UI_FONT
+        };
+
+        // 1. Embedded Inter fonts (SIL OFL)
+        fonts.font_data.insert(
+            "inter-regular".to_owned(),
+            Arc::new(FontData::from_static(include_bytes!(
+                "../../assets/fonts/Inter-Regular.ttf"
+            ))),
+        );
+        fonts.font_data.insert(
+            "inter-medium".to_owned(),
+            Arc::new(FontData::from_static(include_bytes!(
+                "../../assets/fonts/Inter-Medium.ttf"
+            ))),
+        );
+        fonts.font_data.insert(
+            "inter-semibold".to_owned(),
+            Arc::new(FontData::from_static(include_bytes!(
+                "../../assets/fonts/Inter-SemiBold.ttf"
+            ))),
+        );
+
+        // 2. Embedded JetBrains Mono fonts (SIL OFL)
+        fonts.font_data.insert(
+            "jbmono-regular".to_owned(),
+            Arc::new(FontData::from_static(include_bytes!(
+                "../../assets/fonts/JetBrainsMono-Regular.ttf"
+            ))),
+        );
+        fonts.font_data.insert(
+            "jbmono-medium".to_owned(),
+            Arc::new(FontData::from_static(include_bytes!(
+                "../../assets/fonts/JetBrainsMono-Medium.ttf"
+            ))),
+        );
+
+        // 3. System fallback on Windows (Segoe UI family + Consolas)
         #[cfg(windows)]
         {
             if let Ok(win_dir) = std::env::var("SystemRoot") {
                 let fonts_dir = PathBuf::from(win_dir).join("Fonts");
                 if let Ok(bytes) = fs::read(fonts_dir.join("segoeui.ttf")) {
-                    fonts.font_data.insert(
-                        "segoeui".to_owned(),
-                        Arc::new(FontData::from_owned(bytes)),
-                    );
-                    if let Some(prop) = fonts.families.get_mut(&FontFamily::Proportional) {
-                        prop.insert(0, "segoeui".to_owned());
-                    }
+                    fonts
+                        .font_data
+                        .insert("segoeui".to_owned(), Arc::new(FontData::from_owned(bytes)));
+                }
+                if let Ok(bytes) = fs::read(fonts_dir.join("seguisb.ttf")) {
+                    fonts
+                        .font_data
+                        .insert("seguisb".to_owned(), Arc::new(FontData::from_owned(bytes)));
+                }
+                if let Ok(bytes) = fs::read(fonts_dir.join("segoeuib.ttf")) {
+                    fonts
+                        .font_data
+                        .insert("segoeuib".to_owned(), Arc::new(FontData::from_owned(bytes)));
                 }
                 if let Ok(bytes) = fs::read(fonts_dir.join("consola.ttf")) {
-                    fonts.font_data.insert(
-                        "consola".to_owned(),
-                        Arc::new(FontData::from_owned(bytes)),
-                    );
-                    if let Some(mono) = fonts.families.get_mut(&FontFamily::Monospace) {
-                        mono.insert(0, "consola".to_owned());
-                    }
+                    fonts
+                        .font_data
+                        .insert("consola".to_owned(), Arc::new(FontData::from_owned(bytes)));
                 }
             }
         }
 
+        let fallback_prop: Vec<String> = fonts
+            .families
+            .get(&FontFamily::Proportional)
+            .cloned()
+            .unwrap_or_default();
+        let fallback_mono: Vec<String> = fonts
+            .families
+            .get(&FontFamily::Monospace)
+            .cloned()
+            .unwrap_or_default();
+
+        match active_font {
+            UiFont::Inter => {
+                let mut prop = vec!["inter-regular".to_owned()];
+                #[cfg(windows)]
+                prop.push("segoeui".to_owned());
+                prop.extend(fallback_prop.clone());
+                fonts.families.insert(FontFamily::Proportional, prop);
+
+                let mut mono = vec!["jbmono-regular".to_owned()];
+                #[cfg(windows)]
+                mono.push("consola".to_owned());
+                mono.extend(fallback_mono.clone());
+                fonts.families.insert(FontFamily::Monospace, mono);
+
+                let mut med = vec!["inter-medium".to_owned()];
+                #[cfg(windows)]
+                med.push("seguisb".to_owned());
+                med.extend(fallback_prop.clone());
+                fonts
+                    .families
+                    .insert(FontFamily::Name("medium".into()), med);
+
+                let mut sbold = vec!["inter-semibold".to_owned()];
+                #[cfg(windows)]
+                sbold.push("segoeuib".to_owned());
+                sbold.extend(fallback_prop);
+                fonts
+                    .families
+                    .insert(FontFamily::Name("semibold".into()), sbold);
+
+                let mut mono_med = vec!["jbmono-medium".to_owned()];
+                #[cfg(windows)]
+                mono_med.push("consola".to_owned());
+                mono_med.extend(fallback_mono);
+                fonts
+                    .families
+                    .insert(FontFamily::Name("mono-medium".into()), mono_med);
+            }
+            UiFont::SegoeUi => {
+                let mut prop = Vec::new();
+                #[cfg(windows)]
+                prop.push("segoeui".to_owned());
+                prop.push("inter-regular".to_owned());
+                prop.extend(fallback_prop.clone());
+                fonts.families.insert(FontFamily::Proportional, prop);
+
+                let mut mono = Vec::new();
+                #[cfg(windows)]
+                mono.push("consola".to_owned());
+                mono.push("jbmono-regular".to_owned());
+                mono.extend(fallback_mono.clone());
+                fonts.families.insert(FontFamily::Monospace, mono);
+
+                let mut med = Vec::new();
+                #[cfg(windows)]
+                med.push("seguisb".to_owned());
+                med.push("inter-medium".to_owned());
+                med.extend(fallback_prop.clone());
+                fonts
+                    .families
+                    .insert(FontFamily::Name("medium".into()), med);
+
+                let mut sbold = Vec::new();
+                #[cfg(windows)]
+                sbold.push("segoeuib".to_owned());
+                sbold.push("inter-semibold".to_owned());
+                sbold.extend(fallback_prop);
+                fonts
+                    .families
+                    .insert(FontFamily::Name("semibold".into()), sbold);
+
+                let mut mono_med = Vec::new();
+                #[cfg(windows)]
+                mono_med.push("consola".to_owned());
+                mono_med.push("jbmono-medium".to_owned());
+                mono_med.extend(fallback_mono);
+                fonts
+                    .families
+                    .insert(FontFamily::Name("mono-medium".into()), mono_med);
+            }
+        }
+
         ctx.set_fonts(fonts);
+    }
+
+    pub(crate) fn install_system_fonts(ctx: &egui::Context) {
+        Self::install_fonts(ctx);
     }
 
     pub fn mark_config_dirty(&mut self) {
@@ -626,7 +777,12 @@ impl ShiplyApp {
                     .deployments
                     .iter()
                     .find(|d| &d.project_id == proj_id && d.environment == self.selected_env_key)
-                    .or_else(|| self.storage.deployments.iter().find(|d| &d.project_id == proj_id))
+                    .or_else(|| {
+                        self.storage
+                            .deployments
+                            .iter()
+                            .find(|d| &d.project_id == proj_id)
+                    })
                     .map(|d| d.id.clone());
             }
         }
@@ -748,7 +904,8 @@ impl ShiplyApp {
                     }
                     self.active_deployments.retain(|_, id| id != &record.id);
                     if self.active_deployment_id.as_deref() == Some(&record.id) {
-                        self.active_deployment_id = self.active_deployments.values().next().cloned();
+                        self.active_deployment_id =
+                            self.active_deployments.values().next().cloned();
                     }
                     self.storage.upsert_deployment(record);
                     if is_current {
@@ -1001,12 +1158,8 @@ impl ShiplyApp {
         }
 
         // Clean up any deleted project IDs from selection
-        let valid_ids: HashSet<String> = self
-            .storage
-            .projects
-            .iter()
-            .map(|p| p.id.clone())
-            .collect();
+        let valid_ids: HashSet<String> =
+            self.storage.projects.iter().map(|p| p.id.clone()).collect();
         self.bulk_selected_projects
             .retain(|id| valid_ids.contains(id));
 
@@ -1130,7 +1283,11 @@ impl ShiplyApp {
         }
     }
 
-    pub(crate) fn trigger_redeploy_from_record(&mut self, record: &DeploymentRecord, is_rollback: bool) {
+    pub(crate) fn trigger_redeploy_from_record(
+        &mut self,
+        record: &DeploymentRecord,
+        is_rollback: bool,
+    ) {
         let Some(proj) = self
             .storage
             .projects
@@ -1221,6 +1378,7 @@ impl ShiplyApp {
     }
 
     pub fn configure_workspace_theme(ctx: &egui::Context, dark: bool) {
+        Self::install_fonts(ctx);
         let theme = if dark { Theme::dark() } else { Theme::light() };
         let mut style = (*ctx.style()).clone();
         style.spacing.item_spacing = Vec2::new(10.0, 8.0);
@@ -1230,28 +1388,13 @@ impl ShiplyApp {
         style.spacing.scroll.bar_inner_margin = 4.0;
         style.spacing.scroll.bar_width = 8.0;
 
-        // Structured Typography Hierarchy
+        // Structured Typography Hierarchy (Brief 002 Section 2.2)
         let mut text_styles = BTreeMap::new();
-        text_styles.insert(
-            TextStyle::Heading,
-            FontId::new(FS_TITLE, FontFamily::Proportional),
-        );
-        text_styles.insert(
-            TextStyle::Body,
-            FontId::new(FS_BASE, FontFamily::Proportional),
-        );
-        text_styles.insert(
-            TextStyle::Button,
-            FontId::new(FS_BASE, FontFamily::Proportional),
-        );
-        text_styles.insert(
-            TextStyle::Small,
-            FontId::new(FS_SMALL, FontFamily::Proportional),
-        );
-        text_styles.insert(
-            TextStyle::Monospace,
-            FontId::new(FS_BASE, FontFamily::Monospace),
-        );
+        text_styles.insert(TextStyle::Heading, Typo::H2.font());
+        text_styles.insert(TextStyle::Body, Typo::Body.font());
+        text_styles.insert(TextStyle::Button, Typo::Label.font());
+        text_styles.insert(TextStyle::Small, Typo::Small.font());
+        text_styles.insert(TextStyle::Monospace, Typo::Code.font());
         style.text_styles = text_styles;
 
         let mut visuals = if dark {
@@ -1336,14 +1479,33 @@ impl eframe::App for ShiplyApp {
             self.window_maximized = m;
         }
 
+        #[cfg(debug_assertions)]
+        if !self.dpi_diagnostics_logged {
+            let ppp = ctx.pixels_per_point();
+            let native_ppp = ctx
+                .input(|i| i.viewport().native_pixels_per_point)
+                .unwrap_or(ppp);
+            let zoom = ctx.zoom_factor();
+            let screen_rect = ctx.screen_rect();
+            let phys_w = screen_rect.width() * ppp;
+            let phys_h = screen_rect.height() * ppp;
+            eprintln!(
+                "[DPI Diagnostics] pixels_per_point: {:.2}, native_pixels_per_point: {:.2}, zoom_factor: {:.2}, inner_size: [{:.1}, {:.1}] pt ([{:.0}, {:.0}] px)",
+                ppp, native_ppp, zoom, screen_rect.width(), screen_rect.height(), phys_w, phys_h
+            );
+            self.dpi_diagnostics_logged = true;
+        }
+
         self.render_termius_topbar(ctx);
         let screen_width = ctx.screen_rect().width();
         let is_narrow = screen_width < 760.0;
 
         if !is_narrow {
             self.sidebar_drawer_open = false;
-            let sidebar_anim_t =
-                ctx.animate_bool(egui::Id::new("sidebar_smooth_anim"), !self.sidebar_collapsed);
+            let sidebar_anim_t = ctx.animate_bool(
+                egui::Id::new("sidebar_smooth_anim"),
+                !self.sidebar_collapsed,
+            );
             self.render_sidebar(
                 ctx,
                 if self.sidebar_collapsed {
@@ -1364,73 +1526,35 @@ impl eframe::App for ShiplyApp {
         self.render_delete_confirmation_modal(ctx);
         self.render_window_resize_handles(ctx);
 
-        let theme = self.theme();
         egui::CentralPanel::default()
-            .frame(
-                egui::Frame::new()
-                    .fill(theme.bg)
-                    .inner_margin(Margin::ZERO),
-            )
+            .frame(egui::Frame::new().fill(CANVAS_BG).inner_margin(Margin::ZERO))
             .show(ctx, |ui| {
-                // Background linear gradient: linear-gradient(180deg, #FFFFFF 0%, #F5F7FF 100%)
-                let c_rect = ui.max_rect();
-                let mut mesh = egui::Mesh::default();
-                mesh.vertices.push(egui::epaint::Vertex {
-                    pos: c_rect.left_top(),
-                    uv: Pos2::ZERO,
-                    color: theme.bg_gradient_top,
-                });
-                mesh.vertices.push(egui::epaint::Vertex {
-                    pos: c_rect.right_top(),
-                    uv: Pos2::ZERO,
-                    color: theme.bg_gradient_top,
-                });
-                mesh.vertices.push(egui::epaint::Vertex {
-                    pos: c_rect.right_bottom(),
-                    uv: Pos2::ZERO,
-                    color: theme.bg_gradient_bottom,
-                });
-                mesh.vertices.push(egui::epaint::Vertex {
-                    pos: c_rect.left_bottom(),
-                    uv: Pos2::ZERO,
-                    color: theme.bg_gradient_bottom,
-                });
-                mesh.indices.extend_from_slice(&[0, 1, 2, 0, 2, 3]);
-                ui.painter().add(egui::Shape::mesh(mesh));
-
                 ScrollArea::vertical()
                     .id_salt("main_workspace_vertical_scroll")
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
                         let avail_w = ui.available_width();
-                        let page_pad = (avail_w * 0.025).clamp(12.0, 28.0);
-                        let pad_i = page_pad as i8;
+                        let h_pad = 32.0_f32;
+                        let col_w = (avail_w - h_pad * 2.0).clamp(280.0, MAX_CONTENT_WIDTH);
+                        let left_offset = ((avail_w - col_w) / 2.0).max(h_pad);
 
-                        egui::Frame::new()
-                            .inner_margin(Margin::symmetric(pad_i, pad_i))
-                            .show(ui, |ui| {
-                                ui.set_width((avail_w - page_pad * 2.0).max(280.0));
+                        ui.add_space(SP_24);
+                        ui.horizontal(|ui| {
+                            ui.add_space(left_offset);
+                            ui.vertical(|ui| {
+                                ui.set_width(col_w);
                                 if let Some((msg, is_ok)) = &self.status_banner.clone() {
                                     let (bg, fg, border) = if *is_ok {
-                                        (
-                                            SUCCESS_PILL_BG,
-                                            SUCCESS_PILL_TEXT,
-                                            Color32::from_rgb(74, 222, 128),
-                                        )
+                                        (SUCCESS_PILL_BG, SUCCESS_PILL_TEXT, SUCCESS)
                                     } else {
-                                        (
-                                            FAIL_PILL_BG,
-                                            FAIL_PILL_TEXT,
-                                            Color32::from_rgb(248, 113, 113),
-                                        )
+                                        (FAIL_PILL_BG, FAIL_PILL_TEXT, DANGER)
                                     };
                                     let banner_w = ui.available_width();
                                     let (b_rect, b_resp) = ui.allocate_exact_size(
                                         Vec2::new(banner_w, 40.0),
                                         Sense::hover(),
                                     );
-                                    ui.painter()
-                                        .rect_filled(b_rect, CornerRadius::same(8), bg);
+                                    ui.painter().rect_filled(b_rect, CornerRadius::same(8), bg);
                                     ui.painter().rect_stroke(
                                         b_rect,
                                         CornerRadius::same(8),
@@ -1445,7 +1569,8 @@ impl eframe::App for ShiplyApp {
                                     let text_clip = Rect::from_min_max(
                                         Pos2::new(b_rect.left() + 10.0, b_rect.top()),
                                         Pos2::new(
-                                            (b_rect.right() - right_reserve).max(b_rect.left() + 40.0),
+                                            (b_rect.right() - right_reserve)
+                                                .max(b_rect.left() + 40.0),
                                             b_rect.bottom(),
                                         ),
                                     );
@@ -1453,7 +1578,7 @@ impl eframe::App for ShiplyApp {
                                         Pos2::new(b_rect.left() + 14.0, b_rect.center().y),
                                         Align2::LEFT_CENTER,
                                         msg,
-                                        FontId::proportional(FONT_MD),
+                                        Typo::Body.font(),
                                         fg,
                                     );
                                     b_resp.on_hover_text(msg);
@@ -1461,34 +1586,37 @@ impl eframe::App for ShiplyApp {
                                         Pos2::new(b_rect.right() - 36.0, b_rect.center().y),
                                         Vec2::new(48.0, 24.0),
                                     );
-                                    let close_resp = ui.interact(
-                                        close_rect,
-                                        egui::Id::new("close_status_banner"),
-                                        Sense::click(),
-                                    )
-                                    .on_hover_cursor(egui::CursorIcon::PointingHand);
+                                    let close_resp = ui
+                                        .interact(
+                                            close_rect,
+                                            egui::Id::new("close_status_banner"),
+                                            Sense::click(),
+                                        )
+                                        .on_hover_cursor(egui::CursorIcon::PointingHand);
                                     ui.painter().text(
                                         close_rect.center(),
                                         Align2::CENTER_CENTER,
                                         "Close",
-                                        FontId::proportional(FONT_SM),
+                                        Typo::SmallMedium.font(),
                                         fg,
                                     );
                                     if close_resp.clicked() {
                                         self.status_banner = None;
                                     }
 
-                                    if let Some((_, exe_path)) = self.pending_update_restart.clone() {
+                                    if let Some((_, exe_path)) = self.pending_update_restart.clone()
+                                    {
                                         let restart_rect = Rect::from_center_size(
                                             Pos2::new(b_rect.right() - 118.0, b_rect.center().y),
                                             Vec2::new(96.0, 24.0),
                                         );
-                                        let restart_resp = ui.interact(
-                                            restart_rect,
-                                            egui::Id::new("banner_restart_now_btn"),
-                                            Sense::click(),
-                                        )
-                                        .on_hover_cursor(egui::CursorIcon::PointingHand);
+                                        let restart_resp = ui
+                                            .interact(
+                                                restart_rect,
+                                                egui::Id::new("banner_restart_now_btn"),
+                                                Sense::click(),
+                                            )
+                                            .on_hover_cursor(egui::CursorIcon::PointingHand);
                                         ui.painter().rect_filled(
                                             restart_rect,
                                             CornerRadius::same(5),
@@ -1498,7 +1626,7 @@ impl eframe::App for ShiplyApp {
                                             restart_rect.center(),
                                             Align2::CENTER_CENTER,
                                             "Restart Now",
-                                            FontId::proportional(FONT_SM),
+                                            Typo::SmallMedium.font(),
                                             Color32::WHITE,
                                         );
                                         if restart_resp.clicked() {
@@ -1530,6 +1658,8 @@ impl eframe::App for ShiplyApp {
                                     }
                                 }
                             });
+                        });
+                        ui.add_space(SP_32);
                     });
             });
 

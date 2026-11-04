@@ -1,25 +1,29 @@
-pub mod theme;
-pub mod types;
-pub mod icons;
-pub mod helpers;
-pub mod components;
-pub mod modals;
-pub mod topbar;
-pub mod sidebar;
-pub mod views;
 pub mod app;
+pub mod components;
+pub mod helpers;
+pub mod icons;
+pub mod kit;
+pub mod modals;
+pub mod sidebar;
+pub mod theme;
+pub mod topbar;
+pub mod types;
+pub mod typography;
+pub mod views;
 
 #[cfg(test)]
 mod tests;
 
 pub use app::ShiplyApp;
-pub use theme::*;
-pub use types::*;
-pub(crate) use icons::*;
-pub(crate) use helpers::*;
 pub(crate) use components::*;
+pub(crate) use helpers::*;
+pub(crate) use icons::*;
+pub use kit::*;
 #[cfg(test)]
 pub(crate) use modals::*;
+pub use theme::*;
+pub use types::*;
+pub use typography::*;
 
 // Common imports used across UI submodules
 use crate::credentials::{

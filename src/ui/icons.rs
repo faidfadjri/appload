@@ -13,21 +13,33 @@ pub(crate) fn draw_icon_bell(painter: &egui::Painter, c: Pos2, color: Color32) {
         s,
     );
     painter.line_segment(
-        [Pos2::new(c.x - 3.5, c.y - 3.5), Pos2::new(c.x - 4.8, c.y + 2.5)],
+        [
+            Pos2::new(c.x - 3.5, c.y - 3.5),
+            Pos2::new(c.x - 4.8, c.y + 2.5),
+        ],
         s,
     );
     painter.line_segment(
-        [Pos2::new(c.x + 3.5, c.y - 3.5), Pos2::new(c.x + 4.8, c.y + 2.5)],
+        [
+            Pos2::new(c.x + 3.5, c.y - 3.5),
+            Pos2::new(c.x + 4.8, c.y + 2.5),
+        ],
         s,
     );
     // Base rim
     painter.line_segment(
-        [Pos2::new(c.x - 5.5, c.y + 2.5), Pos2::new(c.x + 5.5, c.y + 2.5)],
+        [
+            Pos2::new(c.x - 5.5, c.y + 2.5),
+            Pos2::new(c.x + 5.5, c.y + 2.5),
+        ],
         s,
     );
     // Clapper at bottom
     painter.line_segment(
-        [Pos2::new(c.x - 1.5, c.y + 4.5), Pos2::new(c.x + 1.5, c.y + 4.5)],
+        [
+            Pos2::new(c.x - 1.5, c.y + 4.5),
+            Pos2::new(c.x + 1.5, c.y + 4.5),
+        ],
         s,
     );
 }
@@ -60,13 +72,25 @@ pub(crate) fn draw_window_max_restore_icon(
 // Vector Icon Painters
 pub(crate) fn draw_icon_layers(painter: &egui::Painter, c: Pos2, color: Color32) {
     let s = Stroke::new(1.75_f32, color);
-    painter.line_segment([Pos2::new(c.x - 6.0, c.y - 3.0), Pos2::new(c.x, c.y - 6.0)], s);
-    painter.line_segment([Pos2::new(c.x, c.y - 6.0), Pos2::new(c.x + 6.0, c.y - 3.0)], s);
+    painter.line_segment(
+        [Pos2::new(c.x - 6.0, c.y - 3.0), Pos2::new(c.x, c.y - 6.0)],
+        s,
+    );
+    painter.line_segment(
+        [Pos2::new(c.x, c.y - 6.0), Pos2::new(c.x + 6.0, c.y - 3.0)],
+        s,
+    );
     painter.line_segment([Pos2::new(c.x + 6.0, c.y - 3.0), Pos2::new(c.x, c.y)], s);
     painter.line_segment([Pos2::new(c.x, c.y), Pos2::new(c.x - 6.0, c.y - 3.0)], s);
 
-    painter.line_segment([Pos2::new(c.x - 6.0, c.y + 1.0), Pos2::new(c.x, c.y + 4.0)], s);
-    painter.line_segment([Pos2::new(c.x, c.y + 4.0), Pos2::new(c.x + 6.0, c.y + 1.0)], s);
+    painter.line_segment(
+        [Pos2::new(c.x - 6.0, c.y + 1.0), Pos2::new(c.x, c.y + 4.0)],
+        s,
+    );
+    painter.line_segment(
+        [Pos2::new(c.x, c.y + 4.0), Pos2::new(c.x + 6.0, c.y + 1.0)],
+        s,
+    );
 }
 
 pub(crate) fn draw_icon_git_branch(painter: &egui::Painter, c: Pos2, color: Color32) {
@@ -75,11 +99,17 @@ pub(crate) fn draw_icon_git_branch(painter: &egui::Painter, c: Pos2, color: Colo
     painter.circle_stroke(Pos2::new(c.x - 3.0, c.y + 4.0), 2.0, s);
     painter.circle_stroke(Pos2::new(c.x + 3.5, c.y - 1.5), 2.0, s);
     painter.line_segment(
-        [Pos2::new(c.x - 3.0, c.y - 2.0), Pos2::new(c.x - 3.0, c.y + 2.0)],
+        [
+            Pos2::new(c.x - 3.0, c.y - 2.0),
+            Pos2::new(c.x - 3.0, c.y + 2.0),
+        ],
         s,
     );
     painter.line_segment(
-        [Pos2::new(c.x - 3.0, c.y + 1.0), Pos2::new(c.x + 3.5, c.y + 0.5)],
+        [
+            Pos2::new(c.x - 3.0, c.y + 1.0),
+            Pos2::new(c.x + 3.5, c.y + 0.5),
+        ],
         s,
     );
 }
@@ -105,7 +135,12 @@ pub(crate) fn draw_icon_folder(painter: &egui::Painter, c: Pos2, color: Color32)
     );
 }
 
-pub(crate) fn draw_icon_refresh_rotated(painter: &egui::Painter, c: Pos2, color: Color32, angle: f32) {
+pub(crate) fn draw_icon_refresh_rotated(
+    painter: &egui::Painter,
+    c: Pos2,
+    color: Color32,
+    angle: f32,
+) {
     let s = Stroke::new(1.75_f32, color);
     let rot = |p: Pos2| -> Pos2 {
         if angle.abs() < 1e-4 {
@@ -192,11 +227,17 @@ pub(crate) fn draw_icon_chevron(painter: &egui::Painter, c: Pos2, expanded: bool
 pub(crate) fn draw_icon_check(painter: &egui::Painter, c: Pos2, color: Color32) {
     let s = Stroke::new(1.75_f32, color);
     painter.line_segment(
-        [Pos2::new(c.x - 4.0, c.y + 0.5), Pos2::new(c.x - 1.0, c.y + 3.5)],
+        [
+            Pos2::new(c.x - 4.0, c.y + 0.5),
+            Pos2::new(c.x - 1.0, c.y + 3.5),
+        ],
         s,
     );
     painter.line_segment(
-        [Pos2::new(c.x - 1.0, c.y + 3.5), Pos2::new(c.x + 4.5, c.y - 3.0)],
+        [
+            Pos2::new(c.x - 1.0, c.y + 3.5),
+            Pos2::new(c.x + 4.5, c.y - 3.0),
+        ],
         s,
     );
 }
@@ -222,7 +263,7 @@ pub(crate) fn draw_shiply_logo(
         painter.rect_stroke(
             rect,
             CornerRadius::same(corner_radius),
-            Stroke::new(1.0_f32, Color32::from_rgb(96, 165, 250)),
+            Stroke::new(1.0_f32, SB_ACCENT),
             StrokeKind::Inside,
         );
         painter.text(
@@ -236,6 +277,7 @@ pub(crate) fn draw_shiply_logo(
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 pub(crate) enum OutlineIcon {
     Trash,
     Refresh,
@@ -255,6 +297,18 @@ pub(crate) enum OutlineIcon {
     MoreHorizontal,
     Search,
     Heart,
+    Plus,
+    Info,
+    Eye,
+    EyeOff,
+    Lock,
+    GitCommit,
+    Clock,
+    Play,
+    Terminal,
+    Settings,
+    Server,
+    Shield,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -273,7 +327,7 @@ pub(crate) fn outline_icon_button(
     let (width, galley_opt) = if let Some(text) = label {
         let g = ui
             .painter()
-            .layout_no_wrap(text.to_string(), FontId::proportional(FONT_SM), fg);
+            .layout_no_wrap(text.to_string(), Typo::SmallMedium.font(), fg);
         let w = 10.0 + 14.0 + 6.0 + g.size().x + 12.0;
         (w, Some(g))
     } else {
@@ -305,8 +359,7 @@ pub(crate) fn outline_icon_button(
         border
     };
 
-    ui.painter()
-        .rect_filled(rect, CornerRadius::same(6), fill);
+    ui.painter().rect_filled(rect, CornerRadius::same(6), fill);
     ui.painter().rect_stroke(
         rect,
         CornerRadius::same(6),
@@ -318,10 +371,7 @@ pub(crate) fn outline_icon_button(
         let icon_center = Pos2::new(rect.left() + 16.0, rect.center().y);
         draw_outline_icon(ui.painter(), icon_center, icon, fg);
         ui.painter().galley(
-            Pos2::new(
-                rect.left() + 28.0,
-                rect.center().y - galley.size().y / 2.0,
-            ),
+            Pos2::new(rect.left() + 28.0, rect.center().y - galley.size().y / 2.0),
             galley,
             fg,
         );
@@ -332,48 +382,80 @@ pub(crate) fn outline_icon_button(
     resp
 }
 
-pub(crate) fn draw_outline_icon(painter: &egui::Painter, c: Pos2, icon: OutlineIcon, color: Color32) {
+pub(crate) fn draw_outline_icon(
+    painter: &egui::Painter,
+    c: Pos2,
+    icon: OutlineIcon,
+    color: Color32,
+) {
     let s = Stroke::new(1.75_f32, color);
     match icon {
         OutlineIcon::Trash => {
             // Lid horizontal line
             painter.line_segment(
-                [Pos2::new(c.x - 6.0, c.y - 3.5), Pos2::new(c.x + 6.0, c.y - 3.5)],
+                [
+                    Pos2::new(c.x - 6.0, c.y - 3.5),
+                    Pos2::new(c.x + 6.0, c.y - 3.5),
+                ],
                 s,
             );
             // Lid handle
             painter.line_segment(
-                [Pos2::new(c.x - 2.0, c.y - 3.5), Pos2::new(c.x - 2.0, c.y - 5.5)],
+                [
+                    Pos2::new(c.x - 2.0, c.y - 3.5),
+                    Pos2::new(c.x - 2.0, c.y - 5.5),
+                ],
                 s,
             );
             painter.line_segment(
-                [Pos2::new(c.x - 2.0, c.y - 5.5), Pos2::new(c.x + 2.0, c.y - 5.5)],
+                [
+                    Pos2::new(c.x - 2.0, c.y - 5.5),
+                    Pos2::new(c.x + 2.0, c.y - 5.5),
+                ],
                 s,
             );
             painter.line_segment(
-                [Pos2::new(c.x + 2.0, c.y - 5.5), Pos2::new(c.x + 2.0, c.y - 3.5)],
+                [
+                    Pos2::new(c.x + 2.0, c.y - 5.5),
+                    Pos2::new(c.x + 2.0, c.y - 3.5),
+                ],
                 s,
             );
             // Trash bin body
             painter.line_segment(
-                [Pos2::new(c.x - 4.5, c.y - 3.5), Pos2::new(c.x - 3.8, c.y + 6.0)],
+                [
+                    Pos2::new(c.x - 4.5, c.y - 3.5),
+                    Pos2::new(c.x - 3.8, c.y + 6.0),
+                ],
                 s,
             );
             painter.line_segment(
-                [Pos2::new(c.x - 3.8, c.y + 6.0), Pos2::new(c.x + 3.8, c.y + 6.0)],
+                [
+                    Pos2::new(c.x - 3.8, c.y + 6.0),
+                    Pos2::new(c.x + 3.8, c.y + 6.0),
+                ],
                 s,
             );
             painter.line_segment(
-                [Pos2::new(c.x + 3.8, c.y + 6.0), Pos2::new(c.x + 4.5, c.y - 3.5)],
+                [
+                    Pos2::new(c.x + 3.8, c.y + 6.0),
+                    Pos2::new(c.x + 4.5, c.y - 3.5),
+                ],
                 s,
             );
             // Inner vertical lines
             painter.line_segment(
-                [Pos2::new(c.x - 1.5, c.y - 1.0), Pos2::new(c.x - 1.5, c.y + 3.5)],
+                [
+                    Pos2::new(c.x - 1.5, c.y - 1.0),
+                    Pos2::new(c.x - 1.5, c.y + 3.5),
+                ],
                 s,
             );
             painter.line_segment(
-                [Pos2::new(c.x + 1.5, c.y - 1.0), Pos2::new(c.x + 1.5, c.y + 3.5)],
+                [
+                    Pos2::new(c.x + 1.5, c.y - 1.0),
+                    Pos2::new(c.x + 1.5, c.y + 3.5),
+                ],
                 s,
             );
         }
@@ -388,10 +470,7 @@ pub(crate) fn draw_outline_icon(painter: &egui::Painter, c: Pos2, icon: OutlineI
             draw_icon_heart(painter, c, color);
         }
         OutlineIcon::ArrowUp => {
-            painter.line_segment(
-                [Pos2::new(c.x, c.y + 5.5), Pos2::new(c.x, c.y - 5.0)],
-                s,
-            );
+            painter.line_segment([Pos2::new(c.x, c.y + 5.5), Pos2::new(c.x, c.y - 5.0)], s);
             painter.line_segment(
                 [Pos2::new(c.x - 4.0, c.y - 1.0), Pos2::new(c.x, c.y - 5.0)],
                 s,
@@ -402,10 +481,7 @@ pub(crate) fn draw_outline_icon(painter: &egui::Painter, c: Pos2, icon: OutlineI
             );
         }
         OutlineIcon::ArrowDown => {
-            painter.line_segment(
-                [Pos2::new(c.x, c.y - 5.5), Pos2::new(c.x, c.y + 5.0)],
-                s,
-            );
+            painter.line_segment([Pos2::new(c.x, c.y - 5.5), Pos2::new(c.x, c.y + 5.0)], s);
             painter.line_segment(
                 [Pos2::new(c.x - 4.0, c.y + 1.0), Pos2::new(c.x, c.y + 5.0)],
                 s,
@@ -431,20 +507,23 @@ pub(crate) fn draw_outline_icon(painter: &egui::Painter, c: Pos2, icon: OutlineI
         OutlineIcon::RotateCcw => {
             painter.circle_stroke(c, 4.8, s);
             painter.line_segment(
-                [Pos2::new(c.x - 2.5, c.y - 5.0), Pos2::new(c.x - 5.5, c.y - 4.5)],
+                [
+                    Pos2::new(c.x - 2.5, c.y - 5.0),
+                    Pos2::new(c.x - 5.5, c.y - 4.5),
+                ],
                 s,
             );
             painter.line_segment(
-                [Pos2::new(c.x - 5.5, c.y - 4.5), Pos2::new(c.x - 4.5, c.y - 1.5)],
+                [
+                    Pos2::new(c.x - 5.5, c.y - 4.5),
+                    Pos2::new(c.x - 4.5, c.y - 1.5),
+                ],
                 s,
             );
         }
         OutlineIcon::Key => {
             painter.circle_stroke(Pos2::new(c.x - 2.5, c.y), 2.8, s);
-            painter.line_segment(
-                [Pos2::new(c.x + 0.3, c.y), Pos2::new(c.x + 5.8, c.y)],
-                s,
-            );
+            painter.line_segment([Pos2::new(c.x + 0.3, c.y), Pos2::new(c.x + 5.8, c.y)], s);
             painter.line_segment(
                 [Pos2::new(c.x + 3.4, c.y), Pos2::new(c.x + 3.4, c.y + 2.6)],
                 s,
@@ -472,11 +551,17 @@ pub(crate) fn draw_outline_icon(painter: &egui::Painter, c: Pos2, icon: OutlineI
             );
             // Back rectangle top and right lines
             painter.line_segment(
-                [Pos2::new(c.x - 1.5, c.y - 5.0), Pos2::new(c.x + 5.5, c.y - 5.0)],
+                [
+                    Pos2::new(c.x - 1.5, c.y - 5.0),
+                    Pos2::new(c.x + 5.5, c.y - 5.0),
+                ],
                 s,
             );
             painter.line_segment(
-                [Pos2::new(c.x + 5.5, c.y - 5.0), Pos2::new(c.x + 5.5, c.y + 3.0)],
+                [
+                    Pos2::new(c.x + 5.5, c.y - 5.0),
+                    Pos2::new(c.x + 5.5, c.y + 3.0),
+                ],
                 s,
             );
         }
@@ -484,39 +569,81 @@ pub(crate) fn draw_outline_icon(painter: &egui::Painter, c: Pos2, icon: OutlineI
             let r = Rect::from_center_size(Pos2::new(c.x, c.y + 1.0), Vec2::new(12.0, 8.0));
             painter.rect_stroke(r, CornerRadius::same(1), s, StrokeKind::Inside);
             painter.line_segment(
-                [Pos2::new(r.left(), r.top() - 2.0), Pos2::new(r.left() + 4.5, r.top() - 2.0)],
+                [
+                    Pos2::new(r.left(), r.top() - 2.0),
+                    Pos2::new(r.left() + 4.5, r.top() - 2.0),
+                ],
                 s,
             );
             painter.line_segment(
-                [Pos2::new(r.left() + 4.5, r.top() - 2.0), Pos2::new(r.left() + 6.0, r.top())],
+                [
+                    Pos2::new(r.left() + 4.5, r.top() - 2.0),
+                    Pos2::new(r.left() + 6.0, r.top()),
+                ],
                 s,
             );
         }
         OutlineIcon::ChevronRight => {
-            painter.line_segment([Pos2::new(c.x - 2.0, c.y - 4.0), Pos2::new(c.x + 2.5, c.y)], s);
-            painter.line_segment([Pos2::new(c.x + 2.5, c.y), Pos2::new(c.x - 2.0, c.y + 4.0)], s);
-        }
-        OutlineIcon::ChevronDown => {
-            painter.line_segment([Pos2::new(c.x - 4.0, c.y - 2.0), Pos2::new(c.x, c.y + 2.5)], s);
-            painter.line_segment([Pos2::new(c.x, c.y + 2.5), Pos2::new(c.x + 4.0, c.y - 2.0)], s);
-        }
-        OutlineIcon::ChevronUp => {
-            painter.line_segment([Pos2::new(c.x - 4.0, c.y + 2.0), Pos2::new(c.x, c.y - 2.5)], s);
-            painter.line_segment([Pos2::new(c.x, c.y - 2.5), Pos2::new(c.x + 4.0, c.y + 2.0)], s);
-        }
-        OutlineIcon::Check => {
             painter.line_segment(
-                [Pos2::new(c.x - 4.5, c.y + 0.5), Pos2::new(c.x - 1.0, c.y + 4.0)],
+                [Pos2::new(c.x - 2.0, c.y - 4.0), Pos2::new(c.x + 2.5, c.y)],
                 s,
             );
             painter.line_segment(
-                [Pos2::new(c.x - 1.0, c.y + 4.0), Pos2::new(c.x + 5.0, c.y - 3.5)],
+                [Pos2::new(c.x + 2.5, c.y), Pos2::new(c.x - 2.0, c.y + 4.0)],
+                s,
+            );
+        }
+        OutlineIcon::ChevronDown => {
+            painter.line_segment(
+                [Pos2::new(c.x - 4.0, c.y - 2.0), Pos2::new(c.x, c.y + 2.5)],
+                s,
+            );
+            painter.line_segment(
+                [Pos2::new(c.x, c.y + 2.5), Pos2::new(c.x + 4.0, c.y - 2.0)],
+                s,
+            );
+        }
+        OutlineIcon::ChevronUp => {
+            painter.line_segment(
+                [Pos2::new(c.x - 4.0, c.y + 2.0), Pos2::new(c.x, c.y - 2.5)],
+                s,
+            );
+            painter.line_segment(
+                [Pos2::new(c.x, c.y - 2.5), Pos2::new(c.x + 4.0, c.y + 2.0)],
+                s,
+            );
+        }
+        OutlineIcon::Check => {
+            painter.line_segment(
+                [
+                    Pos2::new(c.x - 4.5, c.y + 0.5),
+                    Pos2::new(c.x - 1.0, c.y + 4.0),
+                ],
+                s,
+            );
+            painter.line_segment(
+                [
+                    Pos2::new(c.x - 1.0, c.y + 4.0),
+                    Pos2::new(c.x + 5.0, c.y - 3.5),
+                ],
                 s,
             );
         }
         OutlineIcon::X => {
-            painter.line_segment([Pos2::new(c.x - 4.0, c.y - 4.0), Pos2::new(c.x + 4.0, c.y + 4.0)], s);
-            painter.line_segment([Pos2::new(c.x + 4.0, c.y - 4.0), Pos2::new(c.x - 4.0, c.y + 4.0)], s);
+            painter.line_segment(
+                [
+                    Pos2::new(c.x - 4.0, c.y - 4.0),
+                    Pos2::new(c.x + 4.0, c.y + 4.0),
+                ],
+                s,
+            );
+            painter.line_segment(
+                [
+                    Pos2::new(c.x + 4.0, c.y - 4.0),
+                    Pos2::new(c.x - 4.0, c.y + 4.0),
+                ],
+                s,
+            );
         }
         OutlineIcon::MoreHorizontal => {
             let r = 1.6_f32;
@@ -535,6 +662,154 @@ pub(crate) fn draw_outline_icon(painter: &egui::Painter, c: Pos2, icon: OutlineI
                 s,
             );
         }
+        OutlineIcon::Plus => {
+            painter.line_segment([Pos2::new(c.x - 4.5, c.y), Pos2::new(c.x + 4.5, c.y)], s);
+            painter.line_segment([Pos2::new(c.x, c.y - 4.5), Pos2::new(c.x, c.y + 4.5)], s);
+        }
+        OutlineIcon::Info => {
+            painter.circle_stroke(c, 5.5, s);
+            painter.circle_filled(Pos2::new(c.x, c.y - 2.5), 1.0, color);
+            painter.line_segment([Pos2::new(c.x, c.y - 0.5), Pos2::new(c.x, c.y + 3.0)], s);
+        }
+        OutlineIcon::Eye => {
+            painter.line_segment([Pos2::new(c.x - 5.5, c.y), Pos2::new(c.x, c.y - 3.2)], s);
+            painter.line_segment([Pos2::new(c.x, c.y - 3.2), Pos2::new(c.x + 5.5, c.y)], s);
+            painter.line_segment([Pos2::new(c.x - 5.5, c.y), Pos2::new(c.x, c.y + 3.2)], s);
+            painter.line_segment([Pos2::new(c.x, c.y + 3.2), Pos2::new(c.x + 5.5, c.y)], s);
+            painter.circle_stroke(c, 1.8, s);
+        }
+        OutlineIcon::EyeOff => {
+            painter.line_segment([Pos2::new(c.x - 5.5, c.y), Pos2::new(c.x, c.y - 3.2)], s);
+            painter.line_segment([Pos2::new(c.x, c.y - 3.2), Pos2::new(c.x + 5.5, c.y)], s);
+            painter.line_segment([Pos2::new(c.x - 5.5, c.y), Pos2::new(c.x, c.y + 3.2)], s);
+            painter.line_segment([Pos2::new(c.x, c.y + 3.2), Pos2::new(c.x + 5.5, c.y)], s);
+            painter.circle_stroke(c, 1.8, s);
+            painter.line_segment(
+                [
+                    Pos2::new(c.x - 5.5, c.y - 5.0),
+                    Pos2::new(c.x + 5.5, c.y + 5.0),
+                ],
+                s,
+            );
+        }
+        OutlineIcon::Lock => {
+            painter.line_segment(
+                [
+                    Pos2::new(c.x - 3.0, c.y - 1.0),
+                    Pos2::new(c.x - 3.0, c.y - 4.0),
+                ],
+                s,
+            );
+            painter.line_segment(
+                [
+                    Pos2::new(c.x - 3.0, c.y - 4.0),
+                    Pos2::new(c.x + 3.0, c.y - 4.0),
+                ],
+                s,
+            );
+            painter.line_segment(
+                [
+                    Pos2::new(c.x + 3.0, c.y - 4.0),
+                    Pos2::new(c.x + 3.0, c.y - 1.0),
+                ],
+                s,
+            );
+            painter.rect_stroke(
+                Rect::from_center_size(Pos2::new(c.x, c.y + 2.5), Vec2::new(10.0, 7.0)),
+                CornerRadius::same(1),
+                s,
+                StrokeKind::Inside,
+            );
+            painter.line_segment([Pos2::new(c.x, c.y + 1.5), Pos2::new(c.x, c.y + 3.5)], s);
+        }
+        OutlineIcon::GitCommit => {
+            painter.circle_stroke(c, 3.2, s);
+            painter.line_segment([Pos2::new(c.x - 6.0, c.y), Pos2::new(c.x - 3.2, c.y)], s);
+            painter.line_segment([Pos2::new(c.x + 3.2, c.y), Pos2::new(c.x + 6.0, c.y)], s);
+        }
+        OutlineIcon::Clock => {
+            painter.circle_stroke(c, 5.5, s);
+            painter.line_segment([c, Pos2::new(c.x, c.y - 3.0)], s);
+            painter.line_segment([c, Pos2::new(c.x + 2.5, c.y)], s);
+        }
+        OutlineIcon::Play => {
+            painter.line_segment(
+                [Pos2::new(c.x - 3.5, c.y - 4.5), Pos2::new(c.x + 4.5, c.y)],
+                s,
+            );
+            painter.line_segment(
+                [Pos2::new(c.x + 4.5, c.y), Pos2::new(c.x - 3.5, c.y + 4.5)],
+                s,
+            );
+            painter.line_segment(
+                [
+                    Pos2::new(c.x - 3.5, c.y + 4.5),
+                    Pos2::new(c.x - 3.5, c.y - 4.5),
+                ],
+                s,
+            );
+        }
+        OutlineIcon::Terminal => {
+            painter.line_segment(
+                [
+                    Pos2::new(c.x - 4.5, c.y - 3.5),
+                    Pos2::new(c.x - 1.5, c.y - 0.5),
+                ],
+                s,
+            );
+            painter.line_segment(
+                [
+                    Pos2::new(c.x - 1.5, c.y - 0.5),
+                    Pos2::new(c.x - 4.5, c.y + 2.5),
+                ],
+                s,
+            );
+            painter.line_segment(
+                [
+                    Pos2::new(c.x + 0.5, c.y + 3.5),
+                    Pos2::new(c.x + 4.5, c.y + 3.5),
+                ],
+                s,
+            );
+        }
+        OutlineIcon::Settings => {
+            painter.circle_stroke(c, 5.0, s);
+            painter.circle_stroke(c, 2.0, s);
+        }
+        OutlineIcon::Server => {
+            painter.rect_stroke(
+                Rect::from_center_size(Pos2::new(c.x, c.y - 2.5), Vec2::new(11.0, 4.0)),
+                CornerRadius::same(1),
+                s,
+                StrokeKind::Inside,
+            );
+            painter.rect_stroke(
+                Rect::from_center_size(Pos2::new(c.x, c.y + 2.5), Vec2::new(11.0, 4.0)),
+                CornerRadius::same(1),
+                s,
+                StrokeKind::Inside,
+            );
+            painter.circle_filled(Pos2::new(c.x - 3.5, c.y - 2.5), 0.8, color);
+            painter.circle_filled(Pos2::new(c.x - 3.5, c.y + 2.5), 0.8, color);
+        }
+        OutlineIcon::Shield => {
+            painter.line_segment(
+                [
+                    Pos2::new(c.x - 5.0, c.y - 4.5),
+                    Pos2::new(c.x + 5.0, c.y - 4.5),
+                ],
+                s,
+            );
+            painter.line_segment(
+                [Pos2::new(c.x + 5.0, c.y - 4.5), Pos2::new(c.x + 5.0, c.y)],
+                s,
+            );
+            painter.line_segment([Pos2::new(c.x + 5.0, c.y), Pos2::new(c.x, c.y + 5.5)], s);
+            painter.line_segment([Pos2::new(c.x, c.y + 5.5), Pos2::new(c.x - 5.0, c.y)], s);
+            painter.line_segment(
+                [Pos2::new(c.x - 5.0, c.y), Pos2::new(c.x - 5.0, c.y - 4.5)],
+                s,
+            );
+        }
     }
 }
-
