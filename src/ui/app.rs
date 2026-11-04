@@ -186,6 +186,8 @@ impl ShiplyApp {
             }
         }
 
+        let has_no_projects = storage.projects.is_empty();
+
         let mut app = Self {
             storage,
             selection,
@@ -254,8 +256,8 @@ impl ShiplyApp {
             bulk_create_tag: false,
             bulk_deploy_queue: VecDeque::new(),
             bulk_total_count: 0,
-            show_onboarding_guide: true,
-            show_credential_guide: true,
+            show_onboarding_guide: has_no_projects,
+            show_credential_guide: false,
             cred_guide_os_tab: if cfg!(windows) {
                 CredentialOsTab::Windows
             } else if cfg!(target_os = "macos") {

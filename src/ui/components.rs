@@ -671,6 +671,7 @@ pub(crate) fn modal_secondary_button(text: &str) -> egui::Button<'static> {
 
 /// Renders a tab button with uniform horizontal padding (`16px` left & right) and consistent
 /// bordered styling so adjacent tabs have an exact, uniform visual gap.
+#[allow(dead_code)]
 pub(crate) fn render_uniform_tab_button(
     ui: &mut egui::Ui,
     id_salt: impl std::hash::Hash,

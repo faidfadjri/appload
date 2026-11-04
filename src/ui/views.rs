@@ -2,235 +2,110 @@ use super::*;
 
 impl ShiplyApp {
     pub(crate) fn render_first_time_empty_state(&mut self, ui: &mut egui::Ui) {
-        ui.add_space(28.0);
+        ui.add_space(SP_32);
         let avail_w = ui.available_width();
-        egui::Frame::new()
-            .fill(CARD_BG)
-            .stroke(Stroke::new(1.0_f32, CARD_BORDER))
-            .corner_radius(12.0)
-            .inner_margin(Margin::symmetric(36, 36))
-            .show(ui, |ui| {
-                ui.set_width((avail_w - 72.0).max(320.0));
-                ui.vertical_centered(|ui| {
-                    let (icon_rect, _) =
-                        ui.allocate_exact_size(Vec2::new(48.0, 48.0), Sense::hover());
-                    draw_shiply_logo(
-                        ui.painter(),
-                        icon_rect,
-                        12,
-                        24.0,
-                        self.logo_texture.as_ref(),
-                    );
+        let content_w = avail_w.min(680.0);
+        let pad_x = ((avail_w - content_w) / 2.0).max(0.0);
 
-                    ui.add_space(12.0);
-                    ui.label(
-                        RichText::new("Welcome to Shiply")
-                            .typo(Typo::H1)
-                            .color(TEXT_PRIMARY),
-                    );
-                    ui.add_space(4.0);
-                    ui.label(
-                        RichText::new(
-                            "No projects or environments configured yet. Auto-import a PowerShell deployment script (.ps1),\ncreate a project manually, or paste your shiply_state.json into the app directory.",
-                        )
-                        .typo(Typo::Body)
-                        .color(TEXT_SECONDARY),
-                    );
-                    ui.add_space(22.0);
-
-                    ui.horizontal_wrapped(|ui| {
-                        let total_btns_w = 510.0;
-                        let pad = ((ui.available_width() - total_btns_w) / 2.0).max(0.0);
-                        if pad > 4.0 {
-                            ui.add_space(pad);
-                        }
-
-                        let import_btn = egui::Button::new(
-                            RichText::new("Auto-Import deploy.ps1 Script")
-                                .typo(Typo::Label)
-                                .color(Color32::WHITE),
-                        )
-                        .fill(PRIMARY_BLUE)
-                        .corner_radius(8.0)
-                        .min_size(Vec2::new(235.0, 40.0));
-
-                        if ui.add(import_btn).clicked() {
-                            self.open_new_project_modal();
-                            if let Some(picked) = pick_ps1_file_dialog() {
-                                self.new_project_ps1_path = picked.clone();
-                                self.apply_ps1_auto_import_to_modal(&picked);
-                            }
-                        }
-
-                        ui.add_space(8.0);
-
-                        let add_btn = egui::Button::new(
-                            RichText::new("+ Add Project")
-                                .typo(Typo::Label)
-                                .color(TEXT_PRIMARY),
-                        )
-                        .fill(SUBTLE_BG)
-                        .stroke(Stroke::new(1.0_f32, CARD_BORDER))
-                        .corner_radius(8.0)
-                        .min_size(Vec2::new(130.0, 40.0));
-
-                        if ui.add(add_btn).clicked() {
-                            self.open_new_project_modal();
-                        }
-
-                        ui.add_space(8.0);
-
-                        let folder_btn = egui::Button::new(
-                            RichText::new("Open App Folder")
-                                .typo(Typo::Label)
-                                .color(TEXT_SECONDARY),
-                        )
-                        .fill(CARD_BG)
-                        .stroke(Stroke::new(1.0_f32, CARD_BORDER))
-                        .corner_radius(8.0)
-                        .min_size(Vec2::new(130.0, 40.0));
-
-                        if ui.add(folder_btn).clicked() {
-                            let dir = self.storage.app_data_dir();
-                            let _ = fs::create_dir_all(&dir);
-                            open_directory_in_os(&dir);
-                        }
-                    });
+        ui.horizontal(|ui| {
+            if pad_x > 0.0 {
+                ui.add_space(pad_x);
+            }
+            ui.vertical(|ui| {
+                ui.set_max_width(content_w);
+                kit::card(ui, |ui| {
+                    if kit::empty_state(
+                        ui,
+                        OutlineIcon::Plus,
+                        "Welcome to Shiply",
+                        "No projects or environments configured yet. Auto-import a PowerShell deployment script (.ps1) or create a project to get started.",
+                        Some("Add your first project"),
+                    ) {
+                        self.open_new_project_modal();
+                    }
                 });
             });
+        });
 
-        ui.add_space(18.0);
+        ui.add_space(SP_16);
         self.render_onboarding_guideline_card(ui);
-        ui.add_space(16.0);
+        ui.add_space(SP_16);
         self.render_os_credentials_guideline_card(ui);
     }
     pub(crate) fn render_all_deployments_overview(&mut self, ui: &mut egui::Ui) {
         let mut open_bulk_modal = false;
-        let mut toggle_select_all = false;
+        let mut clear_selection = false;
         let all_project_ids: Vec<String> =
             self.storage.projects.iter().map(|p| p.id.clone()).collect();
-        let all_selected = !all_project_ids.is_empty()
-            && all_project_ids
-                .iter()
-                .all(|id| self.bulk_selected_projects.contains(id));
         let selected_count = all_project_ids
             .iter()
             .filter(|id| self.bulk_selected_projects.contains(*id))
             .count();
 
-        let overview_avail_w = ui.available_width();
-        let is_compact_overview_hdr = overview_avail_w < 580.0;
-
-        horizontal_row(ui, 38.0, |ui| {
-            ui.label(
-                RichText::new("All Deployments")
-                    .typo(Typo::H1)
-                    .color(TEXT_PRIMARY),
-            );
-            if selected_count > 0 && !is_compact_overview_hdr {
-                render_pill(
-                    ui,
-                    &format!("{selected_count} SELECTED"),
-                    BLUE_PILL_BG,
-                    BLUE_PILL_TEXT,
+        // Page Header
+        ui.horizontal(|ui| {
+            ui.vertical(|ui| {
+                ui.horizontal(|ui| {
+                    ui.label(Typo::H1.rich("All deployments"));
+                    if selected_count > 0 {
+                        ui.add_space(SP_8);
+                        kit::count_badge(ui, selected_count);
+                        ui.label(Typo::Small.rich("selected").color(PRIMARY_BLUE));
+                    }
+                });
+                ui.add_space(2.0);
+                ui.label(
+                    Typo::Small
+                        .rich("Select projects to deploy together, or open one to manage it.")
+                        .color(TEXT_SECONDARY),
                 );
-            }
+            });
 
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                ui.spacing_mut().item_spacing = Vec2::new(8.0, 0.0);
+                ui.spacing_mut().item_spacing = Vec2::new(SP_8, 0.0);
 
-                let bulk_label = if is_compact_overview_hdr {
-                    if selected_count > 0 {
-                        format!("Bulk Deploy ({selected_count})...")
-                    } else {
-                        "Bulk Deploy...".to_string()
-                    }
-                } else if selected_count > 0 {
-                    format!("Bulk Deploy ({selected_count} Selected)...")
+                let deploy_label = if selected_count > 0 {
+                    format!("Deploy selected ({selected_count})")
                 } else {
-                    "Bulk Deploy Projects...".to_string()
+                    "Bulk deploy...".to_string()
                 };
-                let bulk_btn = egui::Button::new(
-                    RichText::new(bulk_label)
-                        .typo(if is_compact_overview_hdr {
-                            Typo::SmallMedium
-                        } else {
-                            Typo::Label
-                        })
-                        .color(Color32::WHITE),
+                if kit::button(
+                    ui,
+                    ButtonVariant::Primary,
+                    ButtonSize::Md,
+                    &deploy_label,
+                    Some(OutlineIcon::Play),
                 )
-                .fill(PRIMARY_BLUE)
-                .corner_radius(7.0)
-                .min_size(Vec2::new(
-                    if is_compact_overview_hdr {
-                        120.0
-                    } else {
-                        190.0
-                    },
-                    34.0,
-                ));
-
-                if ui
-                    .add(bulk_btn)
-                    .on_hover_text(
-                        "Deploy multiple selected projects sequentially with auto-bumped versions",
-                    )
-                    .clicked()
+                .on_hover_text("Deploy multiple selected projects sequentially with auto-bumped versions")
+                .clicked()
                 {
                     open_bulk_modal = true;
                 }
 
-                let sel_btn_label = if is_compact_overview_hdr {
-                    if all_selected {
-                        "Clear"
-                    } else {
-                        "Select All"
-                    }
-                } else if all_selected {
-                    "Clear Selection"
-                } else {
-                    "Select All Projects"
-                };
-                let sel_btn = egui::Button::new(
-                    RichText::new(sel_btn_label)
-                        .typo(Typo::SmallMedium)
-                        .color(TEXT_SECONDARY),
-                )
-                .fill(CARD_BG)
-                .stroke(Stroke::new(1.0_f32, CARD_BORDER))
-                .corner_radius(7.0)
-                .min_size(Vec2::new(
-                    if is_compact_overview_hdr { 80.0 } else { 128.0 },
-                    34.0,
-                ));
-
-                if ui.add(sel_btn).clicked() {
-                    toggle_select_all = true;
+                if selected_count > 0
+                    && kit::button(
+                        ui,
+                        ButtonVariant::Ghost,
+                        ButtonSize::Sm,
+                        "Clear selection",
+                        None,
+                    )
+                    .on_hover_text("Deselect all selected projects")
+                    .clicked()
+                {
+                    clear_selection = true;
                 }
             });
         });
 
-        if toggle_select_all {
-            if all_selected {
-                self.bulk_selected_projects.clear();
-            } else {
-                for id in &all_project_ids {
-                    self.bulk_selected_projects.insert(id.clone());
-                }
-            }
+        if clear_selection {
+            self.bulk_selected_projects.clear();
         }
         if open_bulk_modal {
             self.open_bulk_deploy_modal();
         }
 
-        ui.label(
-            RichText::new(
-                "Select projects below to run a Bulk Deployment, or click a project card to open its workspace.",
-            )
-            .typo(Typo::Body)
-            .color(TEXT_SECONDARY),
-        );
-        ui.add_space(14.0);
+        ui.add_space(SP_16);
 
         // Live Bulk Deployment Queue Progress Banner (when a bulk deployment is running)
         if !self.bulk_deploy_queue.is_empty()
@@ -242,9 +117,9 @@ impl ShiplyApp {
             let mut cancel_queue = false;
 
             egui::Frame::new()
-                .fill(BLUE_PILL_BG)
+                .fill(INFO_SOFT)
                 .stroke(Stroke::new(1.0_f32, PRIMARY_BLUE))
-                .corner_radius(8.0)
+                .corner_radius(CornerRadius::same(R_MD as u8))
                 .inner_margin(Margin::symmetric(16, 10))
                 .show(ui, |ui| {
                     horizontal_row(ui, 30.0, |ui| {
@@ -256,29 +131,25 @@ impl ShiplyApp {
                             ui.painter(),
                             sp_rect.center(),
                             5.0,
-                            BLUE_PILL_TEXT,
+                            PRIMARY_BLUE,
                             time,
                         );
                         ui.add_space(4.0);
                         ui.label(
-                            RichText::new(format!(
-                                "BULK DEPLOYMENT IN PROGRESS — Running {current_idx} of {total} ({remaining} queued)"
-                            ))
-                            .typo(Typo::SmallMedium)
-                            .color(BLUE_PILL_TEXT),
+                            Typo::SmallMedium
+                                .rich(format!(
+                                    "Bulk deployment in progress — Running {current_idx} of {total} ({remaining} queued)"
+                                ))
+                                .color(PRIMARY_BLUE),
                         );
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             if remaining > 0
-                                && outline_icon_button(
+                                && kit::button(
                                     ui,
-                                    "cancel_bulk_queue_btn",
-                                    OutlineIcon::Trash,
-                                    Some("Cancel Remaining Queue"),
-                                    FAIL_PILL_TEXT,
-                                    FAIL_PILL_BG,
-                                    DANGER_SOFT,
-                                    DANGER_SOFT,
-                                    true,
+                                    ButtonVariant::Danger,
+                                    ButtonSize::Sm,
+                                    "Cancel queue",
+                                    Some(OutlineIcon::Trash),
                                 )
                                 .clicked()
                             {
@@ -295,15 +166,16 @@ impl ShiplyApp {
                     false,
                 ));
             }
-            ui.add_space(12.0);
+            ui.add_space(SP_12);
         }
 
+        // Project Cards Grid
         let proj_count = self.storage.projects.len().max(1);
-        let spacing = 14.0;
+        let spacing = SP_16;
         let grid_avail_w = ui.available_width();
-        let max_cols = if grid_avail_w >= 760.0 {
+        let max_cols = if grid_avail_w >= 1000.0 {
             3
-        } else if grid_avail_w >= 480.0 {
+        } else if grid_avail_w >= 640.0 {
             2
         } else {
             1
@@ -318,16 +190,16 @@ impl ShiplyApp {
         let mut clicked_proj = None;
         let mut toggled_bulk_proj = None;
         ui.horizontal_wrapped(|ui| {
-            ui.spacing_mut().item_spacing = Vec2::new(spacing, 14.0);
+            ui.spacing_mut().item_spacing = Vec2::new(spacing, SP_16);
             for project in &self.storage.projects {
                 let is_checked = self.bulk_selected_projects.contains(&project.id);
-                let (rect, resp) = ui.allocate_exact_size(Vec2::new(card_w, 108.0), Sense::click());
+                let (rect, resp) = ui.allocate_exact_size(Vec2::new(card_w, 112.0), Sense::click());
                 let resp = resp.on_hover_cursor(egui::CursorIcon::PointingHand);
 
                 // Checkbox hit target in top-right of the project card
                 let chk_rect = Rect::from_center_size(
                     Pos2::new(rect.right() - 24.0, rect.top() + 24.0),
-                    Vec2::new(22.0, 22.0),
+                    Vec2::new(20.0, 20.0),
                 );
                 let chk_resp = ui
                     .interact(
@@ -337,55 +209,45 @@ impl ShiplyApp {
                     )
                     .on_hover_cursor(egui::CursorIcon::PointingHand);
 
-                draw_elevated_card(
-                    ui.painter(),
-                    rect,
-                    CARD_BG,
-                    Stroke::new(
-                        if is_checked {
-                            2.0_f32
-                        } else if resp.hovered() {
-                            1.5_f32
-                        } else {
-                            1.0_f32
-                        },
-                        if is_checked || resp.hovered() {
-                            PRIMARY_BLUE
-                        } else {
-                            CARD_BORDER
-                        },
-                    ),
+                // Card frame
+                let card_bg = if is_checked {
+                    Color32::from_rgba_premultiplied(20, 110, 245, 12)
+                } else {
+                    CARD_BG
+                };
+                let border_stroke = Stroke::new(
+                    if is_checked { 1.5_f32 } else { 1.0_f32 },
+                    if is_checked {
+                        PRIMARY_BLUE
+                    } else if resp.hovered() {
+                        INPUT_BORDER_HOVER
+                    } else {
+                        CARD_BORDER
+                    },
                 );
 
-                // Draw selection checkbox at top-right of project card
-                ui.painter().rect_filled(
-                    chk_rect,
-                    CornerRadius::same(5),
-                    if is_checked { PRIMARY_BLUE } else { SUBTLE_BG },
-                );
-                ui.painter().rect_stroke(
-                    chk_rect,
-                    CornerRadius::same(5),
-                    Stroke::new(
-                        1.2_f32,
-                        if is_checked || chk_resp.hovered() {
-                            PRIMARY_BLUE
-                        } else {
-                            INPUT_BORDER
-                        },
-                    ),
-                    StrokeKind::Inside,
-                );
+                ui.painter().rect_filled(rect, CornerRadius::same(R_LG as u8), card_bg);
+                ui.painter().rect_stroke(rect, CornerRadius::same(R_LG as u8), border_stroke, StrokeKind::Inside);
+
+                // Checkbox paint
+                let chk_radius = CornerRadius::same(4);
                 if is_checked {
-                    draw_icon_check(ui.painter(), chk_rect.center(), Color32::WHITE);
+                    ui.painter().rect_filled(chk_rect, chk_radius, PRIMARY_BLUE);
+                    let p1 = Pos2::new(chk_rect.left() + 4.5, chk_rect.top() + 10.0);
+                    let p2 = Pos2::new(chk_rect.left() + 8.0, chk_rect.top() + 14.0);
+                    let p3 = Pos2::new(chk_rect.left() + 15.5, chk_rect.top() + 6.0);
+                    ui.painter().line_segment([p1, p2], Stroke::new(1.8_f32, Color32::WHITE));
+                    ui.painter().line_segment([p2, p3], Stroke::new(1.8_f32, Color32::WHITE));
+                } else {
+                    let chk_border = if chk_resp.hovered() { INPUT_BORDER_HOVER } else { INPUT_BORDER };
+                    ui.painter().rect_filled(chk_rect, chk_radius, CARD_BG);
+                    ui.painter().rect_stroke(chk_rect, chk_radius, Stroke::new(1.0_f32, chk_border), StrokeKind::Inside);
                 }
 
+                // Project Name and Path
                 let text_clip = Rect::from_min_max(
-                    Pos2::new(rect.left() + 14.0, rect.top() + 8.0),
-                    Pos2::new(
-                        (chk_rect.left() - 8.0).max(rect.left() + 40.0),
-                        rect.top() + 62.0,
-                    ),
+                    Pos2::new(rect.left() + 16.0, rect.top() + 10.0),
+                    Pos2::new((chk_rect.left() - 8.0).max(rect.left() + 40.0), rect.top() + 66.0),
                 );
                 let clipped_painter = ui.painter().with_clip_rect(text_clip);
                 clipped_painter.text(
@@ -395,16 +257,22 @@ impl ShiplyApp {
                     Typo::H3.font(),
                     TEXT_PRIMARY,
                 );
+                let local_path_display = if project.local_path.len() > 36 {
+                    format!("{}…", &project.local_path[..35])
+                } else {
+                    project.local_path.clone()
+                };
                 clipped_painter.text(
-                    Pos2::new(rect.left() + 18.0, rect.top() + 46.0),
+                    Pos2::new(rect.left() + 18.0, rect.top() + 48.0),
                     Align2::LEFT_CENTER,
-                    &project.local_path,
-                    Typo::Small.font(),
+                    &local_path_display,
+                    Typo::MonoSm.font(),
                     TEXT_MUTED,
                 );
 
+                // Environment version tags row at bottom
                 let mut px = rect.left() + 18.0;
-                let py = rect.top() + 78.0;
+                let py = rect.top() + 80.0;
                 for env in &project.environments {
                     let badge = env.badge_label();
                     let is_env_running = self.storage.deployments.iter().any(|d| {
@@ -418,7 +286,7 @@ impl ShiplyApp {
                         paint_running_pill_left_aligned(
                             ui.painter(),
                             Pos2::new(px, py),
-                            &format!("{badge}: RUNNING"),
+                            &format!("{badge}: Running"),
                             WARN_PILL_BG,
                             WARN_PILL_TEXT,
                             time,
@@ -428,14 +296,15 @@ impl ShiplyApp {
                         let ver_label = self
                             .storage
                             .last_succeeded_deployment(&project.id, &env.key)
-                            .map(|d| format!("{badge}: v{}", d.version))
-                            .unwrap_or_else(|| format!("{badge}: —"));
+                            .map(|d| format!("{badge} v{}", d.version))
+                            .unwrap_or_else(|| format!("{badge} —"));
                         paint_pill_left_aligned(ui.painter(), Pos2::new(px, py), &ver_label, bg, fg)
                     };
                     px += w + 6.0;
                 }
+
                 if chk_resp
-                    .on_hover_text("Select or deselect this project for Bulk Deployment")
+                    .on_hover_text("Select or deselect this project for bulk deployment")
                     .clicked()
                 {
                     toggled_bulk_proj = Some(project.id.clone());
@@ -459,129 +328,120 @@ impl ShiplyApp {
             return;
         }
 
-        ui.add_space(18.0);
+        ui.add_space(SP_16);
         self.render_onboarding_guideline_card(ui);
-        ui.add_space(16.0);
+        ui.add_space(SP_16);
         self.render_os_credentials_guideline_card(ui);
-        ui.add_space(20.0);
+        ui.add_space(SP_20);
         self.render_history_and_logs_view(ui, None);
     }
 
     pub(crate) fn render_onboarding_guideline_card(&mut self, ui: &mut egui::Ui) {
-        egui::Frame::new()
-            .fill(CARD_BG)
-            .stroke(Stroke::new(1.0_f32, CARD_BORDER))
-            .corner_radius(10.0)
-            .inner_margin(Margin::symmetric(20, 14))
-            .show(ui, |ui| {
-                horizontal_row(ui, 30.0, |ui| {
-                    render_pill(ui, "Onboarding", BLUE_PILL_BG, BLUE_PILL_TEXT);
-                    ui.label(
-                        RichText::new("Quick-start deployment guideline")
-                            .typo(Typo::Label)
-                            .color(TEXT_PRIMARY),
-                    );
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        let toggle_lbl = if self.show_onboarding_guide {
-                            "Hide Guide"
-                        } else {
-                            "Show Guide"
-                        };
-                        let btn = egui::Button::new(
-                            RichText::new(toggle_lbl)
-                                .typo(Typo::Caption)
-                                .color(TEXT_SECONDARY),
-                        )
-                        .fill(SUBTLE_BG)
-                        .stroke(Stroke::new(1.0_f32, CARD_BORDER))
-                        .corner_radius(6.0)
-                        .min_size(Vec2::new(86.0, 28.0));
-                        if ui.add(btn).clicked() {
-                            self.show_onboarding_guide = !self.show_onboarding_guide;
-                        }
-                    });
-                });
-
-                if !self.show_onboarding_guide {
-                    return;
-                }
-
-                ui.add_space(8.0);
-                draw_divider(ui, SUBTLE_BG);
-                ui.add_space(10.0);
-
-                let steps = [
-                    (
-                        "Step 1",
-                        "Add or Auto-Import Project",
-                        "Click '+ ADD' in the sidebar or auto-import a deploy-*.ps1 script to populate project directories, remote server configs, and steps.",
-                        BLUE_PILL_BG,
-                        BLUE_PILL_TEXT,
-                    ),
-                    (
-                        "Step 2",
-                        "Setup OS Credentials",
-                        "Store your SSH password securely in Windows Credential Manager, Linux libsecret, or macOS Keychain — zero plain text passwords.",
-                        TEAL_PILL_BG,
-                        TEAL_PILL_TEXT,
-                    ),
-                    (
-                        "Step 3",
-                        "Configure Pipeline Steps",
-                        "Customize Local Command, Verify Path, SCP Upload, and Remote SSH steps with real-time syntax highlighting and {template} variables.",
-                        PURPLE_PILL_BG,
-                        PURPLE_PILL_TEXT,
-                    ),
-                    (
-                        "Step 4",
-                        "Deploy, Bulk Deploy & Rollback",
-                        "Pick target Git branches, verify auto-bumped versions, run sequential Bulk Deployments, or perform 1-click Rollback anytime.",
-                        SUCCESS_PILL_BG,
-                        SUCCESS_PILL_TEXT,
-                    ),
-                ];
-
-                let spacing = 12.0;
-                let onboard_avail = ui.available_width();
-                let onboard_cols = if onboard_avail >= 860.0 {
-                    4
-                } else if onboard_avail >= 460.0 {
-                    2
-                } else {
-                    1
-                };
-                let step_w = if onboard_cols == 1 {
-                    onboard_avail
-                } else {
-                    ((onboard_avail - spacing * (onboard_cols - 1) as f32) / onboard_cols as f32).floor()
-                };
-                const ONBOARDING_CARD_HEIGHT: f32 = 138.0;
-                ui.horizontal_wrapped(|ui| {
-                    ui.spacing_mut().item_spacing = Vec2::new(spacing, 10.0);
-                    for (badge, title, desc, bg, fg) in steps {
-                        egui::Frame::new()
-                            .fill(SUBTLE_BG)
-                            .stroke(Stroke::new(1.0_f32, CARD_BORDER))
-                            .corner_radius(8.0)
-                            .inner_margin(Margin::symmetric(14, 12))
-                            .show(ui, |ui| {
-                                ui.set_width((step_w - 28.0).max(150.0));
-                                ui.set_height(ONBOARDING_CARD_HEIGHT);
-                                render_pill(ui, badge, bg, fg);
-                                ui.add_space(6.0);
-                                ui.label(
-                                    RichText::new(title)
-                                        .typo(Typo::Label)
-                                        .color(TEXT_PRIMARY),
-                                );
-                                ui.add_space(4.0);
-                                ui.label(
-                                    RichText::new(desc).typo(Typo::Small).color(TEXT_SECONDARY),
-                                );
-                            });
+        kit::card(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(Typo::H3.rich("Get started"));
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    let toggle_lbl = if self.show_onboarding_guide {
+                        "Hide"
+                    } else {
+                        "Show"
+                    };
+                    if kit::button(
+                        ui,
+                        ButtonVariant::Ghost,
+                        ButtonSize::Sm,
+                        toggle_lbl,
+                        None,
+                    )
+                    .clicked()
+                    {
+                        self.show_onboarding_guide = !self.show_onboarding_guide;
                     }
                 });
             });
+
+            if !self.show_onboarding_guide {
+                return;
+            }
+
+            ui.add_space(SP_12);
+            let line_w = ui.available_width();
+            let (line_rect, _) = ui.allocate_exact_size(Vec2::new(line_w, 1.0), Sense::hover());
+            ui.painter().line_segment(
+                [line_rect.left_center(), line_rect.right_center()],
+                Stroke::new(1.0_f32, CARD_BORDER),
+            );
+            ui.add_space(SP_12);
+
+            let steps = [
+                (
+                    "1",
+                    "Add or import project",
+                    "Click '+ Add' in the sidebar or auto-import a deploy.ps1 script to populate project directories and environments.",
+                ),
+                (
+                    "2",
+                    "Set up OS credentials",
+                    "Store your SSH password securely in Windows Credential Manager, Linux libsecret, or macOS Keychain.",
+                ),
+                (
+                    "3",
+                    "Configure pipeline steps",
+                    "Customize Local Command, Verify Path, SCP Upload, and Remote SSH steps with syntax highlighting and variables.",
+                ),
+                (
+                    "4",
+                    "Deploy & rollback",
+                    "Select Git branches, auto-bump versions, run sequential bulk deployments, or 1-click rollback anytime.",
+                ),
+            ];
+
+            let spacing = SP_12;
+            let onboard_avail = ui.available_width();
+            let onboard_cols = if onboard_avail >= 860.0 {
+                4
+            } else if onboard_avail >= 460.0 {
+                2
+            } else {
+                1
+            };
+            let step_w = if onboard_cols == 1 {
+                onboard_avail
+            } else {
+                ((onboard_avail - spacing * (onboard_cols - 1) as f32) / onboard_cols as f32).floor()
+            };
+            const ONBOARDING_CARD_HEIGHT: f32 = 140.0;
+
+            ui.horizontal_wrapped(|ui| {
+                ui.spacing_mut().item_spacing = Vec2::new(spacing, SP_12);
+                for (num, title, desc) in steps {
+                    egui::Frame::new()
+                        .fill(SUBTLE_BG)
+                        .stroke(Stroke::new(1.0_f32, CARD_BORDER))
+                        .corner_radius(CornerRadius::same(R_MD as u8))
+                        .inner_margin(Margin::same(14))
+                        .show(ui, |ui| {
+                            ui.set_width((step_w - 28.0).max(150.0));
+                            ui.set_height(ONBOARDING_CARD_HEIGHT);
+                            ui.vertical(|ui| {
+                                let (num_rect, _) = ui.allocate_exact_size(Vec2::splat(24.0), Sense::hover());
+                                ui.painter().circle_filled(num_rect.center(), 12.0, INFO_SOFT);
+                                ui.painter().text(
+                                    num_rect.center(),
+                                    Align2::CENTER_CENTER,
+                                    num,
+                                    Typo::Caption.font(),
+                                    PRIMARY_BLUE,
+                                );
+                                ui.add_space(8.0);
+                                ui.label(Typo::H3.rich(title));
+                                ui.add_space(4.0);
+                                ui.label(Typo::Small.rich(desc).color(TEXT_SECONDARY));
+                            });
+                        });
+                }
+            });
+        });
     }
 
     pub(crate) fn render_os_credentials_guideline_card(&mut self, ui: &mut egui::Ui) {
@@ -597,323 +457,276 @@ impl ShiplyApp {
         };
         let vault_ready = read_os_vault_credential(&target_example).is_some();
 
-        egui::Frame::new()
-            .fill(CARD_BG)
-            .stroke(Stroke::new(1.0_f32, INFO_SOFT))
-            .corner_radius(10.0)
-            .inner_margin(Margin::symmetric(20, 14))
-            .show(ui, |ui| {
-                let cred_avail_w = ui.available_width();
-                horizontal_row(ui, 32.0, |ui| {
-                    let (ic_r, _) =
-                        ui.allocate_exact_size(Vec2::new(20.0, 20.0), Sense::hover());
-                    draw_outline_icon(ui.painter(), ic_r.center(), OutlineIcon::Key, PRIMARY_BLUE);
-                    let cred_title = if cred_avail_w < 580.0 {
-                        "OS credentials setup guideline"
-                    } else {
-                        "OS credentials setup guideline (Windows | Linux | macOS)"
-                    };
-                    ui.label(
-                        RichText::new(cred_title)
-                            .typo(Typo::Label)
-                            .color(PRIMARY_BLUE),
-                    );
-                    if vault_ready && cred_avail_w >= 640.0 {
-                        render_pill(
-                            ui,
-                            "Target found in vault",
-                            SUCCESS_PILL_BG,
-                            SUCCESS_PILL_TEXT,
-                        );
-                    }
-
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        let toggle_lbl = if self.show_credential_guide {
-                            "Hide Guide"
-                        } else {
-                            "Show Guide"
-                        };
-                        let btn = egui::Button::new(
-                            RichText::new(toggle_lbl)
-                                .typo(Typo::Caption)
-                                .color(TEXT_SECONDARY),
-                        )
-                        .fill(SUBTLE_BG)
-                        .stroke(Stroke::new(1.0_f32, CARD_BORDER))
-                        .corner_radius(6.0)
-                        .min_size(Vec2::new(86.0, 28.0));
-                        if ui.add(btn).clicked() {
-                            self.show_credential_guide = !self.show_credential_guide;
-                        }
-                    });
-                });
-
-                if !self.show_credential_guide {
-                    return;
+        kit::card(ui, |ui| {
+            ui.horizontal(|ui| {
+                let (ic_r, _) = ui.allocate_exact_size(Vec2::splat(20.0), Sense::hover());
+                draw_outline_icon(ui.painter(), ic_r.center(), OutlineIcon::Key, PRIMARY_BLUE);
+                ui.add_space(4.0);
+                ui.label(Typo::H3.rich("Set up OS credentials"));
+                ui.add_space(SP_8);
+                ui.label(
+                    Typo::Small
+                        .rich("Store SSH passwords securely in your OS vault without plain-text configs")
+                        .color(TEXT_MUTED),
+                );
+                if vault_ready {
+                    ui.add_space(SP_8);
+                    kit::status_badge(ui, StatusKind::Success, "Vault ready");
                 }
 
-                ui.add_space(6.0);
-                ui.label(
-                    RichText::new(
-                        "Shiply reads your SSH password securely from your operating system's native credential vault so you never hardcode passwords in scripts or config files.",
-                    )
-                    .typo(Typo::Small)
-                    .color(TEXT_SECONDARY),
-                );
-                ui.add_space(10.0);
-
-                // Interactive Target & Username customizer + Verify button
-                ui.horizontal_wrapped(|ui| {
-                    ui.spacing_mut().item_spacing = Vec2::new(6.0, 6.0);
-                    ui.label(
-                        RichText::new("Vault Target:")
-                            .typo(Typo::SmallMedium)
-                            .color(TEXT_SECONDARY),
-                    );
-                    styled_text_edit(
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    let toggle_lbl = if self.show_credential_guide {
+                        "Hide"
+                    } else {
+                        "Show"
+                    };
+                    if kit::button(
                         ui,
-                        "cred_guide_target_input",
-                        &mut self.cred_guide_target_input,
-                        170.0,
-                        Some("e.g. prod-ssh-server"),
-                    );
-                    ui.add_space(4.0);
-                    ui.label(
-                        RichText::new("SSH User:")
-                            .typo(Typo::SmallMedium)
-                            .color(TEXT_SECONDARY),
-                    );
-                    styled_text_edit(
-                        ui,
-                        "cred_guide_user_input",
-                        &mut self.cred_guide_user_input,
-                        130.0,
-                        Some("e.g. deploy"),
-                    );
-                    if outline_icon_button(
-                        ui,
-                        "verify_cred_guide_target_btn",
-                        OutlineIcon::Refresh,
-                        Some("Verify in OS Vault"),
-                        TEXT_PRIMARY,
-                        SUBTLE_BG,
-                        INPUT_BG_HOVER,
-                        CARD_BORDER,
-                        true,
+                        ButtonVariant::Ghost,
+                        ButtonSize::Sm,
+                        toggle_lbl,
+                        None,
                     )
                     .clicked()
                     {
-                        if read_os_vault_credential(&target_example).is_some() {
-                            self.status_banner = Some((
-                                format!("Verified! Credential target '{target_example}' is ready in your OS Vault."),
-                                true,
-                            ));
-                        } else {
-                            self.status_banner = Some((
-                                format!("Target '{target_example}' was not found in your OS Vault yet. Follow the steps below to add it."),
-                                false,
-                            ));
-                        }
+                        self.show_credential_guide = !self.show_credential_guide;
                     }
                 });
+            });
 
-                ui.add_space(10.0);
+            if !self.show_credential_guide {
+                return;
+            }
 
-                // Platform Tab Bar: Windows | Linux | Mac (uniform gap & styling)
-                egui::ScrollArea::horizontal()
-                    .id_salt("cred_guide_os_tabs_scroll")
-                    .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
-                    .show(ui, |ui| {
-                        horizontal_row(ui, 34.0, |ui| {
-                            ui.spacing_mut().item_spacing = Vec2::new(8.0, 0.0);
-                            for (tab, label) in [
-                                (CredentialOsTab::Windows, "Windows (Credential Manager)"),
-                                (CredentialOsTab::Linux, "Linux (libsecret / secret-tool)"),
-                                (CredentialOsTab::Mac, "Mac (macOS Keychain)"),
-                            ] {
-                                let is_active = self.cred_guide_os_tab == tab;
-                                if render_uniform_tab_button(
-                                    ui,
-                                    ("cred_os_tab", label),
-                                    label,
-                                    is_active,
-                                    32.0,
-                                )
-                                .clicked()
-                                {
-                                    self.cred_guide_os_tab = tab;
-                                }
+            ui.add_space(SP_12);
+            let line_w = ui.available_width();
+            let (line_rect, _) = ui.allocate_exact_size(Vec2::new(line_w, 1.0), Sense::hover());
+            ui.painter().line_segment(
+                [line_rect.left_center(), line_rect.right_center()],
+                Stroke::new(1.0_f32, CARD_BORDER),
+            );
+            ui.add_space(SP_12);
+
+            ui.label(
+                Typo::Small
+                    .rich("Shiply reads your SSH password securely from your operating system's native credential vault so you never hardcode passwords in scripts or config files.")
+                    .color(TEXT_SECONDARY),
+            );
+            ui.add_space(SP_12);
+
+            // Interactive inputs
+            ui.horizontal(|ui| {
+                ui.label(Typo::SmallMedium.rich("Vault target:").color(TEXT_SECONDARY));
+                styled_text_edit(
+                    ui,
+                    "cred_guide_target_input",
+                    &mut self.cred_guide_target_input,
+                    170.0,
+                    Some("e.g. prod-ssh-server"),
+                );
+                ui.add_space(SP_8);
+                ui.label(Typo::SmallMedium.rich("SSH user:").color(TEXT_SECONDARY));
+                styled_text_edit(
+                    ui,
+                    "cred_guide_user_input",
+                    &mut self.cred_guide_user_input,
+                    130.0,
+                    Some("e.g. deploy"),
+                );
+                ui.add_space(SP_8);
+                if kit::button(
+                    ui,
+                    ButtonVariant::Secondary,
+                    ButtonSize::Md,
+                    "Verify in OS Vault",
+                    Some(OutlineIcon::Refresh),
+                )
+                .clicked()
+                {
+                    if read_os_vault_credential(&target_example).is_some() {
+                        self.status_banner = Some((
+                            format!("Verified! Credential target '{target_example}' is ready in your OS Vault."),
+                            true,
+                        ));
+                    } else {
+                        self.status_banner = Some((
+                            format!("Target '{target_example}' was not found in your OS Vault yet. Follow the steps below to add it."),
+                            false,
+                        ));
+                    }
+                }
+            });
+
+            ui.add_space(SP_16);
+
+            // Segmented OS Tabs
+            let mut os_idx = match self.cred_guide_os_tab {
+                CredentialOsTab::Windows => 0,
+                CredentialOsTab::Linux => 1,
+                CredentialOsTab::Mac => 2,
+            };
+            if kit::segmented(
+                ui,
+                &mut os_idx,
+                &[
+                    "Windows (Credential Manager)",
+                    "Linux (libsecret / secret-tool)",
+                    "Mac (macOS Keychain)",
+                ],
+            ) {
+                self.cred_guide_os_tab = match os_idx {
+                    0 => CredentialOsTab::Windows,
+                    1 => CredentialOsTab::Linux,
+                    _ => CredentialOsTab::Mac,
+                };
+            }
+
+            ui.add_space(SP_12);
+
+            egui::Frame::new()
+                .fill(SUBTLE_BG)
+                .stroke(Stroke::new(1.0_f32, CARD_BORDER))
+                .corner_radius(CornerRadius::same(R_MD as u8))
+                .inner_margin(Margin::same(16))
+                .show(ui, |ui| match self.cred_guide_os_tab {
+                    CredentialOsTab::Windows => {
+                        let cmdkey_cmd = format!(
+                            "cmdkey /generic:\"{target_example}\" /user:\"{user_example}\" /pass:\"YOUR_SSH_PASSWORD\""
+                        );
+                        ui.horizontal(|ui| {
+                            ui.label(Typo::SmallMedium.rich("Option 1 — Windows Credential Manager (GUI):"));
+                            #[cfg(windows)]
+                            {
+                                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                                    if kit::button(
+                                        ui,
+                                        ButtonVariant::Primary,
+                                        ButtonSize::Sm,
+                                        "Open Windows Credential Manager",
+                                        None,
+                                    )
+                                    .clicked()
+                                    {
+                                        open_windows_credential_manager();
+                                    }
+                                });
                             }
                         });
-                    });
-
-                ui.add_space(10.0);
-
-                egui::Frame::new()
-                    .fill(SUBTLE_BG)
-                    .stroke(Stroke::new(1.0_f32, CARD_BORDER))
-                    .corner_radius(8.0)
-                    .inner_margin(Margin::symmetric(16, 12))
-                    .show(ui, |ui| match self.cred_guide_os_tab {
-                        CredentialOsTab::Windows => {
-                            let cmdkey_cmd = format!(
-                                "cmdkey /generic:\"{target_example}\" /user:\"{user_example}\" /pass:\"YOUR_SSH_PASSWORD\""
+                        ui.add_space(4.0);
+                        ui.label(
+                            Typo::Body.rich(format!(
+                                "1. Open Control Panel -> User Accounts -> Credential Manager -> Windows Credentials.\n2. Under 'Generic Credentials', click 'Add a generic credential'.\n3. Set Internet or network address = '{target_example}', User name = '{user_example}', and Password = your SSH password.\n4. Click OK, then click 'Verify in OS Vault' above."
+                            )).color(TEXT_SECONDARY),
+                        );
+                        ui.add_space(SP_12);
+                        ui.label(Typo::SmallMedium.rich("Option 2 — PowerShell / CMD One-Line Command:"));
+                        ui.add_space(4.0);
+                        ui.horizontal(|ui| {
+                            let mut preview = cmdkey_cmd.clone();
+                            syntax_highlighted_text_edit(
+                                ui,
+                                "cred_cmdkey_preview",
+                                &mut preview,
+                                (ui.available_width() - 90.0).max(220.0),
+                                None,
                             );
-                            horizontal_row(ui, 30.0, |ui| {
-                                ui.label(
-                                    RichText::new("Option 1 — Windows Credential Manager (GUI):")
-                                        .typo(Typo::SmallMedium)
-                                        .color(TEXT_PRIMARY),
-                                );
-                                #[cfg(windows)]
-                                {
-                                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                        let open_cm_btn = egui::Button::new(
-                                            RichText::new("Open Windows Credential Manager")
-                                                .typo(Typo::Caption)
-                                                .color(Color32::WHITE),
-                                        )
-                                        .fill(PRIMARY_BLUE)
-                                        .corner_radius(6.0)
-                                        .min_size(Vec2::new(210.0, 28.0));
-                                        if ui.add(open_cm_btn).clicked() {
-                                            open_windows_credential_manager();
-                                        }
-                                    });
-                                }
-                            });
-                            ui.label(
-                                RichText::new(format!(
-                                    "  1. Open Control Panel -> User Accounts -> Credential Manager -> Windows Credentials.\n  2. Under 'Generic Credentials', click 'Add a generic credential'.\n  3. Set Internet or network address = '{target_example}', User name = '{user_example}', and Password = your SSH password.\n  4. Click OK, then click 'Verify in OS Vault' above."
-                                ))
-                                .typo(Typo::Small)
-                                .color(TEXT_SECONDARY),
+                            if kit::button(
+                                ui,
+                                ButtonVariant::Secondary,
+                                ButtonSize::Md,
+                                "Copy",
+                                Some(OutlineIcon::Copy),
+                            )
+                            .clicked()
+                            {
+                                ui.ctx().copy_text(cmdkey_cmd);
+                                self.status_banner = Some((
+                                    "Copied Windows cmdkey command to clipboard!".to_string(),
+                                    true,
+                                ));
+                            }
+                        });
+                    }
+                    CredentialOsTab::Linux => {
+                        let linux_cmd = format!(
+                            "secret-tool store --label=\"Shiply ({target_example})\" target \"{target_example}\" username \"{user_example}\""
+                        );
+                        ui.label(Typo::SmallMedium.rich("Linux Secret Service (libsecret / GNOME Keyring / KWallet):"));
+                        ui.add_space(4.0);
+                        ui.label(
+                            Typo::Body.rich(format!(
+                                "1. Ensure libsecret-tools is installed (Debian/Ubuntu: sudo apt install libsecret-tools | Fedora: sudo dnf install libsecret).\n2. Run the command below in your terminal and enter your SSH password when prompted.\n3. In your Project's Settings, set OS Credential Vault Target = '{target_example}'."
+                            )).color(TEXT_SECONDARY),
+                        );
+                        ui.add_space(SP_12);
+                        ui.horizontal(|ui| {
+                            let mut preview = linux_cmd.clone();
+                            syntax_highlighted_text_edit(
+                                ui,
+                                "cred_linux_preview",
+                                &mut preview,
+                                (ui.available_width() - 90.0).max(220.0),
+                                None,
                             );
-                            ui.add_space(8.0);
-                            ui.label(
-                                RichText::new("Option 2 — PowerShell / CMD One-Line Command:")
-                                    .typo(Typo::SmallMedium)
-                                    .color(TEXT_PRIMARY),
+                            if kit::button(
+                                ui,
+                                ButtonVariant::Secondary,
+                                ButtonSize::Md,
+                                "Copy",
+                                Some(OutlineIcon::Copy),
+                            )
+                            .clicked()
+                            {
+                                ui.ctx().copy_text(linux_cmd);
+                                self.status_banner = Some((
+                                    "Copied Linux secret-tool command to clipboard!".to_string(),
+                                    true,
+                                ));
+                            }
+                        });
+                    }
+                    CredentialOsTab::Mac => {
+                        let mac_cmd = format!(
+                            "security add-generic-password -U -s \"{target_example}\" -a \"{user_example}\" -w \"YOUR_SSH_PASSWORD\""
+                        );
+                        ui.label(Typo::SmallMedium.rich("macOS Keychain Access (GUI or Terminal CLI):"));
+                        ui.add_space(4.0);
+                        ui.label(
+                            Typo::Body.rich(format!(
+                                "1. GUI: Open Keychain Access -> File -> New Password Item. Set Keychain Item Name = '{target_example}', Account Name = '{user_example}', and enter your SSH password.\n2. CLI: Or run the one-line macOS security command below in Terminal.\n3. In your Project's Settings, set OS Credential Vault Target = '{target_example}'."
+                            )).color(TEXT_SECONDARY),
+                        );
+                        ui.add_space(SP_12);
+                        ui.horizontal(|ui| {
+                            let mut preview = mac_cmd.clone();
+                            syntax_highlighted_text_edit(
+                                ui,
+                                "cred_mac_preview",
+                                &mut preview,
+                                (ui.available_width() - 90.0).max(220.0),
+                                None,
                             );
-                            ui.add_space(4.0);
-                            horizontal_row(ui, 34.0, |ui| {
-                                let mut preview = cmdkey_cmd.clone();
-                                syntax_highlighted_text_edit(
-                                    ui,
-                                    "cred_cmdkey_preview",
-                                    &mut preview,
-                                    (ui.available_width() - 125.0).max(220.0),
-                                    None,
-                                );
-                                let copy_btn = egui::Button::new(
-                                    RichText::new("Copy Command")
-                                        .typo(Typo::SmallMedium)
-                                        .color(TEXT_PRIMARY),
-                                )
-                                .fill(CARD_BG)
-                                .stroke(Stroke::new(1.0_f32, CARD_BORDER))
-                                .corner_radius(6.0)
-                                .min_size(Vec2::new(110.0, 32.0));
-                                if ui.add(copy_btn).clicked() {
-                                    ui.ctx().copy_text(cmdkey_cmd);
-                                    self.status_banner = Some((
-                                        "Copied Windows cmdkey command to clipboard!".to_string(),
-                                        true,
-                                    ));
-                                }
-                            });
-                        }
-                        CredentialOsTab::Linux => {
-                            let linux_cmd = format!(
-                                "secret-tool store --label=\"Shiply ({target_example})\" target \"{target_example}\" username \"{user_example}\""
-                            );
-                            ui.label(
-                                RichText::new("Linux Secret Service (libsecret / GNOME Keyring / KWallet):")
-                                    .typo(Typo::SmallMedium)
-                                    .color(TEXT_PRIMARY),
-                            );
-                            ui.label(
-                                RichText::new(format!(
-                                    "  1. Ensure libsecret-tools is installed (Debian/Ubuntu: sudo apt install libsecret-tools | Fedora: sudo dnf install libsecret).\n  2. Run the command below in your terminal and enter your SSH password when prompted.\n  3. In your Project's Environment & SSH Settings, set OS Credential Vault Target = '{target_example}'."
-                                ))
-                                .typo(Typo::Small)
-                                .color(TEXT_SECONDARY),
-                            );
-                            ui.add_space(8.0);
-                            horizontal_row(ui, 34.0, |ui| {
-                                let mut preview = linux_cmd.clone();
-                                syntax_highlighted_text_edit(
-                                    ui,
-                                    "cred_linux_preview",
-                                    &mut preview,
-                                    (ui.available_width() - 125.0).max(220.0),
-                                    None,
-                                );
-                                let copy_btn = egui::Button::new(
-                                    RichText::new("Copy Command")
-                                        .typo(Typo::SmallMedium)
-                                        .color(TEXT_PRIMARY),
-                                )
-                                .fill(CARD_BG)
-                                .stroke(Stroke::new(1.0_f32, CARD_BORDER))
-                                .corner_radius(6.0)
-                                .min_size(Vec2::new(110.0, 32.0));
-                                if ui.add(copy_btn).clicked() {
-                                    ui.ctx().copy_text(linux_cmd);
-                                    self.status_banner = Some((
-                                        "Copied Linux secret-tool command to clipboard!".to_string(),
-                                        true,
-                                    ));
-                                }
-                            });
-                        }
-                        CredentialOsTab::Mac => {
-                            let mac_cmd = format!(
-                                "security add-generic-password -U -s \"{target_example}\" -a \"{user_example}\" -w \"YOUR_SSH_PASSWORD\""
-                            );
-                            ui.label(
-                                RichText::new("macOS Keychain Access (GUI or Terminal CLI):")
-                                    .typo(Typo::SmallMedium)
-                                    .color(TEXT_PRIMARY),
-                            );
-                            ui.label(
-                                RichText::new(format!(
-                                    "  1. GUI: Open Keychain Access -> File -> New Password Item. Set Keychain Item Name = '{target_example}', Account Name = '{user_example}', and enter your SSH password.\n  2. CLI: Or run the one-line macOS security command below in Terminal.\n  3. In your Project's Environment & SSH Settings, set OS Credential Vault Target = '{target_example}'."
-                                ))
-                                .typo(Typo::Small)
-                                .color(TEXT_SECONDARY),
-                            );
-                            ui.add_space(8.0);
-                            horizontal_row(ui, 34.0, |ui| {
-                                let mut preview = mac_cmd.clone();
-                                syntax_highlighted_text_edit(
-                                    ui,
-                                    "cred_mac_preview",
-                                    &mut preview,
-                                    (ui.available_width() - 125.0).max(220.0),
-                                    None,
-                                );
-                                let copy_btn = egui::Button::new(
-                                    RichText::new("Copy Command")
-                                        .typo(Typo::SmallMedium)
-                                        .color(TEXT_PRIMARY),
-                                )
-                                .fill(CARD_BG)
-                                .stroke(Stroke::new(1.0_f32, CARD_BORDER))
-                                .corner_radius(6.0)
-                                .min_size(Vec2::new(110.0, 32.0));
-                                if ui.add(copy_btn).clicked() {
-                                    ui.ctx().copy_text(mac_cmd);
-                                    self.status_banner = Some((
-                                        "Copied macOS Keychain security command to clipboard!".to_string(),
-                                        true,
-                                    ));
-                                }
-                            });
-                        }
-                    });
-            });
+                            if kit::button(
+                                ui,
+                                ButtonVariant::Secondary,
+                                ButtonSize::Md,
+                                "Copy",
+                                Some(OutlineIcon::Copy),
+                            )
+                            .clicked()
+                            {
+                                ui.ctx().copy_text(mac_cmd);
+                                self.status_banner = Some((
+                                    "Copied macOS Keychain security command to clipboard!".to_string(),
+                                    true,
+                                ));
+                            }
+                        });
+                    }
+                });
+        });
     }
+
     pub(crate) fn render_project_workspace(&mut self, ui: &mut egui::Ui, project_id: &str) {
         if self.cached_project_id.as_deref() != Some(project_id) {
             self.refresh_selected_project_metadata(true);
