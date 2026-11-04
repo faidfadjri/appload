@@ -1739,4 +1739,54 @@ mod tests {
         assert!(out_bat.contains("Line One"));
         assert!(out_bat.contains("Line Two"));
     }
+
+    #[test]
+    fn test_characterization_build_ssh_command_frozen() {
+        let cmd = build_ssh_command("deploy_user", "192.168.1.100", "uptime", None);
+        let args: Vec<String> = cmd
+            .get_args()
+            .map(|a| a.to_string_lossy().to_string())
+            .collect();
+        assert_eq!(
+            args,
+            vec![
+                "-o",
+                "StrictHostKeyChecking=accept-new",
+                "-o",
+                "ConnectTimeout=10",
+                "-o",
+                "NumberOfPasswordPrompts=1",
+                "-o",
+                "BatchMode=yes",
+                "deploy_user@192.168.1.100",
+                "uptime"
+            ]
+        );
+    }
+
+    #[test]
+    fn test_characterization_build_scp_command_frozen() {
+        let sources = vec![PathBuf::from("build/app.jar")];
+        let cmd = build_scp_command("deploy_user", "192.168.1.100", "/opt/app", &sources, None);
+        let args: Vec<String> = cmd
+            .get_args()
+            .map(|a| a.to_string_lossy().to_string())
+            .collect();
+        assert_eq!(
+            args,
+            vec![
+                "-o",
+                "StrictHostKeyChecking=accept-new",
+                "-o",
+                "ConnectTimeout=10",
+                "-o",
+                "NumberOfPasswordPrompts=1",
+                "-r",
+                "-o",
+                "BatchMode=yes",
+                "build/app.jar",
+                "deploy_user@192.168.1.100:/opt/app"
+            ]
+        );
+    }
 }

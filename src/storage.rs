@@ -1848,4 +1848,50 @@ mod tests {
         assert!(removed.is_some());
         assert_eq!(reloaded.secrets.len(), 1);
     }
+
+    #[test]
+    fn test_characterization_storage_json_schema_frozen() {
+        let json_data = r#"{
+            "projects": [
+                {
+                    "id": "proj-1",
+                    "name": "Project Alpha",
+                    "description": "Alpha service",
+                    "local_path": "/alpha",
+                    "group": "Ops",
+                    "environments": [
+                        {
+                            "key": "prod",
+                            "name": "Production",
+                            "app_name": "alpha-prod",
+                            "servers": ["srv1.internal"],
+                            "remote_dir": "/var/www/alpha",
+                            "remote_user": "ubuntu",
+                            "vault_target": "alpha-vault",
+                            "steps": []
+                        }
+                    ]
+                }
+            ],
+            "deployments": [],
+            "secrets": [
+                {
+                    "key": "ALPHA_KEY",
+                    "username": "admin",
+                    "description": "API Key",
+                    "updated_at": "2026-11-04T00:00:00Z"
+                }
+            ]
+        }"#;
+        let storage: AppStorage = serde_json::from_str(json_data).expect("deserialize legacy json");
+        assert_eq!(storage.projects.len(), 1);
+        assert_eq!(storage.projects[0].name, "Project Alpha");
+        assert_eq!(storage.projects[0].description, "Alpha service");
+        assert_eq!(storage.projects[0].local_path, "/alpha");
+        assert_eq!(storage.projects[0].group.as_deref(), Some("Ops"));
+        assert_eq!(storage.projects[0].environments.len(), 1);
+        assert_eq!(storage.projects[0].environments[0].key, "prod");
+        assert_eq!(storage.secrets.len(), 1);
+        assert_eq!(storage.secrets[0].key, "ALPHA_KEY");
+    }
 }
