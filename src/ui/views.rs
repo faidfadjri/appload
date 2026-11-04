@@ -507,224 +507,238 @@ impl ShiplyApp {
             );
             ui.add_space(SP_12);
 
-            ui.label(
-                Typo::Small
-                    .rich("Shiply reads your SSH password securely from your operating system's native credential vault so you never hardcode passwords in scripts or config files.")
-                    .color(TEXT_SECONDARY),
-            );
-            ui.add_space(SP_12);
+            self.render_os_credentials_guide_body(ui, &target_example, &user_example);
+        });
+    }
 
-            // Interactive inputs
-            ui.horizontal(|ui| {
-                ui.label(Typo::SmallMedium.rich("Vault target:").color(TEXT_SECONDARY));
-                styled_text_edit(
-                    ui,
-                    "cred_guide_target_input",
-                    &mut self.cred_guide_target_input,
-                    170.0,
-                    Some("e.g. prod-ssh-server"),
-                );
-                ui.add_space(SP_8);
-                ui.label(Typo::SmallMedium.rich("SSH user:").color(TEXT_SECONDARY));
-                styled_text_edit(
-                    ui,
-                    "cred_guide_user_input",
-                    &mut self.cred_guide_user_input,
-                    130.0,
-                    Some("e.g. deploy"),
-                );
-                ui.add_space(SP_8);
-                if kit::button(
-                    ui,
-                    ButtonVariant::Secondary,
-                    ButtonSize::Md,
-                    "Verify in OS Vault",
-                    Some(OutlineIcon::Refresh),
-                )
-                .clicked()
-                {
-                    if read_os_vault_credential(&target_example).is_some() {
-                        self.status_banner = Some((
-                            format!("Verified! Credential target '{target_example}' is ready in your OS Vault."),
-                            true,
-                        ));
-                    } else {
-                        self.status_banner = Some((
-                            format!("Target '{target_example}' was not found in your OS Vault yet. Follow the steps below to add it."),
-                            false,
-                        ));
-                    }
+    pub(crate) fn render_os_credentials_guide_body(
+        &mut self,
+        ui: &mut egui::Ui,
+        target_example: &str,
+        user_example: &str,
+    ) {
+        ui.label(
+            Typo::Small
+                .rich("Shiply reads your SSH password securely from your operating system's native credential vault so you never hardcode passwords in scripts or config files.")
+                .color(TEXT_SECONDARY),
+        );
+        ui.add_space(SP_12);
+
+        // Interactive inputs
+        ui.horizontal(|ui| {
+            ui.label(Typo::SmallMedium.rich("Vault target:").color(TEXT_SECONDARY));
+            styled_text_edit(
+                ui,
+                "cred_guide_target_input",
+                &mut self.cred_guide_target_input,
+                170.0,
+                Some("e.g. prod-ssh-server"),
+            );
+            ui.add_space(SP_8);
+            ui.label(Typo::SmallMedium.rich("SSH user:").color(TEXT_SECONDARY));
+            styled_text_edit(
+                ui,
+                "cred_guide_user_input",
+                &mut self.cred_guide_user_input,
+                130.0,
+                Some("e.g. deploy"),
+            );
+            ui.add_space(SP_8);
+            if kit::button(
+                ui,
+                ButtonVariant::Secondary,
+                ButtonSize::Md,
+                "Verify in OS Vault",
+                Some(OutlineIcon::Refresh),
+            )
+            .clicked()
+            {
+                if read_os_vault_credential(target_example).is_some() {
+                    self.status_banner = Some((
+                        format!("Verified! Credential target '{target_example}' is ready in your OS Vault."),
+                        true,
+                    ));
+                    self.status_banner_time = Some(Instant::now());
+                } else {
+                    self.status_banner = Some((
+                        format!("Target '{target_example}' was not found in your OS Vault yet. Follow the steps below to add it."),
+                        false,
+                    ));
+                    self.status_banner_time = Some(Instant::now());
+                }
+            }
+        });
+
+        ui.add_space(SP_16);
+
+        // Segmented OS Tabs
+        let mut os_idx = match self.cred_guide_os_tab {
+            CredentialOsTab::Windows => 0,
+            CredentialOsTab::Linux => 1,
+            CredentialOsTab::Mac => 2,
+        };
+        if kit::segmented(
+            ui,
+            &mut os_idx,
+            &[
+                "Windows (Credential Manager)",
+                "Linux (libsecret / secret-tool)",
+                "Mac (macOS Keychain)",
+            ],
+        ) {
+            self.cred_guide_os_tab = match os_idx {
+                0 => CredentialOsTab::Windows,
+                1 => CredentialOsTab::Linux,
+                _ => CredentialOsTab::Mac,
+            };
+        }
+
+        ui.add_space(SP_12);
+
+        egui::Frame::new()
+            .fill(SUBTLE_BG)
+            .stroke(Stroke::new(1.0_f32, CARD_BORDER))
+            .corner_radius(CornerRadius::same(R_MD as u8))
+            .inner_margin(Margin::same(16))
+            .show(ui, |ui| match self.cred_guide_os_tab {
+                CredentialOsTab::Windows => {
+                    let cmdkey_cmd = format!(
+                        "cmdkey /generic:\"{target_example}\" /user:\"{user_example}\" /pass:\"YOUR_SSH_PASSWORD\""
+                    );
+                    ui.horizontal(|ui| {
+                        ui.label(Typo::SmallMedium.rich("Option 1 — Windows Credential Manager (GUI):"));
+                        #[cfg(windows)]
+                        {
+                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                                if kit::button(
+                                    ui,
+                                    ButtonVariant::Primary,
+                                    ButtonSize::Sm,
+                                    "Open Windows Credential Manager",
+                                    None,
+                                )
+                                .clicked()
+                                {
+                                    open_windows_credential_manager();
+                                }
+                            });
+                        }
+                    });
+                    ui.add_space(4.0);
+                    ui.label(
+                        Typo::Body.rich(format!(
+                            "1. Open Control Panel -> User Accounts -> Credential Manager -> Windows Credentials.\n2. Under 'Generic Credentials', click 'Add a generic credential'.\n3. Set Internet or network address = '{target_example}', User name = '{user_example}', and Password = your SSH password.\n4. Click OK, then click 'Verify in OS Vault' above."
+                        )).color(TEXT_SECONDARY),
+                    );
+                    ui.add_space(SP_12);
+                    ui.label(Typo::SmallMedium.rich("Option 2 — PowerShell / CMD One-Line Command:"));
+                    ui.add_space(4.0);
+                    ui.horizontal(|ui| {
+                        let mut preview = cmdkey_cmd.clone();
+                        syntax_highlighted_text_edit(
+                            ui,
+                            "cred_cmdkey_preview",
+                            &mut preview,
+                            (ui.available_width() - 90.0).max(220.0),
+                            None,
+                        );
+                        if kit::button(
+                            ui,
+                            ButtonVariant::Secondary,
+                            ButtonSize::Md,
+                            "Copy",
+                            Some(OutlineIcon::Copy),
+                        )
+                        .clicked()
+                        {
+                            ui.ctx().copy_text(cmdkey_cmd);
+                            self.status_banner = Some((
+                                "Copied Windows cmdkey command to clipboard!".to_string(),
+                                true,
+                            ));
+                            self.status_banner_time = Some(Instant::now());
+                        }
+                    });
+                }
+                CredentialOsTab::Linux => {
+                    let linux_cmd = format!(
+                        "secret-tool store --label=\"Shiply ({target_example})\" target \"{target_example}\" username \"{user_example}\""
+                    );
+                    ui.label(Typo::SmallMedium.rich("Linux Secret Service (libsecret / GNOME Keyring / KWallet):"));
+                    ui.add_space(4.0);
+                    ui.label(
+                        Typo::Body.rich(format!(
+                            "1. Ensure libsecret-tools is installed (Debian/Ubuntu: sudo apt install libsecret-tools | Fedora: sudo dnf install libsecret).\n2. Run the command below in your terminal and enter your SSH password when prompted.\n3. In your Project's Settings, set OS Credential Vault Target = '{target_example}'."
+                        )).color(TEXT_SECONDARY),
+                    );
+                    ui.add_space(SP_12);
+                    ui.horizontal(|ui| {
+                        let mut preview = linux_cmd.clone();
+                        syntax_highlighted_text_edit(
+                            ui,
+                            "cred_linux_preview",
+                            &mut preview,
+                            (ui.available_width() - 90.0).max(220.0),
+                            None,
+                        );
+                        if kit::button(
+                            ui,
+                            ButtonVariant::Secondary,
+                            ButtonSize::Md,
+                            "Copy",
+                            Some(OutlineIcon::Copy),
+                        )
+                        .clicked()
+                        {
+                            ui.ctx().copy_text(linux_cmd);
+                            self.status_banner = Some((
+                                "Copied Linux secret-tool command to clipboard!".to_string(),
+                                true,
+                            ));
+                            self.status_banner_time = Some(Instant::now());
+                        }
+                    });
+                }
+                CredentialOsTab::Mac => {
+                    let mac_cmd = format!(
+                        "security add-generic-password -U -s \"{target_example}\" -a \"{user_example}\" -w \"YOUR_SSH_PASSWORD\""
+                    );
+                    ui.label(Typo::SmallMedium.rich("macOS Keychain Access (GUI or Terminal CLI):"));
+                    ui.add_space(4.0);
+                    ui.label(
+                        Typo::Body.rich(format!(
+                            "1. GUI: Open Keychain Access -> File -> New Password Item. Set Keychain Item Name = '{target_example}', Account Name = '{user_example}', and enter your SSH password.\n2. CLI: Or run the one-line macOS security command below in Terminal.\n3. In your Project's Settings, set OS Credential Vault Target = '{target_example}'."
+                        )).color(TEXT_SECONDARY),
+                    );
+                    ui.add_space(SP_12);
+                    ui.horizontal(|ui| {
+                        let mut preview = mac_cmd.clone();
+                        syntax_highlighted_text_edit(
+                            ui,
+                            "cred_mac_preview",
+                            &mut preview,
+                            (ui.available_width() - 90.0).max(220.0),
+                            None,
+                        );
+                        if kit::button(
+                            ui,
+                            ButtonVariant::Secondary,
+                            ButtonSize::Md,
+                            "Copy",
+                            Some(OutlineIcon::Copy),
+                        )
+                        .clicked()
+                        {
+                            ui.ctx().copy_text(mac_cmd);
+                            self.status_banner = Some((
+                                "Copied macOS Keychain security command to clipboard!".to_string(),
+                                true,
+                            ));
+                            self.status_banner_time = Some(Instant::now());
+                        }
+                    });
                 }
             });
-
-            ui.add_space(SP_16);
-
-            // Segmented OS Tabs
-            let mut os_idx = match self.cred_guide_os_tab {
-                CredentialOsTab::Windows => 0,
-                CredentialOsTab::Linux => 1,
-                CredentialOsTab::Mac => 2,
-            };
-            if kit::segmented(
-                ui,
-                &mut os_idx,
-                &[
-                    "Windows (Credential Manager)",
-                    "Linux (libsecret / secret-tool)",
-                    "Mac (macOS Keychain)",
-                ],
-            ) {
-                self.cred_guide_os_tab = match os_idx {
-                    0 => CredentialOsTab::Windows,
-                    1 => CredentialOsTab::Linux,
-                    _ => CredentialOsTab::Mac,
-                };
-            }
-
-            ui.add_space(SP_12);
-
-            egui::Frame::new()
-                .fill(SUBTLE_BG)
-                .stroke(Stroke::new(1.0_f32, CARD_BORDER))
-                .corner_radius(CornerRadius::same(R_MD as u8))
-                .inner_margin(Margin::same(16))
-                .show(ui, |ui| match self.cred_guide_os_tab {
-                    CredentialOsTab::Windows => {
-                        let cmdkey_cmd = format!(
-                            "cmdkey /generic:\"{target_example}\" /user:\"{user_example}\" /pass:\"YOUR_SSH_PASSWORD\""
-                        );
-                        ui.horizontal(|ui| {
-                            ui.label(Typo::SmallMedium.rich("Option 1 — Windows Credential Manager (GUI):"));
-                            #[cfg(windows)]
-                            {
-                                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                    if kit::button(
-                                        ui,
-                                        ButtonVariant::Primary,
-                                        ButtonSize::Sm,
-                                        "Open Windows Credential Manager",
-                                        None,
-                                    )
-                                    .clicked()
-                                    {
-                                        open_windows_credential_manager();
-                                    }
-                                });
-                            }
-                        });
-                        ui.add_space(4.0);
-                        ui.label(
-                            Typo::Body.rich(format!(
-                                "1. Open Control Panel -> User Accounts -> Credential Manager -> Windows Credentials.\n2. Under 'Generic Credentials', click 'Add a generic credential'.\n3. Set Internet or network address = '{target_example}', User name = '{user_example}', and Password = your SSH password.\n4. Click OK, then click 'Verify in OS Vault' above."
-                            )).color(TEXT_SECONDARY),
-                        );
-                        ui.add_space(SP_12);
-                        ui.label(Typo::SmallMedium.rich("Option 2 — PowerShell / CMD One-Line Command:"));
-                        ui.add_space(4.0);
-                        ui.horizontal(|ui| {
-                            let mut preview = cmdkey_cmd.clone();
-                            syntax_highlighted_text_edit(
-                                ui,
-                                "cred_cmdkey_preview",
-                                &mut preview,
-                                (ui.available_width() - 90.0).max(220.0),
-                                None,
-                            );
-                            if kit::button(
-                                ui,
-                                ButtonVariant::Secondary,
-                                ButtonSize::Md,
-                                "Copy",
-                                Some(OutlineIcon::Copy),
-                            )
-                            .clicked()
-                            {
-                                ui.ctx().copy_text(cmdkey_cmd);
-                                self.status_banner = Some((
-                                    "Copied Windows cmdkey command to clipboard!".to_string(),
-                                    true,
-                                ));
-                            }
-                        });
-                    }
-                    CredentialOsTab::Linux => {
-                        let linux_cmd = format!(
-                            "secret-tool store --label=\"Shiply ({target_example})\" target \"{target_example}\" username \"{user_example}\""
-                        );
-                        ui.label(Typo::SmallMedium.rich("Linux Secret Service (libsecret / GNOME Keyring / KWallet):"));
-                        ui.add_space(4.0);
-                        ui.label(
-                            Typo::Body.rich(format!(
-                                "1. Ensure libsecret-tools is installed (Debian/Ubuntu: sudo apt install libsecret-tools | Fedora: sudo dnf install libsecret).\n2. Run the command below in your terminal and enter your SSH password when prompted.\n3. In your Project's Settings, set OS Credential Vault Target = '{target_example}'."
-                            )).color(TEXT_SECONDARY),
-                        );
-                        ui.add_space(SP_12);
-                        ui.horizontal(|ui| {
-                            let mut preview = linux_cmd.clone();
-                            syntax_highlighted_text_edit(
-                                ui,
-                                "cred_linux_preview",
-                                &mut preview,
-                                (ui.available_width() - 90.0).max(220.0),
-                                None,
-                            );
-                            if kit::button(
-                                ui,
-                                ButtonVariant::Secondary,
-                                ButtonSize::Md,
-                                "Copy",
-                                Some(OutlineIcon::Copy),
-                            )
-                            .clicked()
-                            {
-                                ui.ctx().copy_text(linux_cmd);
-                                self.status_banner = Some((
-                                    "Copied Linux secret-tool command to clipboard!".to_string(),
-                                    true,
-                                ));
-                            }
-                        });
-                    }
-                    CredentialOsTab::Mac => {
-                        let mac_cmd = format!(
-                            "security add-generic-password -U -s \"{target_example}\" -a \"{user_example}\" -w \"YOUR_SSH_PASSWORD\""
-                        );
-                        ui.label(Typo::SmallMedium.rich("macOS Keychain Access (GUI or Terminal CLI):"));
-                        ui.add_space(4.0);
-                        ui.label(
-                            Typo::Body.rich(format!(
-                                "1. GUI: Open Keychain Access -> File -> New Password Item. Set Keychain Item Name = '{target_example}', Account Name = '{user_example}', and enter your SSH password.\n2. CLI: Or run the one-line macOS security command below in Terminal.\n3. In your Project's Settings, set OS Credential Vault Target = '{target_example}'."
-                            )).color(TEXT_SECONDARY),
-                        );
-                        ui.add_space(SP_12);
-                        ui.horizontal(|ui| {
-                            let mut preview = mac_cmd.clone();
-                            syntax_highlighted_text_edit(
-                                ui,
-                                "cred_mac_preview",
-                                &mut preview,
-                                (ui.available_width() - 90.0).max(220.0),
-                                None,
-                            );
-                            if kit::button(
-                                ui,
-                                ButtonVariant::Secondary,
-                                ButtonSize::Md,
-                                "Copy",
-                                Some(OutlineIcon::Copy),
-                            )
-                            .clicked()
-                            {
-                                ui.ctx().copy_text(mac_cmd);
-                                self.status_banner = Some((
-                                    "Copied macOS Keychain security command to clipboard!".to_string(),
-                                    true,
-                                ));
-                            }
-                        });
-                    }
-                });
-        });
     }
 
     pub(crate) fn render_project_workspace(&mut self, ui: &mut egui::Ui, project_id: &str) {
@@ -4718,12 +4732,19 @@ impl ShiplyApp {
     }
 
     pub(crate) fn render_secret_management_view(&mut self, ui: &mut egui::Ui) {
-        if self.storage.sync_project_vault_targets_to_secrets() {
-            let _ = self.storage.save();
+        // Vault-status caching: refresh only if dirty, empty, or 10s elapsed
+        let now = Instant::now();
+        let needs_refresh = self.secret_vault_cache_dirty
+            || (self.secret_vault_cache.is_empty() && !self.storage.secrets.is_empty())
+            || self
+                .secret_vault_last_refresh
+                .is_none_or(|t| now.duration_since(t) >= Duration::from_secs(10));
+        if needs_refresh {
+            self.refresh_secret_vault_cache();
         }
 
         let avail_w = ui.available_width();
-        let is_compact_hdr = avail_w < 580.0;
+        let is_compact_hdr = avail_w < 780.0;
         let os_vault_badge = if cfg!(windows) {
             "Windows Credential Manager"
         } else if cfg!(target_os = "macos") {
@@ -4732,6 +4753,7 @@ impl ShiplyApp {
             "Linux Secret Service"
         };
 
+        // 1. Page Header
         horizontal_row(ui, 38.0, |ui| {
             ui.label(
                 RichText::new("Secret Management")
@@ -4739,29 +4761,40 @@ impl ShiplyApp {
                     .color(TEXT_PRIMARY),
             );
             if !is_compact_hdr {
-                render_pill(ui, os_vault_badge, BLUE_PILL_BG, BLUE_PILL_TEXT);
+                ui.add_space(SP_8);
+                kit::status_badge(ui, StatusKind::Success, os_vault_badge);
             }
 
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                ui.spacing_mut().item_spacing = Vec2::new(8.0, 0.0);
+                ui.spacing_mut().item_spacing = Vec2::new(SP_8, 0.0);
+
+                let new_btn_txt = if is_compact_hdr { "+ New" } else { "+ New secret" };
+                if kit::button(
+                    ui,
+                    ButtonVariant::Primary,
+                    ButtonSize::Md,
+                    new_btn_txt,
+                    None,
+                )
+                .on_hover_text("Open form to add a new secret to the OS Credential Manager")
+                .clicked()
+                {
+                    self.open_new_secret_modal();
+                }
 
                 #[cfg(windows)]
                 {
                     let open_lbl = if is_compact_hdr {
                         "OS Vault"
                     } else {
-                        "Open Windows Credential Manager"
+                        "Open Credential Manager"
                     };
-                    if outline_icon_button(
+                    if kit::button(
                         ui,
-                        "secret_mgmt_open_win_vault_btn",
-                        OutlineIcon::Key,
-                        Some(open_lbl),
-                        TEXT_PRIMARY,
-                        CARD_BG,
-                        SUBTLE_BG,
-                        CARD_BORDER,
-                        true,
+                        ButtonVariant::Secondary,
+                        ButtonSize::Md,
+                        open_lbl,
+                        Some(OutlineIcon::Key),
                     )
                     .on_hover_text("Open Windows Control Panel Credential Manager")
                     .clicked()
@@ -4769,675 +4802,531 @@ impl ShiplyApp {
                         open_windows_credential_manager();
                     }
                 }
-
-                let new_btn = egui::Button::new(
-                    RichText::new(if is_compact_hdr {
-                        "+ New"
-                    } else {
-                        "+ New Secret"
-                    })
-                    .typo(Typo::SmallMedium)
-                    .color(Color32::WHITE),
-                )
-                .fill(PRIMARY_BLUE)
-                .corner_radius(7.0)
-                .min_size(Vec2::new(if is_compact_hdr { 78.0 } else { 120.0 }, 34.0));
-
-                if ui
-                    .add(new_btn)
-                    .on_hover_text("Clear form to add a new secret to the OS Credential Manager")
-                    .clicked()
-                {
-                    self.secret_form_key.clear();
-                    self.secret_form_username.clear();
-                    self.secret_form_value.clear();
-                    self.secret_form_description.clear();
-                    self.secret_form_editing_existing = false;
-                }
             });
         });
 
         ui.label(
-            RichText::new(
-                "Add or update SSH credentials, passwords, and API tokens like GitHub Actions Secrets. Secret values are encrypted directly in your OS Credential Manager and never stored in plaintext in Shiply's database.",
-            )
-            .typo(Typo::Body)
-            .color(TEXT_SECONDARY),
+            RichText::new("Credentials and tokens for your pipelines, stored in your OS vault, never in Shiply's database.")
+                .typo(Typo::Small)
+                .color(TEXT_SECONDARY),
         );
-        ui.add_space(16.0);
+        ui.add_space(SP_16);
 
-        // 1. Add / Update Secret Form Card
-        let mut save_secret_clicked = false;
-        let mut clear_form_clicked = false;
-        egui::Frame::new()
-            .fill(CARD_BG)
-            .stroke(Stroke::new(1.0_f32, CARD_BORDER))
-            .corner_radius(10.0)
-            .inner_margin(Margin::symmetric(22, 18))
-            .show(ui, |ui| {
-                let card_w = ui.available_width();
-                let is_two_col = card_w >= 640.0;
-                let col_w = if is_two_col {
-                    ((card_w - 24.0) / 2.0).max(200.0)
-                } else {
-                    card_w.max(200.0)
-                };
+        // 2. Summary Strip (Stat Tiles)
+        let total_secrets = self.storage.secrets.len();
+        let stored_count = self
+            .storage
+            .secrets
+            .iter()
+            .filter(|s| self.secret_vault_cache.get(&s.key).is_some_and(|c| c.in_vault))
+            .count();
+        let missing_count = total_secrets.saturating_sub(stored_count);
 
-                horizontal_row(ui, 26.0, |ui| {
-                    draw_outline_icon(
-                        ui.painter(),
-                        Pos2::new(ui.cursor().min.x + 8.0, ui.cursor().min.y + 13.0),
-                        OutlineIcon::Key,
-                        PRIMARY_BLUE,
-                    );
-                    ui.add_space(20.0);
-                    ui.label(
-                        RichText::new(if self.secret_form_editing_existing {
-                            "Update secret in OS Credential Manager"
-                        } else {
-                            "Add new secret to OS Credential Manager"
-                        })
-                        .typo(Typo::SmallMedium)
-                        .color(TEXT_PRIMARY),
-                    );
-                });
-                ui.add_space(10.0);
-
-                if is_two_col {
-                    ui.horizontal(|ui| {
-                        ui.spacing_mut().item_spacing = Vec2::new(24.0, 0.0);
-                        ui.vertical(|ui| {
-                            ui.set_width(col_w);
-                            ui.label(
-                                RichText::new("Secret Name / Target Key *")
-                                    .typo(Typo::SmallMedium)
-                                    .color(TEXT_SECONDARY),
-                            );
-                            ui.add_space(4.0);
-                            styled_text_edit(
-                                ui,
-                                "secret_mgmt_key_input",
-                                &mut self.secret_form_key,
-                                col_w,
-                                Some("e.g. indyserver, prod-ssh-server, DOCKER_TOKEN"),
-                            );
-                        });
-                        ui.vertical(|ui| {
-                            ui.set_width(col_w);
-                            ui.label(
-                                RichText::new("Username / Account (Optional)")
-                                    .typo(Typo::SmallMedium)
-                                    .color(TEXT_SECONDARY),
-                            );
-                            ui.add_space(4.0);
-                            styled_text_edit(
-                                ui,
-                                "secret_mgmt_user_input",
-                                &mut self.secret_form_username,
-                                col_w,
-                                Some("e.g. appndq, deploy, ubuntu"),
-                            );
-                        });
-                    });
-                    ui.add_space(12.0);
-                    ui.horizontal(|ui| {
-                        ui.spacing_mut().item_spacing = Vec2::new(24.0, 0.0);
-                        ui.vertical(|ui| {
-                            ui.set_width(col_w);
-                            ui.label(
-                                RichText::new("Secret Value / Password *")
-                                    .typo(Typo::SmallMedium)
-                                    .color(TEXT_SECONDARY),
-                            );
-                            ui.add_space(4.0);
-                            styled_password_edit(
-                                ui,
-                                "secret_mgmt_value_input",
-                                &mut self.secret_form_value,
-                                col_w,
-                                Some("Enter password or secret token (saved to OS Vault)"),
-                            );
-                        });
-                        ui.vertical(|ui| {
-                            ui.set_width(col_w);
-                            ui.label(
-                                RichText::new("Description / Note (Optional)")
-                                    .typo(Typo::SmallMedium)
-                                    .color(TEXT_SECONDARY),
-                            );
-                            ui.add_space(4.0);
-                            styled_text_edit(
-                                ui,
-                                "secret_mgmt_desc_input",
-                                &mut self.secret_form_description,
-                                col_w,
-                                Some("e.g. Production SSH Server or Registry Token"),
-                            );
-                        });
-                    });
-                } else {
-                    ui.label(
-                        RichText::new("Secret Name / Target Key *")
-                            .typo(Typo::SmallMedium)
-                            .color(TEXT_SECONDARY),
-                    );
-                    ui.add_space(4.0);
-                    styled_text_edit(
-                        ui,
-                        "secret_mgmt_key_input",
-                        &mut self.secret_form_key,
-                        col_w,
-                        Some("e.g. indyserver, prod-ssh-server, DOCKER_TOKEN"),
-                    );
-                    ui.add_space(10.0);
-
-                    ui.label(
-                        RichText::new("Username / Account (Optional)")
-                            .typo(Typo::SmallMedium)
-                            .color(TEXT_SECONDARY),
-                    );
-                    ui.add_space(4.0);
-                    styled_text_edit(
-                        ui,
-                        "secret_mgmt_user_input",
-                        &mut self.secret_form_username,
-                        col_w,
-                        Some("e.g. appndq, deploy, ubuntu"),
-                    );
-                    ui.add_space(10.0);
-
-                    ui.label(
-                        RichText::new("Secret Value / Password *")
-                            .typo(Typo::SmallMedium)
-                            .color(TEXT_SECONDARY),
-                    );
-                    ui.add_space(4.0);
-                    styled_password_edit(
-                        ui,
-                        "secret_mgmt_value_input",
-                        &mut self.secret_form_value,
-                        col_w,
-                        Some("Enter password or secret token (saved to OS Vault)"),
-                    );
-                    ui.add_space(10.0);
-
-                    ui.label(
-                        RichText::new("Description / Note (Optional)")
-                            .typo(Typo::SmallMedium)
-                            .color(TEXT_SECONDARY),
-                    );
-                    ui.add_space(4.0);
-                    styled_text_edit(
-                        ui,
-                        "secret_mgmt_desc_input",
-                        &mut self.secret_form_description,
-                        col_w,
-                        Some("e.g. Production SSH Server or Registry Token"),
-                    );
-                }
-
-                ui.add_space(14.0);
-                draw_divider(ui, SUBTLE_BG);
-                ui.add_space(12.0);
-
-                let can_save = !self.secret_form_key.trim().is_empty()
-                    && !self.secret_form_value.is_empty();
-                let preview_key = if self.secret_form_key.trim().is_empty() {
-                    "SECRET_KEY"
-                } else {
-                    self.secret_form_key.trim()
-                };
-
-                horizontal_row(ui, 36.0, |ui| {
-                    if !is_compact_hdr {
-                        ui.label(
-                            RichText::new(format!(
-                                "Pipeline syntax: ${{{{ secrets.{preview_key} }}}}  |  SSH Target: {preview_key}"
-                            ))
-                            .typo(Typo::Caption)
-                            .monospace()
-                            .color(TEXT_MUTED),
-                        );
-                    }
-
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.spacing_mut().item_spacing = Vec2::new(8.0, 0.0);
-                        let save_lbl = if self.secret_form_editing_existing {
-                            "Update in OS Vault"
-                        } else {
-                            "Save to OS Vault"
-                        };
-                        let save_btn = egui::Button::new(
-                            RichText::new(save_lbl)
-                                .typo(Typo::SmallMedium)
-                                .color(if can_save {
-                                    Color32::WHITE
-                                } else {
-                                    SB_TEXT_MUTED
-                                }),
-                        )
-                        .fill(if can_save {
-                            PRIMARY_BLUE
-                        } else {
-                            SB_TEXT
-                        })
-                        .corner_radius(7.0)
-                        .min_size(Vec2::new(165.0, 34.0));
-
-                        if ui.add_enabled(can_save, save_btn).clicked() {
-                            save_secret_clicked = true;
-                        }
-
-                        if (!self.secret_form_key.is_empty()
-                            || !self.secret_form_username.is_empty()
-                            || !self.secret_form_value.is_empty()
-                            || !self.secret_form_description.is_empty())
-                            && ui
-                                .add(
-                                    egui::Button::new(
-                                        RichText::new("Clear")
-                                            .typo(Typo::SmallMedium)
-                                            .color(TEXT_SECONDARY),
-                                    )
-                                    .fill(SUBTLE_BG)
-                                    .stroke(Stroke::new(1.0_f32, CARD_BORDER))
-                                    .corner_radius(7.0)
-                                    .min_size(Vec2::new(76.0, 34.0)),
-                                )
-                                .clicked()
-                        {
-                            clear_form_clicked = true;
-                        }
-                    });
-                });
-            });
-
-        if save_secret_clicked {
-            if let Err(err) = self.save_secret_to_os_vault() {
-                self.status_banner = Some((err, false));
+        let mut referenced_envs = HashSet::new();
+        for s in &self.storage.secrets {
+            for env_ref in self.storage.environments_using_secret(&s.key) {
+                referenced_envs.insert(env_ref);
             }
-        } else if clear_form_clicked {
-            self.secret_form_key.clear();
-            self.secret_form_username.clear();
-            self.secret_form_value.clear();
-            self.secret_form_description.clear();
-            self.secret_form_editing_existing = false;
+        }
+        let used_envs_count = referenced_envs.len();
+
+        let is_narrow_tiles = avail_w < 640.0;
+        let num_cols = if is_narrow_tiles { 2 } else { 4 };
+        let tile_gap = SP_12;
+        let tile_w = ((avail_w - (num_cols as f32 - 1.0) * tile_gap) / num_cols as f32).max(120.0);
+
+        let stats = [
+            ("Total secrets", total_secrets, TEXT_PRIMARY),
+            ("Stored in vault", stored_count, SUCCESS),
+            (
+                "Missing in vault",
+                missing_count,
+                if missing_count > 0 { WARNING } else { TEXT_MUTED },
+            ),
+            ("Used by environments", used_envs_count, TEXT_PRIMARY),
+        ];
+
+        if is_narrow_tiles {
+            for chunk in stats.chunks(2) {
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing = Vec2::new(tile_gap, 0.0);
+                    for (lbl, val, col) in chunk {
+                        render_secret_stat_tile(ui, tile_w, lbl, *val, *col);
+                    }
+                });
+                ui.add_space(SP_8);
+            }
+        } else {
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing = Vec2::new(tile_gap, 0.0);
+                for (lbl, val, col) in &stats {
+                    render_secret_stat_tile(ui, tile_w, lbl, *val, *col);
+                }
+            });
         }
 
-        ui.add_space(18.0);
+        ui.add_space(SP_16);
 
-        // 2. Configured Secrets List Header + Search
+        // 3. Secrets Table Card
         let query = self.secret_search_query.trim().to_lowercase();
         let filtered_secrets: Vec<SecretEntry> = self
             .storage
             .secrets
             .iter()
             .filter(|s| {
-                query.is_empty()
+                // Filter by search query
+                let matches_query = query.is_empty()
                     || s.key.to_lowercase().contains(&query)
                     || s.description.to_lowercase().contains(&query)
                     || s.username
                         .as_deref()
-                        .is_some_and(|u| u.to_lowercase().contains(&query))
+                        .is_some_and(|u| u.to_lowercase().contains(&query));
+                if !matches_query {
+                    return false;
+                }
+
+                // Filter by status tab
+                let in_vault = self
+                    .secret_vault_cache
+                    .get(&s.key)
+                    .is_some_and(|c| c.in_vault);
+                match self.secret_filter_status {
+                    SecretFilterStatus::All => true,
+                    SecretFilterStatus::Stored => in_vault,
+                    SecretFilterStatus::Missing => !in_vault,
+                }
             })
             .cloned()
             .collect();
 
-        horizontal_row(ui, 34.0, |ui| {
-            ui.label(
-                RichText::new(format!("CONFIGURED SECRETS ({})", filtered_secrets.len()))
-                    .typo(Typo::Label)
-                    .color(TEXT_PRIMARY),
-            );
+        let is_stacked_view =
+            ui.ctx().screen_rect().width() < 1050.0 || ui.available_width() < 720.0;
+        let mut edit_target: Option<(String, String, String)> = None;
+        let mut delete_target_key: Option<String> = None;
+        let mut copied_expr: Option<String> = None;
 
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                let search_w = if is_compact_hdr { 160.0 } else { 240.0 };
+        kit::card(ui, |ui| {
+            // Card Toolbar
+            horizontal_row(ui, 36.0, |ui| {
+                let search_w = if is_compact_hdr { 140.0 } else { 200.0 };
                 styled_text_edit(
                     ui,
                     "secret_mgmt_search_input",
                     &mut self.secret_search_query,
                     search_w,
-                    Some("Filter secrets..."),
+                    Some("Search secrets..."),
                 );
-            });
-        });
 
-        ui.add_space(8.0);
+                ui.add_space(SP_12);
 
-        let is_stacked_view =
-            ui.ctx().screen_rect().width() < 860.0 || ui.available_width() < 640.0;
-        let mut edit_target: Option<(String, String, String)> = None;
-        let mut delete_target_key: Option<String> = None;
-        let mut copied_expr: Option<String> = None;
-
-        egui::Frame::new()
-            .fill(CARD_BG)
-            .stroke(Stroke::new(1.0_f32, CARD_BORDER))
-            .corner_radius(10.0)
-            .inner_margin(Margin::symmetric(20, 14))
-            .show(ui, |ui| {
-                let table_avail_w = ui.available_width();
-                // Fixed columns: KEY/DESC (flex) + USERNAME (120) + STATUS (145) + USED BY (180) + UPDATED (135) + ACTIONS (115)
-                let key_col_w =
-                    (table_avail_w - (120.0 + 145.0 + 180.0 + 135.0 + 115.0)).max(150.0);
-
-                if !is_stacked_view {
-                    horizontal_row(ui, 22.0, |ui| {
-                        ui.add_sized(
-                            [key_col_w, 20.0],
-                            egui::Label::new(
-                                RichText::new("Secret / target key")
-                                    .typo(Typo::Caption)
-                                    .color(TEXT_MUTED),
-                            ),
-                        );
-                        ui.add_sized(
-                            [120.0, 20.0],
-                            egui::Label::new(
-                                RichText::new("Username")
-                                    .typo(Typo::Caption)
-                                    .color(TEXT_MUTED),
-                            ),
-                        );
-                        ui.add_sized(
-                            [145.0, 20.0],
-                            egui::Label::new(
-                                RichText::new("OS vault status")
-                                    .typo(Typo::Caption)
-                                    .color(TEXT_MUTED),
-                            ),
-                        );
-                        ui.add_sized(
-                            [180.0, 20.0],
-                            egui::Label::new(
-                                RichText::new("Used by")
-                                    .typo(Typo::Caption)
-                                    .color(TEXT_MUTED),
-                            ),
-                        );
-                        ui.add_sized(
-                            [135.0, 20.0],
-                            egui::Label::new(
-                                RichText::new("Updated (local)")
-                                    .typo(Typo::Caption)
-                                    .color(TEXT_MUTED),
-                            ),
-                        );
-                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            ui.label(
-                                RichText::new("Actions")
-                                    .typo(Typo::Caption)
-                                    .color(TEXT_MUTED),
-                            );
-                        });
-                    });
-                    ui.add_space(6.0);
-                    draw_divider(ui, CARD_BORDER);
-                }
-
-                if filtered_secrets.is_empty() {
-                    ui.vertical_centered(|ui| {
-                        ui.add_space(20.0);
-                        ui.label(
-                            RichText::new(
-                                "No secrets configured yet. Use the form above to save a secret directly to your OS Credential Manager.",
-                            )
-                            .typo(Typo::Body)
-                            .color(TEXT_MUTED),
-                        );
-                        ui.add_space(20.0);
-                    });
-                }
-
-                for (idx, sec) in filtered_secrets.iter().enumerate() {
-                    if idx > 0 {
-                        draw_divider(ui, SUBTLE_BG);
-                    }
-                    ui.add_space(6.0);
-
-                    let vault_cred = read_os_vault_credential(&sec.key);
-                    let in_vault = vault_cred.is_some();
-                    let effective_user = vault_cred
-                        .and_then(|c| c.username)
-                        .or_else(|| sec.username.clone())
-                        .unwrap_or_else(|| "—".to_string());
-                    let used_by_list = self.storage.environments_using_secret(&sec.key);
-                    let used_by_str = if used_by_list.is_empty() {
-                        "Pipeline / Global".to_string()
-                    } else {
-                        used_by_list.join(", ")
+                let mut filter_idx = match self.secret_filter_status {
+                    SecretFilterStatus::All => 0,
+                    SecretFilterStatus::Stored => 1,
+                    SecretFilterStatus::Missing => 2,
+                };
+                if kit::segmented(ui, &mut filter_idx, &["All", "Stored", "Missing"]) {
+                    self.secret_filter_status = match filter_idx {
+                        0 => SecretFilterStatus::All,
+                        1 => SecretFilterStatus::Stored,
+                        _ => SecretFilterStatus::Missing,
                     };
+                }
 
-                    if is_stacked_view {
-                        horizontal_row(ui, 24.0, |ui| {
-                            ui.label(
-                                RichText::new(&sec.key)
-                                    .typo(Typo::Mono)
-                                    .color(TEXT_PRIMARY),
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    ui.spacing_mut().item_spacing = Vec2::new(SP_8, 0.0);
+
+                    if kit::icon_button(
+                        ui,
+                        OutlineIcon::Refresh,
+                        ButtonSize::Sm,
+                        "Refresh OS vault status",
+                    )
+                    .clicked()
+                    {
+                        self.refresh_secret_vault_cache();
+                    }
+
+                    let count_str = if filtered_secrets.len() == 1 {
+                        "1 secret".to_string()
+                    } else {
+                        format!("{} secrets", filtered_secrets.len())
+                    };
+                    ui.label(Typo::Small.rich(count_str).color(TEXT_MUTED));
+                });
+            });
+
+            ui.add_space(SP_12);
+
+            let table_avail_w = ui.available_width();
+            let key_col_w = (table_avail_w - (120.0 + 140.0 + 190.0 + 130.0 + 110.0)).max(150.0);
+
+            // Table Column Header
+            if !is_stacked_view {
+                egui::Frame::new()
+                    .fill(SUBTLE_BG)
+                    .inner_margin(Margin::symmetric(12, 8))
+                    .corner_radius(CornerRadius::same(R_SM as u8))
+                    .show(ui, |ui| {
+                        horizontal_row(ui, 20.0, |ui| {
+                            ui.add_sized(
+                                [key_col_w, 20.0],
+                                egui::Label::new(
+                                    Typo::SmallMedium.rich("Name").color(TEXT_SECONDARY),
+                                ),
                             );
-                            let (s_txt, s_bg, s_fg) = if in_vault {
-                                ("Stored in OS vault", SUCCESS_PILL_BG, SUCCESS_PILL_TEXT)
-                            } else {
-                                ("Missing in vault", WARN_PILL_BG, WARN_PILL_TEXT)
-                            };
-                            render_pill(ui, s_txt, s_bg, s_fg);
-                        });
-                        if !sec.description.is_empty() {
-                            ui.label(
-                                RichText::new(&sec.description)
-                                    .typo(Typo::Small)
-                                    .color(TEXT_SECONDARY),
+                            ui.add_sized(
+                                [120.0, 20.0],
+                                egui::Label::new(
+                                    Typo::SmallMedium.rich("Username").color(TEXT_SECONDARY),
+                                ),
                             );
-                        }
-                        horizontal_row(ui, 28.0, |ui| {
-                            ui.label(
-                                RichText::new(format!("User: {effective_user}  •  {used_by_str}"))
-                                    .typo(Typo::Caption)
-                                    .color(TEXT_MUTED),
+                            ui.add_sized(
+                                [140.0, 20.0],
+                                egui::Label::new(
+                                    Typo::SmallMedium.rich("Status").color(TEXT_SECONDARY),
+                                ),
+                            );
+                            ui.add_sized(
+                                [190.0, 20.0],
+                                egui::Label::new(
+                                    Typo::SmallMedium.rich("Used by").color(TEXT_SECONDARY),
+                                ),
+                            );
+                            ui.add_sized(
+                                [130.0, 20.0],
+                                egui::Label::new(
+                                    Typo::SmallMedium.rich("Updated").color(TEXT_SECONDARY),
+                                ),
                             );
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                ui.spacing_mut().item_spacing = Vec2::new(6.0, 0.0);
-                                if outline_icon_button(
-                                    ui,
-                                    ("sec_stack_del", &sec.key),
-                                    OutlineIcon::Trash,
-                                    None,
-                                    FAIL_PILL_TEXT,
-                                    SUBTLE_BG,
-                                    FAIL_PILL_BG,
-                                    CARD_BORDER,
-                                    true,
-                                )
-                                .on_hover_text("Delete secret from OS Credential Manager")
-                                .clicked()
-                                {
-                                    delete_target_key = Some(sec.key.clone());
-                                }
-                                if outline_icon_button(
-                                    ui,
-                                    ("sec_stack_copy", &sec.key),
-                                    OutlineIcon::Copy,
-                                    None,
-                                    TEXT_SECONDARY,
-                                    SUBTLE_BG,
-                                    PILL_CONTAINER_BG,
-                                    CARD_BORDER,
-                                    true,
-                                )
-                                .on_hover_text(format!(
-                                    "Copy ${{{{ secrets.{} }}}} to clipboard",
-                                    sec.key
-                                ))
-                                .clicked()
-                                {
-                                    copied_expr = Some(format!("${{{{ secrets.{} }}}}", sec.key));
-                                }
-                                if outline_icon_button(
-                                    ui,
-                                    ("sec_stack_edit", &sec.key),
-                                    OutlineIcon::Edit,
-                                    Some(if in_vault { "Update" } else { "Set Value" }),
-                                    PRIMARY_BLUE,
-                                    BLUE_PILL_BG,
-                                    INFO_SOFT,
-                                    PRIMARY_BLUE,
-                                    true,
-                                )
-                                .on_hover_text("Load this secret into the form above to set or rotate its password")
-                                .clicked()
-                                {
-                                    edit_target = Some((
-                                        sec.key.clone(),
-                                        sec.username.clone().unwrap_or_default(),
-                                        sec.description.clone(),
-                                    ));
-                                }
+                                ui.label(
+                                    Typo::SmallMedium.rich("Actions").color(TEXT_SECONDARY),
+                                );
                             });
                         });
+                    });
+                ui.add_space(4.0);
+            }
+
+            if self.storage.secrets.is_empty() {
+                if kit::empty_state(
+                    ui,
+                    OutlineIcon::Key,
+                    "No secrets yet",
+                    "Credentials and tokens are saved directly into your OS vault, never touching Shiply's database.",
+                    Some("+ Create your first secret"),
+                ) {
+                    self.open_new_secret_modal();
+                }
+            } else if filtered_secrets.is_empty() {
+                ui.vertical_centered(|ui| {
+                    ui.add_space(SP_24);
+                    let no_match_msg = if !query.is_empty() {
+                        format!("No secrets match '{query}'")
                     } else {
-                        let row_h = TABLE_ROW_HEIGHT;
-                        horizontal_row(ui, row_h, |ui| {
-                            // KEY & DESCRIPTION column
-                            let (k_rect, _) =
-                                ui.allocate_exact_size(Vec2::new(key_col_w, row_h), Sense::hover());
-                            ui.painter().with_clip_rect(k_rect).text(
-                                Pos2::new(
-                                    k_rect.left(),
-                                    if sec.description.is_empty() {
-                                        k_rect.center().y
-                                    } else {
-                                        k_rect.top() + 14.0
-                                    },
-                                ),
-                                Align2::LEFT_CENTER,
-                                &sec.key,
-                                Typo::Mono.font(),
-                                TEXT_PRIMARY,
-                            );
-                            if !sec.description.is_empty() {
-                                ui.painter().with_clip_rect(k_rect).text(
-                                    Pos2::new(k_rect.left(), k_rect.top() + 33.0),
-                                    Align2::LEFT_CENTER,
-                                    &sec.description,
-                                    Typo::Small.font(),
-                                    TEXT_MUTED,
-                                );
-                            }
+                        "No secrets match the selected filter".to_string()
+                    };
+                    ui.label(Typo::Body.rich(no_match_msg).color(TEXT_MUTED));
+                    ui.add_space(SP_8);
+                    if kit::button(
+                        ui,
+                        ButtonVariant::Ghost,
+                        ButtonSize::Sm,
+                        "Clear filters",
+                        None,
+                    )
+                    .clicked()
+                    {
+                        self.secret_search_query.clear();
+                        self.secret_filter_status = SecretFilterStatus::All;
+                    }
+                    ui.add_space(SP_24);
+                });
+            }
 
-                            // USERNAME column
-                            let (u_rect, _) =
-                                ui.allocate_exact_size(Vec2::new(120.0, row_h), Sense::hover());
-                            ui.painter().with_clip_rect(u_rect).text(
-                                Pos2::new(u_rect.left(), u_rect.center().y),
-                                Align2::LEFT_CENTER,
-                                &effective_user,
-                                Typo::Small.font(),
-                                TEXT_SECONDARY,
-                            );
+            for (idx, sec) in filtered_secrets.iter().enumerate() {
+                if idx > 0 {
+                    draw_divider(ui, SUBTLE_BG);
+                }
+                ui.add_space(2.0);
 
-                            // OS VAULT STATUS column
-                            let (s_rect, _) =
-                                ui.allocate_exact_size(Vec2::new(145.0, row_h), Sense::hover());
-                            let (s_txt, s_bg, s_fg) = if in_vault {
-                                ("Stored in vault", SUCCESS_PILL_BG, SUCCESS_PILL_TEXT)
+                let cached = self.secret_vault_cache.get(&sec.key);
+                let in_vault = cached.is_some_and(|c| c.in_vault);
+                let effective_user = cached
+                    .and_then(|c| c.username.clone())
+                    .or_else(|| sec.username.clone())
+                    .unwrap_or_else(|| "—".to_string());
+
+                // Gather referencing environments as concise badges with project context
+                let mut referencing_envs: Vec<(String, String)> = Vec::new();
+                for proj in &self.storage.projects {
+                    for env in &proj.environments {
+                        if env.vault_target.trim().eq_ignore_ascii_case(&sec.key) {
+                            let badge = crate::domain::format_env_badge(&env.key);
+                            let ctx = format!("{}: {}", proj.name, env.name);
+                            referencing_envs.push((badge, ctx));
+                        }
+                    }
+                }
+                let full_used_tip = if referencing_envs.is_empty() {
+                    "Not used in any project environment".to_string()
+                } else {
+                    referencing_envs
+                        .iter()
+                        .map(|(_, ctx)| ctx.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                };
+
+                if is_stacked_view {
+                    horizontal_row(ui, 24.0, |ui| {
+                        ui.label(Typo::Mono.rich(&sec.key).color(TEXT_PRIMARY));
+                        ui.add_space(SP_8);
+                        kit::status_badge(
+                            ui,
+                            if in_vault {
+                                StatusKind::Success
                             } else {
-                                ("Missing in vault", WARN_PILL_BG, WARN_PILL_TEXT)
-                            };
-                            paint_pill_left_aligned(
-                                ui.painter(),
-                                Pos2::new(s_rect.left(), s_rect.center().y),
-                                s_txt,
-                                s_bg,
-                                s_fg,
-                            );
+                                StatusKind::Warning
+                            },
+                            if in_vault { "Stored" } else { "Missing" },
+                        );
+                    });
+                    if !sec.description.is_empty() {
+                        ui.label(Typo::Small.rich(&sec.description).color(TEXT_SECONDARY));
+                    }
+                    horizontal_row(ui, 28.0, |ui| {
+                        ui.label(
+                            Typo::Caption
+                                .rich(format!("User: {effective_user}"))
+                                .color(TEXT_MUTED),
+                        );
+                        if !referencing_envs.is_empty() {
+                            ui.add_space(SP_8);
+                            for (badge, _) in referencing_envs.iter().take(2) {
+                                kit::tag(ui, badge, env_pastel_pill_colors(badge));
+                                ui.add_space(2.0);
+                            }
+                            if referencing_envs.len() > 2 {
+                                let rem = referencing_envs.len() - 2;
+                                kit::count_badge(ui, rem);
+                            }
+                        }
+                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                            ui.spacing_mut().item_spacing = Vec2::new(SP_8, 0.0);
+                            if kit::danger_icon_button(
+                                ui,
+                                OutlineIcon::Trash,
+                                ButtonSize::Sm,
+                                "Delete secret from OS Credential Manager",
+                            )
+                            .clicked()
+                            {
+                                delete_target_key = Some(sec.key.clone());
+                            }
+                            let copy_tip = format!("Copy ${{{{ secrets.{} }}}} to clipboard", sec.key);
+                            if kit::icon_button(
+                                ui,
+                                OutlineIcon::Copy,
+                                ButtonSize::Sm,
+                                &copy_tip,
+                            )
+                            .clicked()
+                            {
+                                copied_expr = Some(format!("${{{{ secrets.{} }}}}", sec.key));
+                            }
+                            if kit::icon_button(
+                                ui,
+                                OutlineIcon::Edit,
+                                ButtonSize::Sm,
+                                "Edit / Rotate secret in OS Credential Manager",
+                            )
+                            .clicked()
+                            {
+                                edit_target = Some((
+                                    sec.key.clone(),
+                                    sec.username.clone().unwrap_or_default(),
+                                    sec.description.clone(),
+                                ));
+                            }
+                        });
+                    });
+                } else {
+                    let row_h = if sec.description.is_empty() {
+                        48.0_f32
+                    } else {
+                        56.0_f32
+                    };
+                    let (row_rect, row_resp) = ui.allocate_exact_size(
+                        Vec2::new(table_avail_w, row_h),
+                        Sense::click(),
+                    );
+                    let is_hovered = row_resp.hovered();
 
-                            // USED BY column
-                            let (ub_rect, ub_resp) =
-                                ui.allocate_exact_size(Vec2::new(180.0, row_h), Sense::hover());
-                            ui.painter().with_clip_rect(ub_rect).text(
-                                Pos2::new(ub_rect.left(), ub_rect.center().y),
-                                Align2::LEFT_CENTER,
-                                &used_by_str,
-                                Typo::Small.font(),
-                                TEXT_SECONDARY,
-                            );
-                            ub_resp.on_hover_text(&used_by_str);
+                    if is_hovered {
+                        ui.painter().rect_filled(
+                            row_rect,
+                            CornerRadius::same(R_SM as u8),
+                            SUBTLE_BG,
+                        );
+                    }
 
-                            // UPDATED column
-                            let (t_rect, _) =
-                                ui.allocate_exact_size(Vec2::new(135.0, row_h), Sense::hover());
-                            ui.painter().text(
-                                Pos2::new(t_rect.left(), t_rect.center().y),
+                    if row_resp.clicked() {
+                        edit_target = Some((
+                            sec.key.clone(),
+                            sec.username.clone().unwrap_or_default(),
+                            sec.description.clone(),
+                        ));
+                    }
+
+                    let row_ui = &mut ui.new_child(
+                        egui::UiBuilder::new()
+                            .max_rect(row_rect)
+                            .layout(Layout::left_to_right(Align::Center)),
+                    );
+
+                    horizontal_row(row_ui, row_h, |ui| {
+                        ui.add_space(8.0);
+
+                        // 1. NAME column
+                        let (k_rect, _) = ui.allocate_exact_size(
+                            Vec2::new(key_col_w - 8.0, row_h),
+                            Sense::hover(),
+                        );
+                        let name_top = if sec.description.is_empty() {
+                            k_rect.center().y
+                        } else {
+                            k_rect.top() + 15.0
+                        };
+                        ui.painter().with_clip_rect(k_rect).text(
+                            Pos2::new(k_rect.left(), name_top),
+                            Align2::LEFT_CENTER,
+                            &sec.key,
+                            Typo::Mono.font(),
+                            TEXT_PRIMARY,
+                        );
+                        if !sec.description.is_empty() {
+                            ui.painter().with_clip_rect(k_rect).text(
+                                Pos2::new(k_rect.left(), k_rect.top() + 37.0),
                                 Align2::LEFT_CENTER,
-                                sec.format_updated_at_local("%Y-%m-%d %H:%M"),
+                                &sec.description,
                                 Typo::Small.font(),
                                 TEXT_MUTED,
                             );
+                        }
 
-                            // ACTIONS column
-                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                ui.spacing_mut().item_spacing = Vec2::new(6.0, 0.0);
-                                if outline_icon_button(
-                                    ui,
-                                    ("sec_tbl_del", &sec.key),
-                                    OutlineIcon::Trash,
-                                    None,
-                                    FAIL_PILL_TEXT,
-                                    SUBTLE_BG,
-                                    FAIL_PILL_BG,
-                                    CARD_BORDER,
-                                    true,
-                                )
-                                .on_hover_text("Delete secret from OS Credential Manager")
-                                .clicked()
-                                {
-                                    delete_target_key = Some(sec.key.clone());
-                                }
-                                if outline_icon_button(
-                                    ui,
-                                    ("sec_tbl_copy", &sec.key),
-                                    OutlineIcon::Copy,
-                                    None,
-                                    TEXT_SECONDARY,
-                                    SUBTLE_BG,
-                                    PILL_CONTAINER_BG,
-                                    CARD_BORDER,
-                                    true,
-                                )
-                                .on_hover_text(format!(
-                                    "Copy ${{{{ secrets.{} }}}} to clipboard",
-                                    sec.key
-                                ))
-                                .clicked()
-                                {
-                                    copied_expr = Some(format!("${{{{ secrets.{} }}}}", sec.key));
-                                }
-                                if outline_icon_button(
-                                    ui,
-                                    ("sec_tbl_edit", &sec.key),
-                                    OutlineIcon::Edit,
-                                    None,
-                                    PRIMARY_BLUE,
-                                    SUBTLE_BG,
-                                    BLUE_PILL_BG,
-                                    CARD_BORDER,
-                                    true,
-                                )
-                                .on_hover_text("Edit / Rotate secret value in OS Credential Manager")
-                                .clicked()
-                                {
-                                    edit_target = Some((
-                                        sec.key.clone(),
-                                        sec.username.clone().unwrap_or_default(),
-                                        sec.description.clone(),
-                                    ));
-                                }
-                            });
+                        // 2. USERNAME column
+                        let (u_rect, _) =
+                            ui.allocate_exact_size(Vec2::new(120.0, row_h), Sense::hover());
+                        ui.painter().with_clip_rect(u_rect).text(
+                            Pos2::new(u_rect.left(), u_rect.center().y),
+                            Align2::LEFT_CENTER,
+                            &effective_user,
+                            Typo::Small.font(),
+                            TEXT_SECONDARY,
+                        );
+
+                        // 3. STATUS column
+                        let (s_rect, _) =
+                            ui.allocate_exact_size(Vec2::new(140.0, row_h), Sense::hover());
+                        let mut s_child = ui.new_child(
+                            egui::UiBuilder::new().max_rect(s_rect).layout(
+                                Layout::left_to_right(Align::Center),
+                            ),
+                        );
+                        kit::status_badge(
+                            &mut s_child,
+                            if in_vault {
+                                StatusKind::Success
+                            } else {
+                                StatusKind::Warning
+                            },
+                            if in_vault { "Stored" } else { "Missing" },
+                        );
+
+                        // 4. USED BY column
+                        let (ub_rect, ub_resp) =
+                            ui.allocate_exact_size(Vec2::new(190.0, row_h), Sense::hover());
+                        let mut ub_child = ui.new_child(
+                            egui::UiBuilder::new().max_rect(ub_rect).layout(
+                                Layout::left_to_right(Align::Center),
+                            ),
+                        );
+                        if referencing_envs.is_empty() {
+                            ub_child.label(Typo::Small.rich("Not used").color(TEXT_MUTED));
+                        } else {
+                            for (badge, _) in referencing_envs.iter().take(2) {
+                                kit::tag(
+                                    &mut ub_child,
+                                    badge,
+                                    env_pastel_pill_colors(badge),
+                                );
+                                ub_child.add_space(4.0);
+                            }
+                            if referencing_envs.len() > 2 {
+                                let rem = referencing_envs.len() - 2;
+                                kit::count_badge(&mut ub_child, rem);
+                            }
+                        }
+                        ub_resp.on_hover_text(&full_used_tip);
+
+                        // 5. UPDATED column
+                        let (t_rect, t_resp) =
+                            ui.allocate_exact_size(Vec2::new(130.0, row_h), Sense::hover());
+                        let rel_time = helpers::format_relative_time(sec.updated_at);
+                        ui.painter().text(
+                            Pos2::new(t_rect.left(), t_rect.center().y),
+                            Align2::LEFT_CENTER,
+                            rel_time,
+                            Typo::Small.font(),
+                            TEXT_MUTED,
+                        );
+                        t_resp.on_hover_text(sec.format_updated_at_local("%Y-%m-%d %H:%M"));
+
+                        // 6. ACTIONS column
+                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                            ui.spacing_mut().item_spacing = Vec2::new(SP_8, 0.0);
+                            if kit::danger_icon_button(
+                                ui,
+                                OutlineIcon::Trash,
+                                ButtonSize::Sm,
+                                "Delete secret from OS Credential Manager",
+                            )
+                            .clicked()
+                            {
+                                delete_target_key = Some(sec.key.clone());
+                            }
+                            let copy_tip = format!("Copy ${{{{ secrets.{} }}}} to clipboard", sec.key);
+                            if kit::icon_button(
+                                ui,
+                                OutlineIcon::Copy,
+                                ButtonSize::Sm,
+                                &copy_tip,
+                            )
+                            .clicked()
+                            {
+                                copied_expr = Some(format!("${{{{ secrets.{} }}}}", sec.key));
+                            }
+                            if kit::icon_button(
+                                ui,
+                                OutlineIcon::Edit,
+                                ButtonSize::Sm,
+                                "Edit / Rotate secret in OS Credential Manager",
+                            )
+                            .clicked()
+                            {
+                                edit_target = Some((
+                                    sec.key.clone(),
+                                    sec.username.clone().unwrap_or_default(),
+                                    sec.description.clone(),
+                                ));
+                            }
                         });
-                    }
-                    ui.add_space(6.0);
+                    });
                 }
-            });
+                ui.add_space(2.0);
+            }
+        });
 
         if let Some((k, u, d)) = edit_target {
             self.open_secret_management_for_target(&k, &u, &d);
@@ -5446,9 +5335,94 @@ impl ShiplyApp {
         } else if let Some(expr) = copied_expr {
             ui.ctx().copy_text(expr.clone());
             self.status_banner = Some((format!("Copied '{expr}' to clipboard!"), true));
+            self.status_banner_time = Some(Instant::now());
         }
 
-        ui.add_space(18.0);
-        self.render_os_credentials_guideline_card(ui);
+        ui.add_space(SP_16);
+        self.render_secret_storage_help(ui);
     }
+
+    pub(crate) fn render_secret_storage_help(&mut self, ui: &mut egui::Ui) {
+        let target_example = if self.cred_guide_target_input.trim().is_empty() {
+            "prod-ssh-server".to_string()
+        } else {
+            self.cred_guide_target_input.trim().to_string()
+        };
+        let user_example = if self.cred_guide_user_input.trim().is_empty() {
+            "deploy".to_string()
+        } else {
+            self.cred_guide_user_input.trim().to_string()
+        };
+
+        kit::card(ui, |ui| {
+            ui.horizontal(|ui| {
+                let (ic_r, _) = ui.allocate_exact_size(Vec2::splat(20.0), Sense::hover());
+                draw_outline_icon(ui.painter(), ic_r.center(), OutlineIcon::Key, PRIMARY_BLUE);
+                ui.add_space(4.0);
+                ui.label(Typo::H3.rich("How Shiply stores secrets"));
+                ui.add_space(SP_8);
+                ui.label(
+                    Typo::Small
+                        .rich("Encrypted in your operating system's native credential vault")
+                        .color(TEXT_MUTED),
+                );
+
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    let toggle_lbl = if self.secret_help_expanded {
+                        "Hide"
+                    } else {
+                        "Show"
+                    };
+                    if kit::button(
+                        ui,
+                        ButtonVariant::Ghost,
+                        ButtonSize::Sm,
+                        toggle_lbl,
+                        None,
+                    )
+                    .clicked()
+                    {
+                        self.secret_help_expanded = !self.secret_help_expanded;
+                    }
+                });
+            });
+
+            if !self.secret_help_expanded {
+                return;
+            }
+
+            ui.add_space(SP_12);
+            let line_w = ui.available_width();
+            let (line_rect, _) = ui.allocate_exact_size(Vec2::new(line_w, 1.0), Sense::hover());
+            ui.painter().line_segment(
+                [line_rect.left_center(), line_rect.right_center()],
+                Stroke::new(1.0_f32, CARD_BORDER),
+            );
+            ui.add_space(SP_12);
+
+            self.render_os_credentials_guide_body(ui, &target_example, &user_example);
+        });
+    }
+}
+
+fn render_secret_stat_tile(
+    ui: &mut egui::Ui,
+    width: f32,
+    label: &str,
+    value: usize,
+    val_color: Color32,
+) {
+    egui::Frame::new()
+        .fill(CARD_BG)
+        .stroke(Stroke::new(1.0_f32, CARD_BORDER))
+        .corner_radius(CornerRadius::same(R_LG as u8))
+        .inner_margin(Margin::symmetric(16, 12))
+        .show(ui, |ui| {
+            ui.set_width(width - 32.0);
+            ui.vertical(|ui| {
+                ui.label(Typo::Small.rich(label).color(TEXT_MUTED));
+                ui.add_space(4.0);
+                ui.label(Typo::H2.rich(value.to_string()).color(val_color));
+            });
+        });
 }

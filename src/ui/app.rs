@@ -101,6 +101,13 @@ pub struct ShiplyApp {
     pub(crate) cred_guide_user_input: String,
 
     // Secret Management (OS Credential Manager) state
+    pub(crate) show_secret_modal: bool,
+    pub(crate) secret_form_show_password: bool,
+    pub(crate) secret_help_expanded: bool,
+    pub(crate) secret_vault_cache: HashMap<String, CachedVaultStatus>,
+    pub(crate) secret_vault_cache_dirty: bool,
+    pub(crate) secret_vault_last_refresh: Option<Instant>,
+    pub(crate) secret_filter_status: SecretFilterStatus,
     pub(crate) secret_form_key: String,
     pub(crate) secret_form_username: String,
     pub(crate) secret_form_value: String,
@@ -171,9 +178,10 @@ impl ShiplyApp {
                 selection = SidebarSelection::SecretManagement;
             }
         }
-        let show_modal = std::env::var("SHIPLY_OPEN_MODAL")
-            .map(|v| v.eq_ignore_ascii_case("new_project"))
-            .unwrap_or(false);
+        let modal_env = std::env::var("SHIPLY_OPEN_MODAL").unwrap_or_default();
+        let show_modal = modal_env.eq_ignore_ascii_case("new_project");
+        let show_secret_modal_init = modal_env.eq_ignore_ascii_case("secret")
+            || modal_env.eq_ignore_ascii_case("new_secret");
         let initial_selected_dep = storage.deployments.first().map(|d| d.id.clone());
 
         let mut active_tab = WorkspaceTab::HistoryAndLogs;
@@ -268,6 +276,13 @@ impl ShiplyApp {
             },
             cred_guide_target_input: "prod-ssh-server".to_string(),
             cred_guide_user_input: "deploy".to_string(),
+            show_secret_modal: show_secret_modal_init,
+            secret_form_show_password: false,
+            secret_help_expanded: false,
+            secret_vault_cache: HashMap::new(),
+            secret_vault_cache_dirty: true,
+            secret_vault_last_refresh: None,
+            secret_filter_status: SecretFilterStatus::All,
             secret_form_key: String::new(),
             secret_form_username: String::new(),
             secret_form_value: String::new(),
@@ -352,8 +367,10 @@ impl ShiplyApp {
         self.secret_form_editing_existing = false;
 
         self.refresh_selected_project_metadata(false);
+        self.refresh_secret_vault_cache();
         let msg = format!("Saved secret '{key}' to OS Credential Manager.");
         self.status_banner = Some((msg.clone(), true));
+        self.status_banner_time = Some(Instant::now());
         Ok(msg)
     }
 
@@ -363,16 +380,19 @@ impl ShiplyApp {
         let res = delete_os_vault_credential(trimmed);
         self.storage.remove_secret_metadata(trimmed);
         self.refresh_selected_project_metadata(false);
+        self.refresh_secret_vault_cache();
         match res {
             Ok(()) => {
                 self.status_banner = Some((
                     format!("Deleted secret '{trimmed}' from OS Credential Manager."),
                     true,
                 ));
+                self.status_banner_time = Some(Instant::now());
                 Ok(())
             }
             Err(err) => {
                 self.status_banner = Some((err.clone(), false));
+                self.status_banner_time = Some(Instant::now());
                 Err(err)
             }
         }
@@ -390,7 +410,51 @@ impl ShiplyApp {
         self.secret_form_description = description.trim().to_string();
         self.secret_form_value.clear();
         self.secret_form_editing_existing = !self.secret_form_key.is_empty();
+        self.secret_form_show_password = false;
         self.selection = SidebarSelection::SecretManagement;
+        self.show_secret_modal = true;
+        self.secret_vault_cache_dirty = true;
+    }
+
+    /// Clears form state and opens the modal to create a new secret.
+    pub fn open_new_secret_modal(&mut self) {
+        self.secret_form_key.clear();
+        self.secret_form_username.clear();
+        self.secret_form_value.clear();
+        self.secret_form_description.clear();
+        self.secret_form_editing_existing = false;
+        self.secret_form_show_password = false;
+        self.show_secret_modal = true;
+    }
+
+    /// Refreshes the cached OS vault status for all configured secrets.
+    pub(crate) fn refresh_secret_vault_cache(&mut self) {
+        if self.storage.sync_project_vault_targets_to_secrets() {
+            let _ = self.storage.save();
+        }
+        let mut cache = HashMap::new();
+        for sec in &self.storage.secrets {
+            if let Some(cred) = read_os_vault_credential(&sec.key) {
+                cache.insert(
+                    sec.key.clone(),
+                    CachedVaultStatus {
+                        in_vault: true,
+                        username: cred.username.or_else(|| sec.username.clone()),
+                    },
+                );
+            } else {
+                cache.insert(
+                    sec.key.clone(),
+                    CachedVaultStatus {
+                        in_vault: false,
+                        username: sec.username.clone(),
+                    },
+                );
+            }
+        }
+        self.secret_vault_cache = cache;
+        self.secret_vault_cache_dirty = false;
+        self.secret_vault_last_refresh = Some(Instant::now());
     }
 
     pub fn theme(&self) -> Theme {
@@ -1619,6 +1683,7 @@ impl eframe::App for ShiplyApp {
         self.render_bulk_deploy_modal(ctx);
         self.render_github_update_modal(ctx);
         self.render_delete_confirmation_modal(ctx);
+        self.render_secret_modal(ctx);
         self.render_window_resize_handles(ctx);
 
         egui::CentralPanel::default()

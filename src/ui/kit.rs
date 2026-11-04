@@ -202,6 +202,50 @@ pub(crate) fn icon_button(
     }
 }
 
+/// Square ghost danger icon button with required hover tooltip (red on hover).
+#[allow(dead_code)]
+pub(crate) fn danger_icon_button(
+    ui: &mut egui::Ui,
+    icon: OutlineIcon,
+    size: ButtonSize,
+    tooltip: &str,
+) -> egui::Response {
+    let side = match size {
+        ButtonSize::Md => 32.0,
+        ButtonSize::Sm => 28.0,
+    };
+    let (rect, resp) = ui.allocate_exact_size(Vec2::splat(side), Sense::click());
+    let hovered = resp.hovered();
+    let enabled = ui.is_enabled();
+
+    if enabled && hovered {
+        ui.painter()
+            .rect_filled(rect, CornerRadius::same(R_MD as u8), DANGER_SOFT);
+        ui.painter().rect_stroke(
+            rect,
+            CornerRadius::same(R_MD as u8),
+            Stroke::new(1.0_f32, DANGER_BORDER),
+            StrokeKind::Inside,
+        );
+    }
+
+    let color = if !enabled {
+        TEXT_MUTED.gamma_multiply(0.5)
+    } else if hovered {
+        DANGER
+    } else {
+        TEXT_SECONDARY
+    };
+
+    draw_outline_icon(ui.painter(), rect.center(), icon, color);
+    let resp = resp.on_hover_text(tooltip);
+    if enabled {
+        resp.on_hover_cursor(egui::CursorIcon::PointingHand)
+    } else {
+        resp
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StatusKind {
     Success,

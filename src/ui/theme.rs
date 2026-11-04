@@ -170,6 +170,7 @@ pub const TEXT_PLACEHOLDER: Color32 = Color32::from_rgb(156, 163, 175); // #9CA3
 pub const PRIMARY_BLUE: Color32 = Color32::from_rgb(20, 110, 245); // #146EF5
 pub const PRIMARY_BLUE_HOVER: Color32 = Color32::from_rgb(15, 94, 215); // #0F5ED7
 pub const PRIMARY_BLUE_ACTIVE: Color32 = Color32::from_rgb(11, 79, 184); // #0B4FB8
+pub const PRIMARY_SOFT: Color32 = Color32::from_rgb(231, 240, 254); // #E7F0FE
 pub const FOCUS_RING: Color32 = Color32::from_rgba_premultiplied(5, 27, 61, 64); // 25% alpha
 pub const BLUE_PILL_BG: Color32 = Color32::from_rgb(231, 240, 254); // #E7F0FE
 pub const BLUE_PILL_TEXT: Color32 = Color32::from_rgb(20, 110, 245); // #146EF5

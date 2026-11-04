@@ -31,6 +31,20 @@ pub(crate) enum CredentialOsTab {
     Mac,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) enum SecretFilterStatus {
+    #[default]
+    All,
+    Stored,
+    Missing,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct CachedVaultStatus {
+    pub in_vault: bool,
+    pub username: Option<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ConfirmDeleteAction {
     Project {
