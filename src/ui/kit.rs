@@ -450,6 +450,34 @@ pub fn checkbox(
     resp
 }
 
+/// Standardized form field container: label above input, optional red asterisk for required,
+/// 6px gap, input content, then optional helper text 4px below.
+pub fn form_field<R>(
+    ui: &mut egui::Ui,
+    label: &str,
+    helper: Option<&str>,
+    required: bool,
+    add_input: impl FnOnce(&mut egui::Ui) -> R,
+) -> R {
+    ui.vertical(|ui| {
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 2.0;
+            ui.label(Typo::Label.rich(label).color(TEXT_PRIMARY));
+            if required {
+                ui.label(Typo::Label.rich("*").color(DANGER));
+            }
+        });
+        ui.add_space(6.0);
+        let res = add_input(ui);
+        if let Some(help) = helper {
+            ui.add_space(4.0);
+            ui.label(Typo::Small.rich(help).color(TEXT_MUTED));
+        }
+        res
+    })
+    .inner
+}
+
 /// Standardized card with title header, right actions, and 1px separator line under the header.
 pub fn card_with_header<R>(
     ui: &mut egui::Ui,

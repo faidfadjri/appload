@@ -193,6 +193,7 @@ pub const STATUS_DOT_WARN: Color32 = WARNING;
 pub const DANGER: Color32 = Color32::from_rgb(220, 38, 38); // #DC2626
 pub const DANGER_HOVER: Color32 = Color32::from_rgb(185, 28, 28); // #B91C1C
 pub const DANGER_SOFT: Color32 = Color32::from_rgb(254, 226, 226); // #FEE2E2
+pub const DANGER_BORDER: Color32 = Color32::from_rgb(254, 202, 202); // #FECACA
 pub const FAIL_PILL_BG: Color32 = DANGER_SOFT;
 pub const FAIL_PILL_TEXT: Color32 = DANGER;
 
