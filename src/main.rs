@@ -52,7 +52,10 @@ fn main() -> eframe::Result<()> {
         return eframe::run_native(
             "Shiply Setup",
             setup_options,
-            Box::new(|_cc| Ok(Box::new(SetupWizardApp::default()))),
+            Box::new(|cc| {
+                ShiplyApp::configure_workspace_theme(&cc.egui_ctx, false);
+                Ok(Box::new(SetupWizardApp::default()))
+            }),
         );
     }
 
@@ -88,7 +91,8 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "Shiply",
         native_options,
-        Box::new(move |_cc| {
+        Box::new(move |cc| {
+            ShiplyApp::configure_workspace_theme(&cc.egui_ctx, false);
             let mut app = ShiplyApp::new(storage);
             if let Some(notice) = startup_notice {
                 app.set_status_banner(notice, true);
