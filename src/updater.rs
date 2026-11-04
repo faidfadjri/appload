@@ -117,10 +117,7 @@ struct GitHubAssetPayload {
 
 /// Normalizes a version or tag string by stripping a leading `v`/`V` and whitespace.
 pub fn normalize_version_tag(raw: &str) -> String {
-    raw.trim()
-        .trim_start_matches(['v', 'V'])
-        .trim()
-        .to_string()
+    raw.trim().trim_start_matches(['v', 'V']).trim().to_string()
 }
 
 /// Parses a semantic version string (`major.minor.patch[-prerelease]`) into comparable components.
@@ -208,7 +205,8 @@ fn select_platform_asset<'a>(
         "macos" => {
             if let Some(a) = assets.iter().find(|a| {
                 let n = a.name.to_lowercase();
-                !is_metadata(&n) && (n.contains("macos") || n.contains("darwin") || n.contains("mac"))
+                !is_metadata(&n)
+                    && (n.contains("macos") || n.contains("darwin") || n.contains("mac"))
             }) {
                 return Some(a);
             }
@@ -224,9 +222,7 @@ fn select_platform_asset<'a>(
         _ => {}
     }
 
-    assets
-        .iter()
-        .find(|a| !is_metadata(&a.name.to_lowercase()))
+    assets.iter().find(|a| !is_metadata(&a.name.to_lowercase()))
 }
 
 /// Parses a GitHub `/releases/latest` JSON payload and compares it against `current_version`.
@@ -250,9 +246,15 @@ pub fn parse_github_release_json_for_os(
 
     // 1. Check if payload matches latest.json manifest format
     if let Ok(latest) = serde_json::from_str::<LatestJsonPayload>(trimmed) {
-        if latest.platforms.is_some() || (latest.version.is_some() && trimmed.contains("\"platforms\"")) {
-            let tag = latest.tag_name.or(latest.version.clone()).unwrap_or_default();
-            let candidate_version = normalize_version_tag(latest.version.as_deref().unwrap_or(&tag));
+        if latest.platforms.is_some()
+            || (latest.version.is_some() && trimmed.contains("\"platforms\""))
+        {
+            let tag = latest
+                .tag_name
+                .or(latest.version.clone())
+                .unwrap_or_default();
+            let candidate_version =
+                normalize_version_tag(latest.version.as_deref().unwrap_or(&tag));
             if !is_newer_semver(current_version, &candidate_version) {
                 return Ok(None);
             }
@@ -368,7 +370,9 @@ fn fetch_latest_release_json() -> Result<String, String> {
     if let Ok(output) = cmd_latest.output() {
         if output.status.success() {
             let text = String::from_utf8_lossy(&output.stdout).to_string();
-            if (text.contains("\"version\"") || text.contains("\"tag_name\"")) && text.contains("\"platforms\"") {
+            if (text.contains("\"version\"") || text.contains("\"tag_name\""))
+                && text.contains("\"platforms\"")
+            {
                 return Ok(text);
             }
         }
@@ -434,12 +438,19 @@ fn fetch_latest_release_json() -> Result<String, String> {
             GITHUB_RELEASES_LATEST_JSON_URL
         );
         let mut ps_latest = Command::new("powershell");
-        ps_latest.args(["-NoProfile", "-NonInteractive", "-Command", &ps_latest_script]);
+        ps_latest.args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            &ps_latest_script,
+        ]);
         configure_background_command(&mut ps_latest);
         if let Ok(output) = ps_latest.output() {
             if output.status.success() {
                 let text = String::from_utf8_lossy(&output.stdout).to_string();
-                if (text.contains("\"version\"") || text.contains("\"tag_name\"")) && text.contains("\"platforms\"") {
+                if (text.contains("\"version\"") || text.contains("\"tag_name\""))
+                    && text.contains("\"platforms\"")
+                {
                     return Ok(text);
                 }
             }
@@ -473,41 +484,30 @@ fn fetch_latest_release_json() -> Result<String, String> {
 /// Spawns a non-blocking background thread to check GitHub Releases against `CARGO_PKG_VERSION`.
 pub fn spawn_update_check(tx: Sender<UpdaterEvent>, manual: bool) {
     let _ = tx.send(UpdaterEvent::Checking);
-    thread::spawn(move || {
-        match fetch_latest_release_json() {
-            Ok(json) => match parse_github_release_json(&json, APP_VERSION) {
-                Ok(Some(release)) => {
-                    let _ = tx.send(UpdaterEvent::UpdateAvailable { release, manual });
-                }
-                Ok(None) => {
-                    let _ = tx.send(UpdaterEvent::UpToDate {
-                        current_version: APP_VERSION.to_string(),
-                        manual,
-                    });
-                }
-                Err(err) => {
-                    let _ = tx.send(UpdaterEvent::CheckFailed {
-                        error: err,
-                        manual,
-                    });
-                }
-            },
-            Err(err) => {
-                let _ = tx.send(UpdaterEvent::CheckFailed {
-                    error: err,
+    thread::spawn(move || match fetch_latest_release_json() {
+        Ok(json) => match parse_github_release_json(&json, APP_VERSION) {
+            Ok(Some(release)) => {
+                let _ = tx.send(UpdaterEvent::UpdateAvailable { release, manual });
+            }
+            Ok(None) => {
+                let _ = tx.send(UpdaterEvent::UpToDate {
+                    current_version: APP_VERSION.to_string(),
                     manual,
                 });
             }
+            Err(err) => {
+                let _ = tx.send(UpdaterEvent::CheckFailed { error: err, manual });
+            }
+        },
+        Err(err) => {
+            let _ = tx.send(UpdaterEvent::CheckFailed { error: err, manual });
         }
     });
 }
 
 /// Replaces `target_exe` with `new_binary_path` safely on all platforms (including Windows where
 /// a running `.exe` cannot be overwritten directly, but CAN be renamed to `.old` while running).
-pub fn replace_executable_atomic(
-    new_binary_path: &Path,
-    target_exe: &Path,
-) -> Result<(), String> {
+pub fn replace_executable_atomic(new_binary_path: &Path, target_exe: &Path) -> Result<(), String> {
     if !new_binary_path.is_file() {
         return Err(format!(
             "Downloaded update binary '{}' does not exist.",
@@ -839,7 +839,10 @@ mod tests {
             .expect("should find update");
         assert_eq!(win_update.version, "0.10.15");
         assert_eq!(win_update.tag_name, "v0.10.15");
-        assert_eq!(win_update.download_url, "https://github.com/faidfadjri/shiply/releases/download/v0.10.15/shiply.exe");
+        assert_eq!(
+            win_update.download_url,
+            "https://github.com/faidfadjri/shiply/releases/download/v0.10.15/shiply.exe"
+        );
 
         // Same version returns None
         let up_to_date = parse_github_release_json_for_os(manifest_json, "0.10.15", "windows")
@@ -869,6 +872,9 @@ mod tests {
             .expect("should find update");
         assert_eq!(res.version, "0.10.15");
         assert_eq!(res.tag_name, "v0.10.15");
-        assert_eq!(res.download_url, "https://github.com/faidfadjri/shiply/releases/download/v0.10.15/shiply.exe");
+        assert_eq!(
+            res.download_url,
+            "https://github.com/faidfadjri/shiply/releases/download/v0.10.15/shiply.exe"
+        );
     }
 }

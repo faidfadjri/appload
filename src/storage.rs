@@ -575,7 +575,10 @@ impl AppStorage {
     }
 
     pub fn save_to(&self, path: &Path) -> Result<(), String> {
-        let db_path = if path.extension().is_some_and(|e| e.eq_ignore_ascii_case("json")) {
+        let db_path = if path
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("json"))
+        {
             path.with_extension("db")
         } else {
             path.to_path_buf()
@@ -596,7 +599,10 @@ impl AppStorage {
             .map_err(|e| format!("Failed to save secrets metadata to SQLite database: {e}"))?;
 
         // If path was originally requested as JSON (e.g. drop-in export), also write JSON mirror
-        if path.extension().is_some_and(|e| e.eq_ignore_ascii_case("json")) {
+        if path
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("json"))
+        {
             if let Ok(json) = serde_json::to_string_pretty(self) {
                 let _ = fs::write(path, json);
             }
@@ -619,9 +625,7 @@ impl AppStorage {
 
         // 1. Check if primary `shiply_state.db` was updated externally on disk
         if let Some(disk_mtime) = file_mtime(&state_path) {
-            let is_changed = self
-                .last_state_mtime
-                .is_none_or(|prev| disk_mtime > prev);
+            let is_changed = self.last_state_mtime.is_none_or(|prev| disk_mtime > prev);
             if is_changed {
                 if let Ok(conn) = Connection::open(&state_path) {
                     if let (Ok(p), Ok(d)) = (
@@ -867,7 +871,9 @@ impl AppStorage {
     /// Sets or clears the group for a given project ID.
     pub fn set_project_group(&mut self, project_id: &str, group: Option<String>) -> bool {
         if let Some(proj) = self.projects.iter_mut().find(|p| p.id == project_id) {
-            let normalized = group.map(|g| g.trim().to_string()).filter(|g| !g.is_empty());
+            let normalized = group
+                .map(|g| g.trim().to_string())
+                .filter(|g| !g.is_empty());
             proj.group = normalized;
             let _ = self.save();
             true
@@ -902,8 +908,7 @@ impl AppStorage {
                 // Preserves current custom order
             }
             ProjectSortMode::NameAsc => {
-                self.projects
-                    .sort_by_key(|a| a.name.to_lowercase());
+                self.projects.sort_by_key(|a| a.name.to_lowercase());
                 for (i, p) in self.projects.iter_mut().enumerate() {
                     p.sort_order = Some(i as i32);
                 }
@@ -947,7 +952,10 @@ impl AppStorage {
     /// (e.g. when the application or desktop was closed/restarted while a deployment was in progress).
     /// Marks orphaned records and their running step logs as `Failed`, records `finished_at` and `duration_ms`,
     /// and returns the number of reconciled records.
-    pub fn reconcile_orphaned_running_deployments(&mut self, active_ids: &HashSet<String>) -> usize {
+    pub fn reconcile_orphaned_running_deployments(
+        &mut self,
+        active_ids: &HashSet<String>,
+    ) -> usize {
         let now = chrono::Utc::now();
         let mut reconciled = 0;
         for dep in &mut self.deployments {
@@ -1179,11 +1187,7 @@ impl AppStorage {
     }
 
     /// Returns the most recent deployment (regardless of status) for a given project and environment key.
-    pub fn latest_deployment(
-        &self,
-        project_id: &str,
-        env_key: &str,
-    ) -> Option<&DeploymentRecord> {
+    pub fn latest_deployment(&self, project_id: &str, env_key: &str) -> Option<&DeploymentRecord> {
         self.deployments
             .iter()
             .find(|d| d.project_id == project_id && d.environment == env_key)
@@ -1362,7 +1366,11 @@ mod tests {
             "projects": [sample_proj],
             "deployments": [sample_dep]
         });
-        fs::write(&json_path, serde_json::to_string_pretty(&legacy_data).unwrap()).unwrap();
+        fs::write(
+            &json_path,
+            serde_json::to_string_pretty(&legacy_data).unwrap(),
+        )
+        .unwrap();
 
         // 2. Call load_or_default with the SQLite db path
         let storage = AppStorage::load_or_default(&db_path);
@@ -1522,14 +1530,18 @@ mod tests {
         let _ = storage.save();
 
         // 1. First duplication
-        let dup1 = storage.duplicate_project("api-service").expect("duplicate 1");
+        let dup1 = storage
+            .duplicate_project("api-service")
+            .expect("duplicate 1");
         assert_eq!(dup1.id, "api-service-copy");
         assert_eq!(dup1.name, "API Service (Copy)");
         assert_eq!(dup1.group, Some("Services".to_string()));
         assert_eq!(storage.projects.len(), 2);
 
         // 2. Second duplication of original
-        let dup2 = storage.duplicate_project("api-service").expect("duplicate 2");
+        let dup2 = storage
+            .duplicate_project("api-service")
+            .expect("duplicate 2");
         assert_eq!(dup2.id, "api-service-copy-2");
         assert_eq!(dup2.name, "API Service (Copy 2)");
         assert_eq!(dup2.group, Some("Services".to_string()));
@@ -1539,7 +1551,10 @@ mod tests {
         let reloaded = AppStorage::load_or_default(&db_path);
         assert_eq!(reloaded.projects.len(), 3);
         assert!(reloaded.projects.iter().any(|p| p.id == "api-service-copy"));
-        assert!(reloaded.projects.iter().any(|p| p.id == "api-service-copy-2"));
+        assert!(reloaded
+            .projects
+            .iter()
+            .any(|p| p.id == "api-service-copy-2"));
     }
 
     #[test]
@@ -1659,8 +1674,25 @@ mod tests {
 
         // Reload and verify
         let reloaded = AppStorage::load_or_default(&db_path);
-        assert_eq!(reloaded.projects.iter().find(|p| p.id == "p3").unwrap().group.as_deref(), Some("Backend"));
-        assert_eq!(reloaded.projects.iter().find(|p| p.id == "p1").unwrap().group, None);
+        assert_eq!(
+            reloaded
+                .projects
+                .iter()
+                .find(|p| p.id == "p3")
+                .unwrap()
+                .group
+                .as_deref(),
+            Some("Backend")
+        );
+        assert_eq!(
+            reloaded
+                .projects
+                .iter()
+                .find(|p| p.id == "p1")
+                .unwrap()
+                .group,
+            None
+        );
     }
 
     #[test]
@@ -1722,38 +1754,44 @@ mod tests {
         let mut storage = AppStorage::load_or_default(&db_path);
         let now = chrono::Utc::now();
 
-        let make_dep = |id: &str, proj: &str, env: &str, status: DeploymentStatus| DeploymentRecord {
-            id: id.to_string(),
-            project_id: proj.to_string(),
-            project_name: format!("Project {proj}"),
-            environment: env.to_string(),
-            app_name: format!("{proj}-{env}"),
-            version: "1.0.0".to_string(),
-            git_branch: Some("main".to_string()),
-            git_commit: Some("abc1234".to_string()),
-            git_changes: vec![],
-            is_rollback: false,
-            servers: vec!["10.0.0.1".to_string()],
-            status,
-            started_at: now,
-            finished_at: if status == DeploymentStatus::Running {
-                None
-            } else {
-                Some(now)
-            },
-            duration_ms: if status == DeploymentStatus::Running {
-                None
-            } else {
-                Some(1200)
-            },
-            step_logs: vec![],
-            executed_steps: vec![],
-        };
+        let make_dep =
+            |id: &str, proj: &str, env: &str, status: DeploymentStatus| DeploymentRecord {
+                id: id.to_string(),
+                project_id: proj.to_string(),
+                project_name: format!("Project {proj}"),
+                environment: env.to_string(),
+                app_name: format!("{proj}-{env}"),
+                version: "1.0.0".to_string(),
+                git_branch: Some("main".to_string()),
+                git_commit: Some("abc1234".to_string()),
+                git_changes: vec![],
+                is_rollback: false,
+                servers: vec!["10.0.0.1".to_string()],
+                status,
+                started_at: now,
+                finished_at: if status == DeploymentStatus::Running {
+                    None
+                } else {
+                    Some(now)
+                },
+                duration_ms: if status == DeploymentStatus::Running {
+                    None
+                } else {
+                    Some(1200)
+                },
+                step_logs: vec![],
+                executed_steps: vec![],
+            };
 
         storage.upsert_deployment(make_dep("dep-1", "p1", "dev", DeploymentStatus::Succeeded));
         storage.upsert_deployment(make_dep("dep-2", "p1", "dev", DeploymentStatus::Failed));
         storage.upsert_deployment(make_dep("dep-3", "p1", "prod", DeploymentStatus::Succeeded));
-        storage.upsert_deployment(make_dep("dep-running", "p1", "dev", DeploymentStatus::Running));
+        storage.upsert_deployment(make_dep(
+            "dep-running",
+            "p1",
+            "dev",
+            DeploymentStatus::Running,
+        ));
         storage.upsert_deployment(make_dep("dep-4", "p2", "prod", DeploymentStatus::Cancelled));
 
         // 1. Running deployments cannot be removed while running

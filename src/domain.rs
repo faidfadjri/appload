@@ -70,9 +70,7 @@ pub enum StepKind {
         shell: Option<LocalShell>,
     },
     /// Verify that a local file or directory exists before continuing (e.g., `./dist/server.js`).
-    VerifyLocalPath {
-        path: String,
-    },
+    VerifyLocalPath { path: String },
     /// Transfer local paths (and optional staged `.env` file) via SCP to `{remote_dir}` on each target server.
     TransferFiles {
         sources: Vec<String>,
@@ -80,9 +78,7 @@ pub enum StepKind {
     },
     /// Execute a shell command over SSH on each target server.
     /// Supports placeholders: `{remote_dir}`, `{remote_user}`, `{app_name}`, `{http_proxy}`, `{version}`.
-    RemoteCommand {
-        command: String,
-    },
+    RemoteCommand { command: String },
 }
 
 impl StepKind {
@@ -254,7 +250,9 @@ impl Project {
             return Err("Environment name cannot be empty.".to_string());
         }
         if self.get_env(&key).is_some() {
-            return Err(format!("Environment '{key}' already exists in this project."));
+            return Err(format!(
+                "Environment '{key}' already exists in this project."
+            ));
         }
 
         let base_slug = normalize_env_key(&self.name);
@@ -270,14 +268,15 @@ impl Project {
             .cloned();
 
         let new_env = if let Some(tpl) = template {
-            let remote_dir = if !tpl.remote_dir.is_empty() && tpl.remote_dir.ends_with(&tpl.app_name) {
-                let prefix = &tpl.remote_dir[..tpl.remote_dir.len() - tpl.app_name.len()];
-                format!("{prefix}{new_app_name}")
-            } else if !tpl.remote_user.is_empty() {
-                format!("/home/{}/apps/{new_app_name}", tpl.remote_user)
-            } else {
-                String::new()
-            };
+            let remote_dir =
+                if !tpl.remote_dir.is_empty() && tpl.remote_dir.ends_with(&tpl.app_name) {
+                    let prefix = &tpl.remote_dir[..tpl.remote_dir.len() - tpl.app_name.len()];
+                    format!("{prefix}{new_app_name}")
+                } else if !tpl.remote_user.is_empty() {
+                    format!("/home/{}/apps/{new_app_name}", tpl.remote_user)
+                } else {
+                    String::new()
+                };
 
             let env_source = tpl.env_source.as_ref().map(|_| format!("./.env.{key}"));
             let steps = tpl
@@ -470,7 +469,10 @@ impl SecretEntry {
     }
 
     pub fn format_updated_at_local(&self, fmt: &str) -> String {
-        self.updated_at.with_timezone(&Local).format(fmt).to_string()
+        self.updated_at
+            .with_timezone(&Local)
+            .format(fmt)
+            .to_string()
     }
 }
 
@@ -501,7 +503,8 @@ mod tests {
                 PipelineStep::new(
                     "Restart PM2",
                     StepKind::RemoteCommand {
-                        command: "/data/{remote_user}/nodejs/bin/pm2 restart {app_name}".to_string(),
+                        command: "/data/{remote_user}/nodejs/bin/pm2 restart {app_name}"
+                            .to_string(),
                     },
                 ),
             ],
@@ -592,7 +595,10 @@ mod tests {
             sort_order: Some(1),
         };
 
-        let dup = orig.create_duplicate("proj-1-copy".to_string(), "Original Service (Copy)".to_string());
+        let dup = orig.create_duplicate(
+            "proj-1-copy".to_string(),
+            "Original Service (Copy)".to_string(),
+        );
         assert_eq!(dup.id, "proj-1-copy");
         assert_eq!(dup.name, "Original Service (Copy)");
         assert_eq!(dup.description, "Production API");
@@ -602,8 +608,14 @@ mod tests {
         assert_eq!(dup.group.as_deref(), Some("Backend"));
         assert_eq!(dup.sort_order, None);
         // Verify pipeline step IDs are refreshed with new distinct UUIDs
-        assert_ne!(dup.environments[0].steps[0].id, orig.environments[0].steps[0].id);
-        assert_ne!(dup.environments[0].steps[1].id, orig.environments[0].steps[1].id);
+        assert_ne!(
+            dup.environments[0].steps[0].id,
+            orig.environments[0].steps[0].id
+        );
+        assert_ne!(
+            dup.environments[0].steps[1].id,
+            orig.environments[0].steps[1].id
+        );
     }
 
     #[test]
@@ -641,7 +653,8 @@ mod tests {
                 "allow_failure": false
             }
         }"#;
-        let deserialized: PipelineStep = serde_json::from_str(legacy_json).expect("deserialize legacy");
+        let deserialized: PipelineStep =
+            serde_json::from_str(legacy_json).expect("deserialize legacy");
         assert!(matches!(
             deserialized.kind,
             StepKind::LocalCommand { shell: None, .. }

@@ -54,7 +54,10 @@ pub fn is_setup_mode(args: &[String]) -> bool {
     if let Ok(exe) = env::current_exe() {
         if let Some(stem) = exe.file_stem().and_then(|s| s.to_str()) {
             let lower = stem.to_lowercase();
-            if lower == "setup" || lower.starts_with("shiply-setup") || lower.starts_with("shiply_setup") {
+            if lower == "setup"
+                || lower.starts_with("shiply-setup")
+                || lower.starts_with("shiply_setup")
+            {
                 return true;
             }
         }
@@ -295,7 +298,8 @@ fn create_windows_shortcuts(
         path_exprs.push("[IO.Path]::Combine($env:APPDATA, 'Microsoft\\Windows\\Start Menu\\Programs\\Shiply.lnk')");
     }
     if desktop {
-        path_exprs.push("[IO.Path]::Combine([Environment]::GetFolderPath('Desktop'), 'Shiply.lnk')");
+        path_exprs
+            .push("[IO.Path]::Combine([Environment]::GetFolderPath('Desktop'), 'Shiply.lnk')");
     }
     if path_exprs.is_empty() {
         return Ok(());
@@ -689,7 +693,10 @@ mod tests {
 
         // Verify Shiply Installer.app bundle
         let app_bundle = mac_dir.join("Shiply Installer.app");
-        assert!(app_bundle.exists(), "Shiply Installer.app bundle must exist");
+        assert!(
+            app_bundle.exists(),
+            "Shiply Installer.app bundle must exist"
+        );
 
         let info_plist = app_bundle.join("Contents").join("Info.plist");
         assert!(info_plist.exists(), "Info.plist must exist in bundle");
@@ -698,9 +705,15 @@ mod tests {
         assert!(plist_content.contains("<string>Shiply Installer</string>"));
 
         let installer_exec = app_bundle.join("Contents").join("MacOS").join("installer");
-        assert!(installer_exec.exists(), "installer executable must exist in bundle");
+        assert!(
+            installer_exec.exists(),
+            "installer executable must exist in bundle"
+        );
 
-        let icon_png = app_bundle.join("Contents").join("Resources").join("logo.png");
+        let icon_png = app_bundle
+            .join("Contents")
+            .join("Resources")
+            .join("logo.png");
         assert!(icon_png.exists(), "logo.png must exist in bundle resources");
     }
 

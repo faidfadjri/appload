@@ -76,7 +76,9 @@ impl ShiplyApp {
                     &deploy_label,
                     Some(OutlineIcon::Play),
                 )
-                .on_hover_text("Deploy multiple selected projects sequentially with auto-bumped versions")
+                .on_hover_text(
+                    "Deploy multiple selected projects sequentially with auto-bumped versions",
+                )
                 .clicked()
                 {
                     open_bulk_modal = true;
@@ -226,8 +228,14 @@ impl ShiplyApp {
                     },
                 );
 
-                ui.painter().rect_filled(rect, CornerRadius::same(R_LG as u8), card_bg);
-                ui.painter().rect_stroke(rect, CornerRadius::same(R_LG as u8), border_stroke, StrokeKind::Inside);
+                ui.painter()
+                    .rect_filled(rect, CornerRadius::same(R_LG as u8), card_bg);
+                ui.painter().rect_stroke(
+                    rect,
+                    CornerRadius::same(R_LG as u8),
+                    border_stroke,
+                    StrokeKind::Inside,
+                );
 
                 // Checkbox paint
                 let chk_radius = CornerRadius::same(4);
@@ -236,18 +244,32 @@ impl ShiplyApp {
                     let p1 = Pos2::new(chk_rect.left() + 4.5, chk_rect.top() + 10.0);
                     let p2 = Pos2::new(chk_rect.left() + 8.0, chk_rect.top() + 14.0);
                     let p3 = Pos2::new(chk_rect.left() + 15.5, chk_rect.top() + 6.0);
-                    ui.painter().line_segment([p1, p2], Stroke::new(1.8_f32, Color32::WHITE));
-                    ui.painter().line_segment([p2, p3], Stroke::new(1.8_f32, Color32::WHITE));
+                    ui.painter()
+                        .line_segment([p1, p2], Stroke::new(1.8_f32, Color32::WHITE));
+                    ui.painter()
+                        .line_segment([p2, p3], Stroke::new(1.8_f32, Color32::WHITE));
                 } else {
-                    let chk_border = if chk_resp.hovered() { INPUT_BORDER_HOVER } else { INPUT_BORDER };
+                    let chk_border = if chk_resp.hovered() {
+                        INPUT_BORDER_HOVER
+                    } else {
+                        INPUT_BORDER
+                    };
                     ui.painter().rect_filled(chk_rect, chk_radius, CARD_BG);
-                    ui.painter().rect_stroke(chk_rect, chk_radius, Stroke::new(1.0_f32, chk_border), StrokeKind::Inside);
+                    ui.painter().rect_stroke(
+                        chk_rect,
+                        chk_radius,
+                        Stroke::new(1.0_f32, chk_border),
+                        StrokeKind::Inside,
+                    );
                 }
 
                 // Project Name and Path
                 let text_clip = Rect::from_min_max(
                     Pos2::new(rect.left() + 16.0, rect.top() + 10.0),
-                    Pos2::new((chk_rect.left() - 8.0).max(rect.left() + 40.0), rect.top() + 66.0),
+                    Pos2::new(
+                        (chk_rect.left() - 8.0).max(rect.left() + 40.0),
+                        rect.top() + 66.0,
+                    ),
                 );
                 let clipped_painter = ui.painter().with_clip_rect(text_clip);
                 clipped_painter.text(
@@ -346,14 +368,8 @@ impl ShiplyApp {
                     } else {
                         "Show"
                     };
-                    if kit::button(
-                        ui,
-                        ButtonVariant::Ghost,
-                        ButtonSize::Sm,
-                        toggle_lbl,
-                        None,
-                    )
-                    .clicked()
+                    if kit::button(ui, ButtonVariant::Ghost, ButtonSize::Sm, toggle_lbl, None)
+                        .clicked()
                     {
                         self.show_onboarding_guide = !self.show_onboarding_guide;
                     }
@@ -408,7 +424,8 @@ impl ShiplyApp {
             let step_w = if onboard_cols == 1 {
                 onboard_avail
             } else {
-                ((onboard_avail - spacing * (onboard_cols - 1) as f32) / onboard_cols as f32).floor()
+                ((onboard_avail - spacing * (onboard_cols - 1) as f32) / onboard_cols as f32)
+                    .floor()
             };
             const ONBOARDING_CARD_HEIGHT: f32 = 140.0;
 
@@ -424,8 +441,10 @@ impl ShiplyApp {
                             ui.set_width((step_w - 28.0).max(150.0));
                             ui.set_height(ONBOARDING_CARD_HEIGHT);
                             ui.vertical(|ui| {
-                                let (num_rect, _) = ui.allocate_exact_size(Vec2::splat(24.0), Sense::hover());
-                                ui.painter().circle_filled(num_rect.center(), 12.0, INFO_SOFT);
+                                let (num_rect, _) =
+                                    ui.allocate_exact_size(Vec2::splat(24.0), Sense::hover());
+                                ui.painter()
+                                    .circle_filled(num_rect.center(), 12.0, INFO_SOFT);
                                 ui.painter().text(
                                     num_rect.center(),
                                     Align2::CENTER_CENTER,
@@ -3462,8 +3481,7 @@ impl ShiplyApp {
                     .iter()
                     .position(|(_, k)| k == &self.selected_env_key)
                     .unwrap_or(0);
-                let env_names: Vec<&str> =
-                    project_envs.iter().map(|(n, _)| n.as_str()).collect();
+                let env_names: Vec<&str> = project_envs.iter().map(|(n, _)| n.as_str()).collect();
                 if !env_names.is_empty() && kit::segmented(ui, &mut selected_idx, &env_names) {
                     if let Some((_, k)) = project_envs.get(selected_idx) {
                         switched_env_key = Some(k.clone());
@@ -3614,8 +3632,16 @@ impl ShiplyApp {
                     d.version.to_lowercase().contains(&query)
                         || d.project_name.to_lowercase().contains(&query)
                         || d.environment.to_lowercase().contains(&query)
-                        || d.git_branch.as_deref().unwrap_or("").to_lowercase().contains(&query)
-                        || d.git_commit.as_deref().unwrap_or("").to_lowercase().contains(&query)
+                        || d.git_branch
+                            .as_deref()
+                            .unwrap_or("")
+                            .to_lowercase()
+                            .contains(&query)
+                        || d.git_commit
+                            .as_deref()
+                            .unwrap_or("")
+                            .to_lowercase()
+                            .contains(&query)
                 }
             })
             .cloned()
@@ -3782,11 +3808,8 @@ impl ShiplyApp {
 
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                                 let rel = helpers::format_relative_time(dep.started_at);
-                                let ts_resp = ui.label(
-                                    RichText::new(rel)
-                                        .typo(Typo::Small)
-                                        .color(TEXT_MUTED),
-                                );
+                                let ts_resp = ui
+                                    .label(RichText::new(rel).typo(Typo::Small).color(TEXT_MUTED));
                                 let mut hover_msg = format!(
                                     "Started (Local): {}",
                                     dep.format_started_at_local("%Y-%m-%d %H:%M:%S %:z")
@@ -3924,14 +3947,21 @@ impl ShiplyApp {
                                         "View log"
                                     })
                                     .typo(Typo::SmallMedium)
-                                    .color(if is_selected { PRIMARY_BLUE } else { TEXT_PRIMARY }),
+                                    .color(if is_selected {
+                                        PRIMARY_BLUE
+                                    } else {
+                                        TEXT_PRIMARY
+                                    }),
                                 )
-                                .fill(if is_selected {
-                                    BLUE_PILL_BG
-                                } else {
-                                    SUBTLE_BG
-                                })
-                                .stroke(Stroke::new(1.0_f32, if is_selected { PRIMARY_BLUE } else { CARD_BORDER }))
+                                .fill(if is_selected { BLUE_PILL_BG } else { SUBTLE_BG })
+                                .stroke(Stroke::new(
+                                    1.0_f32,
+                                    if is_selected {
+                                        PRIMARY_BLUE
+                                    } else {
+                                        CARD_BORDER
+                                    },
+                                ))
                                 .corner_radius(CornerRadius::same(6));
 
                                 if ui.add(logs_btn).clicked() {
@@ -3954,8 +3984,8 @@ impl ShiplyApp {
 
                         horizontal_row(ui, row_h, |ui| {
                             // 1. Status (90px)
-                            let (s_rect, _) =
-                                ui.allocate_exact_size(Vec2::new(col_status, row_h), Sense::hover());
+                            let (s_rect, _) = ui
+                                .allocate_exact_size(Vec2::new(col_status, row_h), Sense::hover());
                             let (s_bg, s_fg) = status_pill_colors(dep.status);
                             let s_pos = Pos2::new(s_rect.left(), s_rect.center().y);
                             if dep.status == DeploymentStatus::Running {
@@ -3980,8 +4010,8 @@ impl ShiplyApp {
                             }
 
                             // 2. Version (80px, MONO)
-                            let (v_rect, _) =
-                                ui.allocate_exact_size(Vec2::new(col_version, row_h), Sense::hover());
+                            let (v_rect, _) = ui
+                                .allocate_exact_size(Vec2::new(col_version, row_h), Sense::hover());
                             ui.painter().text(
                                 Pos2::new(v_rect.left(), v_rect.center().y),
                                 Align2::LEFT_CENTER,
@@ -3991,8 +4021,8 @@ impl ShiplyApp {
                             );
 
                             // 3. Branch (120px, MONO, truncated with ellipsis)
-                            let (b_rect, b_resp) =
-                                ui.allocate_exact_size(Vec2::new(col_branch, row_h), Sense::hover());
+                            let (b_rect, b_resp) = ui
+                                .allocate_exact_size(Vec2::new(col_branch, row_h), Sense::hover());
                             draw_icon_git_branch(
                                 ui.painter(),
                                 Pos2::new(b_rect.left() + 2.0, b_rect.center().y),
@@ -4001,8 +4031,10 @@ impl ShiplyApp {
                             let raw_branch = dep.git_branch.as_deref().unwrap_or("main");
                             let max_b_chars = 11;
                             let b_text = if raw_branch.chars().count() > max_b_chars {
-                                let truncated: String =
-                                    raw_branch.chars().take(max_b_chars.saturating_sub(1)).collect();
+                                let truncated: String = raw_branch
+                                    .chars()
+                                    .take(max_b_chars.saturating_sub(1))
+                                    .collect();
                                 format!("{truncated}…")
                             } else {
                                 raw_branch.to_string()
@@ -4017,11 +4049,14 @@ impl ShiplyApp {
                             b_resp.on_hover_text(format!("Branch: {raw_branch}"));
 
                             // 4. Commit (70px, MONO)
-                            let (c_rect, c_resp) =
-                                ui.allocate_exact_size(Vec2::new(col_commit, row_h), Sense::hover());
+                            let (c_rect, c_resp) = ui
+                                .allocate_exact_size(Vec2::new(col_commit, row_h), Sense::hover());
                             let full_sha = dep.git_commit.as_deref().unwrap_or("-");
-                            let short_sha =
-                                if full_sha.len() > 7 { &full_sha[..7] } else { full_sha };
+                            let short_sha = if full_sha.len() > 7 {
+                                &full_sha[..7]
+                            } else {
+                                full_sha
+                            };
                             ui.painter().text(
                                 Pos2::new(c_rect.left(), c_rect.center().y),
                                 Align2::LEFT_CENTER,
@@ -4034,8 +4069,10 @@ impl ShiplyApp {
                             }
 
                             // 5. Deployed (140px, relative time + tooltip with full timestamp)
-                            let (t_rect, t_resp) =
-                                ui.allocate_exact_size(Vec2::new(col_deployed, row_h), Sense::hover());
+                            let (t_rect, t_resp) = ui.allocate_exact_size(
+                                Vec2::new(col_deployed, row_h),
+                                Sense::hover(),
+                            );
                             let rel_time = helpers::format_relative_time(dep.started_at);
                             ui.painter().text(
                                 Pos2::new(t_rect.left(), t_rect.center().y),
@@ -4048,19 +4085,19 @@ impl ShiplyApp {
                                 "Started: {}",
                                 dep.format_started_at_local("%Y-%m-%d %H:%M:%S %:z")
                             );
-                            if let Some(fin) =
-                                dep.format_finished_at_local("%Y-%m-%d %H:%M:%S %:z")
+                            if let Some(fin) = dep.format_finished_at_local("%Y-%m-%d %H:%M:%S %:z")
                             {
                                 hover_msg.push_str(&format!("\nFinished: {fin}"));
                             }
                             if let Some(ms) = dep.duration_ms {
-                                hover_msg.push_str(&format!("\nDuration: {:.1}s", ms as f64 / 1000.0));
+                                hover_msg
+                                    .push_str(&format!("\nDuration: {:.1}s", ms as f64 / 1000.0));
                             }
                             t_resp.on_hover_text(hover_msg);
 
                             // 6. Trigger / User (110px)
-                            let (u_rect, _) =
-                                ui.allocate_exact_size(Vec2::new(col_trigger, row_h), Sense::hover());
+                            let (u_rect, _) = ui
+                                .allocate_exact_size(Vec2::new(col_trigger, row_h), Sense::hover());
                             let trigger_lbl = if dep.is_rollback {
                                 "Rollback"
                             } else {
@@ -4203,11 +4240,7 @@ impl ShiplyApp {
                                         TEXT_PRIMARY
                                     }),
                                 )
-                                .fill(if is_selected {
-                                    BLUE_PILL_BG
-                                } else {
-                                    SUBTLE_BG
-                                })
+                                .fill(if is_selected { BLUE_PILL_BG } else { SUBTLE_BG })
                                 .stroke(Stroke::new(
                                     1.0_f32,
                                     if is_selected {
@@ -4421,9 +4454,7 @@ impl ShiplyApp {
                                     char_color,
                                 );
                                 ui.label(
-                                    RichText::new(path)
-                                        .typo(Typo::MonoSm)
-                                        .color(TEXT_SECONDARY),
+                                    RichText::new(path).typo(Typo::MonoSm).color(TEXT_SECONDARY),
                                 );
                             });
                         }
@@ -4438,8 +4469,13 @@ impl ShiplyApp {
     }
 
     pub(crate) fn render_terminal_window(&mut self, ui: &mut egui::Ui, dep: &DeploymentRecord) {
-        let is_running = dep.status == DeploymentStatus::Running || self.is_deployment_active(&dep.id);
-        let term_h = if self.console_expanded_height { 480.0 } else { 260.0 };
+        let is_running =
+            dep.status == DeploymentStatus::Running || self.is_deployment_active(&dep.id);
+        let term_h = if self.console_expanded_height {
+            480.0
+        } else {
+            260.0
+        };
 
         egui::Frame::new()
             .fill(SB_BG)
@@ -4523,7 +4559,11 @@ impl ShiplyApp {
                 )
                 .fill(Color32::TRANSPARENT)
                 .stroke(Stroke::NONE);
-                if child.add(clr_btn).on_hover_text("Close log console").clicked() {
+                if child
+                    .add(clr_btn)
+                    .on_hover_text("Close log console")
+                    .clicked()
+                {
                     self.selected_deployment_id = None;
                     self.console_collapsed = true;
                 }
@@ -4540,10 +4580,18 @@ impl ShiplyApp {
                 .stroke(Stroke::new(1.0_f32, SB_BORDER_LINE))
                 .corner_radius(CornerRadius::same(4));
 
-                if child.add(copy_btn).on_hover_text("Copy full log to clipboard").clicked() {
+                if child
+                    .add(copy_btn)
+                    .on_hover_text("Copy full log to clipboard")
+                    .clicked()
+                {
                     let mut full_log = String::new();
                     for step in &dep.step_logs {
-                        full_log.push_str(&format!("[{}] {}\n", step.status.label(), step.step_name));
+                        full_log.push_str(&format!(
+                            "[{}] {}\n",
+                            step.status.label(),
+                            step.step_name
+                        ));
                         full_log.push_str(&format!("$ {}\n", step.command_summary));
                         full_log.push_str(&step.output);
                         full_log.push('\n');
@@ -4558,7 +4606,8 @@ impl ShiplyApp {
                 if is_running {
                     child.ctx().request_repaint();
                     let time = child.input(|i| i.time);
-                    let (spin_r, _) = child.allocate_exact_size(Vec2::new(14.0, 14.0), Sense::hover());
+                    let (spin_r, _) =
+                        child.allocate_exact_size(Vec2::new(14.0, 14.0), Sense::hover());
                     draw_circle_loading_spinner(
                         child.painter(),
                         spin_r.center(),
@@ -4602,7 +4651,8 @@ impl ShiplyApp {
                                 }
 
                                 for (i, step_log) in dep.step_logs.iter().enumerate() {
-                                    let is_step_collapsed = self.collapsed_step_indices.contains(&i);
+                                    let is_step_collapsed =
+                                        self.collapsed_step_indices.contains(&i);
                                     let color = match step_log.status {
                                         DeploymentStatus::Succeeded => TERM_GREEN,
                                         DeploymentStatus::Failed => TERM_RED,
@@ -4611,8 +4661,10 @@ impl ShiplyApp {
                                     };
 
                                     let step_resp = horizontal_row(ui, 24.0, |ui| {
-                                        let (ic_r, _) =
-                                            ui.allocate_exact_size(Vec2::new(14.0, 14.0), Sense::hover());
+                                        let (ic_r, _) = ui.allocate_exact_size(
+                                            Vec2::new(14.0, 14.0),
+                                            Sense::hover(),
+                                        );
                                         if step_log.status == DeploymentStatus::Succeeded {
                                             draw_icon_check(ui.painter(), ic_r.center(), color);
                                         } else if step_log.status == DeploymentStatus::Running {
@@ -4645,8 +4697,10 @@ impl ShiplyApp {
                                                 .color(SB_TEXT_FAINT),
                                         );
 
-                                        let (ch_r, _) =
-                                            ui.allocate_exact_size(Vec2::new(14.0, 14.0), Sense::hover());
+                                        let (ch_r, _) = ui.allocate_exact_size(
+                                            Vec2::new(14.0, 14.0),
+                                            Sense::hover(),
+                                        );
                                         draw_icon_chevron(
                                             ui.painter(),
                                             ch_r.center(),
@@ -4672,9 +4726,12 @@ impl ShiplyApp {
                                     if !is_step_collapsed {
                                         ui.indent(format!("term_step_indent_{i}"), |ui| {
                                             ui.label(
-                                                RichText::new(format!("$ {}", step_log.command_summary))
-                                                    .typo(Typo::Code)
-                                                    .color(SB_TEXT_FAINT),
+                                                RichText::new(format!(
+                                                    "$ {}",
+                                                    step_log.command_summary
+                                                ))
+                                                .typo(Typo::Code)
+                                                .color(SB_TEXT_FAINT),
                                             );
                                             for line in step_log.output.lines() {
                                                 let trimmed = line.trim();
@@ -4703,8 +4760,10 @@ impl ShiplyApp {
                                 if is_running {
                                     ui.add_space(4.0);
                                     horizontal_row(ui, 24.0, |ui| {
-                                        let (ic_r, _) =
-                                            ui.allocate_exact_size(Vec2::new(14.0, 14.0), Sense::hover());
+                                        let (ic_r, _) = ui.allocate_exact_size(
+                                            Vec2::new(14.0, 14.0),
+                                            Sense::hover(),
+                                        );
                                         ui.ctx().request_repaint();
                                         let time = ui.input(|i| i.time);
                                         draw_circle_loading_spinner(
@@ -4720,9 +4779,11 @@ impl ShiplyApp {
                                             .map(|s| s.step_name.as_str())
                                             .unwrap_or("Running pipeline");
                                         ui.label(
-                                            RichText::new(format!("Executing: {active_step_name}..."))
-                                                .typo(Typo::Code)
-                                                .color(SB_ACCENT),
+                                            RichText::new(format!(
+                                                "Executing: {active_step_name}..."
+                                            ))
+                                            .typo(Typo::Code)
+                                            .color(SB_ACCENT),
                                         );
                                     });
                                 }
@@ -4768,7 +4829,11 @@ impl ShiplyApp {
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 ui.spacing_mut().item_spacing = Vec2::new(SP_8, 0.0);
 
-                let new_btn_txt = if is_compact_hdr { "+ New" } else { "+ New secret" };
+                let new_btn_txt = if is_compact_hdr {
+                    "+ New"
+                } else {
+                    "+ New secret"
+                };
                 if kit::button(
                     ui,
                     ButtonVariant::Primary,
@@ -4818,7 +4883,11 @@ impl ShiplyApp {
             .storage
             .secrets
             .iter()
-            .filter(|s| self.secret_vault_cache.get(&s.key).is_some_and(|c| c.in_vault))
+            .filter(|s| {
+                self.secret_vault_cache
+                    .get(&s.key)
+                    .is_some_and(|c| c.in_vault)
+            })
             .count();
         let missing_count = total_secrets.saturating_sub(stored_count);
 
@@ -4841,7 +4910,11 @@ impl ShiplyApp {
             (
                 "Missing in vault",
                 missing_count,
-                if missing_count > 0 { WARNING } else { TEXT_MUTED },
+                if missing_count > 0 {
+                    WARNING
+                } else {
+                    TEXT_MUTED
+                },
             ),
             ("Used by environments", used_envs_count, TEXT_PRIMARY),
         ];
@@ -4999,9 +5072,7 @@ impl ShiplyApp {
                                 ),
                             );
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                ui.label(
-                                    Typo::SmallMedium.rich("Actions").color(TEXT_SECONDARY),
-                                );
+                                ui.label(Typo::SmallMedium.rich("Actions").color(TEXT_SECONDARY));
                             });
                         });
                     });
@@ -5124,14 +5195,10 @@ impl ShiplyApp {
                             {
                                 delete_target_key = Some(sec.key.clone());
                             }
-                            let copy_tip = format!("Copy ${{{{ secrets.{} }}}} to clipboard", sec.key);
-                            if kit::icon_button(
-                                ui,
-                                OutlineIcon::Copy,
-                                ButtonSize::Sm,
-                                &copy_tip,
-                            )
-                            .clicked()
+                            let copy_tip =
+                                format!("Copy ${{{{ secrets.{} }}}} to clipboard", sec.key);
+                            if kit::icon_button(ui, OutlineIcon::Copy, ButtonSize::Sm, &copy_tip)
+                                .clicked()
                             {
                                 copied_expr = Some(format!("${{{{ secrets.{} }}}}", sec.key));
                             }
@@ -5157,10 +5224,8 @@ impl ShiplyApp {
                     } else {
                         56.0_f32
                     };
-                    let (row_rect, row_resp) = ui.allocate_exact_size(
-                        Vec2::new(table_avail_w, row_h),
-                        Sense::click(),
-                    );
+                    let (row_rect, row_resp) =
+                        ui.allocate_exact_size(Vec2::new(table_avail_w, row_h), Sense::click());
                     let is_hovered = row_resp.hovered();
 
                     if is_hovered {
@@ -5189,10 +5254,8 @@ impl ShiplyApp {
                         ui.add_space(8.0);
 
                         // 1. NAME column
-                        let (k_rect, _) = ui.allocate_exact_size(
-                            Vec2::new(key_col_w - 8.0, row_h),
-                            Sense::hover(),
-                        );
+                        let (k_rect, _) = ui
+                            .allocate_exact_size(Vec2::new(key_col_w - 8.0, row_h), Sense::hover());
                         let name_top = if sec.description.is_empty() {
                             k_rect.center().y
                         } else {
@@ -5230,9 +5293,9 @@ impl ShiplyApp {
                         let (s_rect, _) =
                             ui.allocate_exact_size(Vec2::new(140.0, row_h), Sense::hover());
                         let mut s_child = ui.new_child(
-                            egui::UiBuilder::new().max_rect(s_rect).layout(
-                                Layout::left_to_right(Align::Center),
-                            ),
+                            egui::UiBuilder::new()
+                                .max_rect(s_rect)
+                                .layout(Layout::left_to_right(Align::Center)),
                         );
                         kit::status_badge(
                             &mut s_child,
@@ -5248,19 +5311,15 @@ impl ShiplyApp {
                         let (ub_rect, ub_resp) =
                             ui.allocate_exact_size(Vec2::new(190.0, row_h), Sense::hover());
                         let mut ub_child = ui.new_child(
-                            egui::UiBuilder::new().max_rect(ub_rect).layout(
-                                Layout::left_to_right(Align::Center),
-                            ),
+                            egui::UiBuilder::new()
+                                .max_rect(ub_rect)
+                                .layout(Layout::left_to_right(Align::Center)),
                         );
                         if referencing_envs.is_empty() {
                             ub_child.label(Typo::Small.rich("Not used").color(TEXT_MUTED));
                         } else {
                             for (badge, _) in referencing_envs.iter().take(2) {
-                                kit::tag(
-                                    &mut ub_child,
-                                    badge,
-                                    env_pastel_pill_colors(badge),
-                                );
+                                kit::tag(&mut ub_child, badge, env_pastel_pill_colors(badge));
                                 ub_child.add_space(4.0);
                             }
                             if referencing_envs.len() > 2 {
@@ -5296,14 +5355,10 @@ impl ShiplyApp {
                             {
                                 delete_target_key = Some(sec.key.clone());
                             }
-                            let copy_tip = format!("Copy ${{{{ secrets.{} }}}} to clipboard", sec.key);
-                            if kit::icon_button(
-                                ui,
-                                OutlineIcon::Copy,
-                                ButtonSize::Sm,
-                                &copy_tip,
-                            )
-                            .clicked()
+                            let copy_tip =
+                                format!("Copy ${{{{ secrets.{} }}}} to clipboard", sec.key);
+                            if kit::icon_button(ui, OutlineIcon::Copy, ButtonSize::Sm, &copy_tip)
+                                .clicked()
                             {
                                 copied_expr = Some(format!("${{{{ secrets.{} }}}}", sec.key));
                             }
@@ -5373,14 +5428,8 @@ impl ShiplyApp {
                     } else {
                         "Show"
                     };
-                    if kit::button(
-                        ui,
-                        ButtonVariant::Ghost,
-                        ButtonSize::Sm,
-                        toggle_lbl,
-                        None,
-                    )
-                    .clicked()
+                    if kit::button(ui, ButtonVariant::Ghost, ButtonSize::Sm, toggle_lbl, None)
+                        .clicked()
                     {
                         self.secret_help_expanded = !self.secret_help_expanded;
                     }

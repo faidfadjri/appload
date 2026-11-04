@@ -188,7 +188,8 @@ impl ShiplyApp {
         if let Ok(val) = std::env::var("SHIPLY_INITIAL_TAB") {
             if val.eq_ignore_ascii_case("pipeline_steps") || val.eq_ignore_ascii_case("steps") {
                 active_tab = WorkspaceTab::PipelineSteps;
-            } else if val.eq_ignore_ascii_case("deployments") || val.eq_ignore_ascii_case("history") {
+            } else if val.eq_ignore_ascii_case("deployments") || val.eq_ignore_ascii_case("history")
+            {
                 active_tab = WorkspaceTab::HistoryAndLogs;
             } else if val.eq_ignore_ascii_case("settings") {
                 active_tab = WorkspaceTab::ServerSettings;

@@ -70,7 +70,11 @@ pub fn update_package_json_version(project_dir: &Path, new_version: &str) -> Res
         .map_err(|e| format!("Invalid JSON in {}: {e}", pkg_path.display()))?;
 
     let mut replaced = false;
-    let line_ending = if content.contains("\r\n") { "\r\n" } else { "\n" };
+    let line_ending = if content.contains("\r\n") {
+        "\r\n"
+    } else {
+        "\n"
+    };
     let mut updated_lines = Vec::new();
 
     for line in content.lines() {
@@ -263,11 +267,7 @@ pub fn read_git_code_changes(project_dir: &Path, previous_commit: Option<&str>) 
 }
 
 /// Creates or updates an annotated git tag for the deployment in `project_dir`.
-pub fn create_git_tag(
-    project_dir: &Path,
-    version: &str,
-    env_name: &str,
-) -> Result<String, String> {
+pub fn create_git_tag(project_dir: &Path, version: &str, env_name: &str) -> Result<String, String> {
     let trimmed = version.trim();
     if trimmed.is_empty() {
         return Err("Version cannot be empty when creating a Git tag".to_string());

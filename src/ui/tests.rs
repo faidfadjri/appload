@@ -2701,7 +2701,10 @@ fn test_secret_management_page_and_os_vault_roundtrip() {
     // Plaintext secret value must be wiped from UI memory immediately after saving
     assert!(app.secret_form_value.is_empty());
     // Cache must be populated and marked stored in vault
-    assert!(app.secret_vault_cache.get(&test_key).is_some_and(|c| c.in_vault));
+    assert!(app
+        .secret_vault_cache
+        .get(&test_key)
+        .is_some_and(|c| c.in_vault));
 
     // Verify OS Credential Manager has the secret and username
     let vault_cred = read_os_vault_credential(&test_key).expect("secret in OS vault");

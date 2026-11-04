@@ -1667,8 +1667,7 @@ impl ShiplyApp {
     }
 
     pub(crate) fn render_secret_modal(&mut self, ctx: &egui::Context) {
-        let Some(anim_t) =
-            prepare_animated_modal(ctx, "secret_modal", &mut self.show_secret_modal)
+        let Some(anim_t) = prepare_animated_modal(ctx, "secret_modal", &mut self.show_secret_modal)
         else {
             return;
         };

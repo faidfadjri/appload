@@ -168,7 +168,12 @@ pub fn resolve_openssh_binary(tool: &str) -> PathBuf {
             fallback_dirs.push(PathBuf::from(sys_root).join("System32").join("OpenSSH"));
         }
         if let Ok(prog_files) = env::var("ProgramFiles") {
-            fallback_dirs.push(PathBuf::from(&prog_files).join("Git").join("usr").join("bin"));
+            fallback_dirs.push(
+                PathBuf::from(&prog_files)
+                    .join("Git")
+                    .join("usr")
+                    .join("bin"),
+            );
             fallback_dirs.push(PathBuf::from(prog_files).join("OpenSSH-Win64"));
         }
         for dir in fallback_dirs {
@@ -350,8 +355,12 @@ fn execute_multiline_script_file(
         }
     };
 
-    fs::write(&script_path, script_content.as_bytes())
-        .map_err(|e| format!("Failed to write temporary script '{}': {e}", script_path.display()))?;
+    fs::write(&script_path, script_content.as_bytes()).map_err(|e| {
+        format!(
+            "Failed to write temporary script '{}': {e}",
+            script_path.display()
+        )
+    })?;
 
     #[cfg(unix)]
     {
@@ -413,10 +422,12 @@ pub fn validate_deployment_request(req: &DeploymentRequest) -> Result<(), String
 
     // 2. App name validation: no shell metacharacters or whitespace
     let app_name = req.env_config.app_name.trim();
-    if app_name
-        .chars()
-        .any(|c| matches!(c, ';' | '&' | '|' | '$' | '>' | '<' | '`' | '\n' | '\r' | '\0' | ' '))
-    {
+    if app_name.chars().any(|c| {
+        matches!(
+            c,
+            ';' | '&' | '|' | '$' | '>' | '<' | '`' | '\n' | '\r' | '\0' | ' '
+        )
+    }) {
         return Err(format!(
             "Invalid app_name '{app_name}': cannot contain whitespace or shell metacharacters."
         ));
@@ -615,8 +626,7 @@ pub fn run_deployment(
         .collect();
 
     let initial_meta = read_git_metadata(&req.local_path);
-    let initial_changes =
-        read_git_code_changes(&req.local_path, req.previous_commit.as_deref());
+    let initial_changes = read_git_code_changes(&req.local_path, req.previous_commit.as_deref());
 
     let mut record = DeploymentRecord {
         id: req.deployment_id.clone(),
@@ -679,13 +689,14 @@ pub fn run_deployment(
     let secrets_to_redact: Vec<&str> = owned_secrets_to_redact.iter().map(String::as_str).collect();
 
     let pkg_path = req.local_path.join("package.json");
-    let mut pkg_guard: Option<PackageJsonRevertGuard> = if req.bump_package_json && pkg_path.exists() {
-        std::fs::read_to_string(&pkg_path)
-            .ok()
-            .map(|content| PackageJsonRevertGuard::new(pkg_path.clone(), content))
-    } else {
-        None
-    };
+    let mut pkg_guard: Option<PackageJsonRevertGuard> =
+        if req.bump_package_json && pkg_path.exists() {
+            std::fs::read_to_string(&pkg_path)
+                .ok()
+                .map(|content| PackageJsonRevertGuard::new(pkg_path.clone(), content))
+        } else {
+            None
+        };
 
     macro_rules! finalize {
         ($rec:expr, $status:expr) => {
@@ -762,9 +773,7 @@ pub fn run_deployment(
         );
     } else if let Some(target_branch) = &req.target_git_branch {
         let trimmed_branch = target_branch.trim();
-        if !trimmed_branch.is_empty()
-            && initial_meta.branch.as_deref() != Some(trimmed_branch)
-        {
+        if !trimmed_branch.is_empty() && initial_meta.branch.as_deref() != Some(trimmed_branch) {
             let step_start = Instant::now();
             match checkout_git_branch(&req.local_path, trimmed_branch) {
                 Ok(out) => {
@@ -900,8 +909,7 @@ pub fn run_deployment(
                 build_ssh_command(&env_cfg.remote_user, server, "true", askpass_guard.as_ref());
             match run_command_capture(&mut ssh_cmd) {
                 Ok((true, _)) => {
-                    preflight_log
-                        .push_str(&format!("\n  [OK] {}@{}", env_cfg.remote_user, server));
+                    preflight_log.push_str(&format!("\n  [OK] {}@{}", env_cfg.remote_user, server));
                 }
                 Ok((false, out)) => {
                     preflight_log.push_str(&format!(
@@ -1342,7 +1350,9 @@ fn finalize_record(
                     step_name: "Revert package.json Version".to_string(),
                     command_summary: "Revert package.json due to deployment failure".to_string(),
                     status: DeploymentStatus::Succeeded,
-                    output: "Deployment failed. package.json was reverted back to its previous version.".to_string(),
+                    output:
+                        "Deployment failed. package.json was reverted back to its previous version."
+                            .to_string(),
                     duration_ms: 0,
                 });
             }
@@ -1489,14 +1499,12 @@ mod tests {
             remote_dir: "/data/demo".to_string(),
             env_source: None,
             http_proxy: None,
-            steps: vec![
-                PipelineStep::new(
-                    "Failing Verification",
-                    StepKind::VerifyLocalPath {
-                        path: "./does_not_exist/binary.exe".to_string(),
-                    },
-                ),
-            ],
+            steps: vec![PipelineStep::new(
+                "Failing Verification",
+                StepKind::VerifyLocalPath {
+                    path: "./does_not_exist/binary.exe".to_string(),
+                },
+            )],
         };
 
         let req = DeploymentRequest {
@@ -1527,9 +1535,10 @@ mod tests {
         );
 
         // Verify revert log step was appended
-        assert!(
-            record.step_logs.iter().any(|log| log.step_name == "Revert package.json Version")
-        );
+        assert!(record
+            .step_logs
+            .iter()
+            .any(|log| log.step_name == "Revert package.json Version"));
     }
 
     #[test]
@@ -1678,13 +1687,9 @@ mod tests {
             "varA='Shiply Line 1'\nvarB='Shiply Line 2'\necho \"$varA - $varB\""
         };
 
-        let (ok_multi, out_multi) = execute_local_shell_command(
-            tmp.path(),
-            multiline_script,
-            None,
-            Some("step-multi"),
-        )
-        .expect("multiline execution");
+        let (ok_multi, out_multi) =
+            execute_local_shell_command(tmp.path(), multiline_script, None, Some("step-multi"))
+                .expect("multiline execution");
         assert!(ok_multi, "multiline command failed: {out_multi}");
         assert!(
             out_multi.contains("Shiply Line 1 - Shiply Line 2"),
@@ -1698,13 +1703,9 @@ mod tests {
             "echo 'About to fail'\nexit 9"
         };
 
-        let (failed, out_failing) = execute_local_shell_command(
-            tmp.path(),
-            multiline_failing,
-            None,
-            Some("step-fail"),
-        )
-        .expect("failing command execution");
+        let (failed, out_failing) =
+            execute_local_shell_command(tmp.path(), multiline_failing, None, Some("step-fail"))
+                .expect("failing command execution");
         assert!(!failed, "command should have reported failure");
         assert!(out_failing.contains("About to fail"));
     }

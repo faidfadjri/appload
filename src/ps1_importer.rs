@@ -91,9 +91,9 @@ pub fn import_project_from_path(
     let inferred_name = pkg_name
         .or(go_name)
         .or_else(|| {
-            environments.first().map(|e| {
-                strip_env_suffix(&e.app_name).to_string()
-            })
+            environments
+                .first()
+                .map(|e| strip_env_suffix(&e.app_name).to_string())
         })
         .or_else(|| {
             project_dir
@@ -154,8 +154,8 @@ pub fn parse_ps1_file(script_path: &Path) -> Result<EnvironmentConfig, String> {
 /// Parses the text content of a PowerShell deployment script (such as `deploy-dev.ps1` or `deploy-prod.ps1`)
 /// into a structured `EnvironmentConfig` with auto-populated servers, paths, credentials, and pipeline steps.
 pub fn parse_ps1_content(content: &str, filename_stem: &str) -> Result<EnvironmentConfig, String> {
-    let app_name = extract_ps_string_var(content, "AppName")
-        .unwrap_or_else(|| "app-service-dev".to_string());
+    let app_name =
+        extract_ps_string_var(content, "AppName").unwrap_or_else(|| "app-service-dev".to_string());
 
     let vault_target = extract_ps_string_var(content, "CredentialTarget")
         .or_else(|| extract_ps_string_var(content, "VaultTarget"))
@@ -173,7 +173,8 @@ pub fn parse_ps1_content(content: &str, filename_stem: &str) -> Result<Environme
     let http_proxy = extract_ps_string_var(content, "HttpProxy");
     let env_source = extract_ps_string_var(content, "EnvSource");
 
-    let (env_key, env_name) = infer_env_key_and_name(filename_stem, &app_name, env_source.as_deref());
+    let (env_key, env_name) =
+        infer_env_key_and_name(filename_stem, &app_name, env_source.as_deref());
 
     let raw_remote_dir = extract_non_empty_remote_dir(content)
         .unwrap_or_else(|| "/data/indy-service/apps/$AppName".to_string());
@@ -238,9 +239,7 @@ pub fn parse_ps1_content(content: &str, filename_stem: &str) -> Result<Environme
         let test_path = extract_test_path_target(content).unwrap_or_else(|| bin_path.clone());
         steps.push(PipelineStep::new(
             format!("Verify {test_path}"),
-            StepKind::VerifyLocalPath {
-                path: test_path,
-            },
+            StepKind::VerifyLocalPath { path: test_path },
         ));
     } else if let Some(explicit_path) = extract_test_path_target(content) {
         steps.push(PipelineStep::new(
@@ -431,7 +430,16 @@ pub fn parse_ps1_content(content: &str, filename_stem: &str) -> Result<Environme
 }
 
 fn strip_env_suffix(app_name: &str) -> &str {
-    for suffix in ["-dev", "-development", "-prod", "-production", "-staging", "-stg", "-uat", "-qa"] {
+    for suffix in [
+        "-dev",
+        "-development",
+        "-prod",
+        "-production",
+        "-staging",
+        "-stg",
+        "-uat",
+        "-qa",
+    ] {
         if let Some(stripped) = app_name.strip_suffix(suffix) {
             return stripped;
         }
@@ -643,9 +651,7 @@ fn extract_go_test_command(content: &str) -> Option<String> {
         }
         if let Some(pos) = trimmed.find("go test") {
             let cmd_part = &trimmed[pos..];
-            let end_idx = cmd_part
-                .find([';', '|', '&'])
-                .unwrap_or(cmd_part.len());
+            let end_idx = cmd_part.find([';', '|', '&']).unwrap_or(cmd_part.len());
             let final_cmd = cmd_part[..end_idx].trim();
             if !final_cmd.is_empty() {
                 return Some(final_cmd.to_string());
@@ -789,7 +795,8 @@ Invoke-Remote -Server $server -Command "$Pm2 restart $AppName"
 
     #[test]
     fn test_parse_ndm_dq_subscription_deploy_dev_ps1() {
-        let env = parse_ps1_content(SAMPLE_NDM_DEV_PS1, "deploy-dev").expect("parse deploy-dev.ps1");
+        let env =
+            parse_ps1_content(SAMPLE_NDM_DEV_PS1, "deploy-dev").expect("parse deploy-dev.ps1");
         assert_eq!(env.key, "dev");
         assert_eq!(env.name, "Development");
         assert_eq!(env.app_name, "ndm-dq-subscription-dev");
@@ -818,7 +825,10 @@ Invoke-Remote -Server $server -Command "$Pm2 restart $AppName"
         ));
         assert!(matches!(
             &env.steps[3].kind,
-            StepKind::TransferFiles { stage_env_file: true, .. }
+            StepKind::TransferFiles {
+                stage_env_file: true,
+                ..
+            }
         ));
     }
 
@@ -867,8 +877,8 @@ Invoke-Remote -Server $server -Command "systemctl restart auth-service"
 
     #[test]
     fn test_parse_go_project_ps1_content() {
-        let env = parse_ps1_content(SAMPLE_GO_DEPLOY_PS1, "deploy-dev")
-            .expect("parse Go deploy-dev.ps1");
+        let env =
+            parse_ps1_content(SAMPLE_GO_DEPLOY_PS1, "deploy-dev").expect("parse Go deploy-dev.ps1");
         assert_eq!(env.key, "dev");
         assert_eq!(env.app_name, "auth-service-dev");
         assert_eq!(env.remote_user, "appndq");
@@ -904,10 +914,7 @@ Invoke-Remote -Server $server -Command "systemctl restart auth-service"
         ));
 
         // Step 3: transfer files
-        assert!(matches!(
-            &env.steps[3].kind,
-            StepKind::TransferFiles { .. }
-        ));
+        assert!(matches!(&env.steps[3].kind, StepKind::TransferFiles { .. }));
 
         // Step 4: systemctl restart
         assert!(matches!(

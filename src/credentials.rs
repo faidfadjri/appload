@@ -138,14 +138,7 @@ fn read_windows_generic_credential(target: &str) -> Option<VaultCredential> {
 
     let mut cred_ptr: *mut CREDENTIALW = ptr::null_mut();
     // SAFETY: `wide_target` is a valid null-terminated UTF-16 string and `cred_ptr` receives the allocated CREDENTIALW pointer.
-    let ok = unsafe {
-        CredReadW(
-            wide_target.as_ptr(),
-            CRED_TYPE_GENERIC,
-            0,
-            &mut cred_ptr,
-        )
-    };
+    let ok = unsafe { CredReadW(wide_target.as_ptr(), CRED_TYPE_GENERIC, 0, &mut cred_ptr) };
 
     if ok == 0 || cred_ptr.is_null() {
         return None;
@@ -171,10 +164,8 @@ fn read_windows_generic_credential(target: &str) -> Option<VaultCredential> {
         };
 
         let password = if !cred.CredentialBlob.is_null() && cred.CredentialBlobSize > 0 {
-            let blob = std::slice::from_raw_parts(
-                cred.CredentialBlob,
-                cred.CredentialBlobSize as usize,
-            );
+            let blob =
+                std::slice::from_raw_parts(cred.CredentialBlob, cred.CredentialBlobSize as usize);
             decode_credential_blob(blob)
         } else {
             String::new()
@@ -214,7 +205,10 @@ pub fn write_os_vault_credential(
 
     #[cfg(target_os = "macos")]
     {
-        let account = username.map(str::trim).filter(|u| !u.is_empty()).unwrap_or("shiply");
+        let account = username
+            .map(str::trim)
+            .filter(|u| !u.is_empty())
+            .unwrap_or("shiply");
         let output = std::process::Command::new("security")
             .args([
                 "add-generic-password",
@@ -241,7 +235,10 @@ pub fn write_os_vault_credential(
     #[cfg(all(not(windows), not(target_os = "macos")))]
     {
         use std::process::Stdio;
-        let account = username.map(str::trim).filter(|u| !u.is_empty()).unwrap_or("shiply");
+        let account = username
+            .map(str::trim)
+            .filter(|u| !u.is_empty())
+            .unwrap_or("shiply");
         let mut child = std::process::Command::new("secret-tool")
             .args([
                 "store",
@@ -484,9 +481,7 @@ pub fn resolve_credentials(
         return ResolvedCredentials {
             username: username.clone(),
             password: Some(vault_cred.password),
-            source_description: format!(
-                "OS Credential Store ('{vault_target}' as '{username}')"
-            ),
+            source_description: format!("OS Credential Store ('{vault_target}' as '{username}')"),
         };
     }
 
@@ -575,7 +570,10 @@ mod tests {
             "docker login -u ${{{{ secrets.{target}.username }}}} -p ${{{{ secrets.{target} }}}}"
         );
         let (interpolated, redact_list) = interpolate_os_secrets(&cmd_template);
-        assert_eq!(interpolated, "docker login -u deploy_admin -p MyVaultS3cret!99");
+        assert_eq!(
+            interpolated,
+            "docker login -u deploy_admin -p MyVaultS3cret!99"
+        );
         assert!(redact_list.contains(&"MyVaultS3cret!99".to_string()));
 
         let refs: Vec<&str> = redact_list.iter().map(String::as_str).collect();

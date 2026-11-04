@@ -1,10 +1,7 @@
 use crate::domain::{normalize_env_key, EnvironmentConfig, PipelineStep, Project, StepKind};
 
 pub fn default_projects() -> Vec<Project> {
-    vec![
-        ndm_dq_subscription_project(),
-        indy_subscription_project(),
-    ]
+    vec![ndm_dq_subscription_project(), indy_subscription_project()]
 }
 
 pub fn ndm_dq_subscription_project() -> Project {
