@@ -2,8 +2,8 @@ use super::icons::*;
 use super::theme::*;
 use super::typography::*;
 use eframe::egui::{
-    self, Align, Color32, CornerRadius, FontId, Layout, Margin, Pos2, Sense, Shadow, Stroke,
-    StrokeKind, Vec2,
+    self, Align, Color32, CornerRadius, FontId, Layout, Margin, Pos2, Rect, Sense, Shadow, Stroke,
+    StrokeKind, Vec2, WidgetText,
 };
 
 #[allow(dead_code)]
@@ -288,6 +288,81 @@ pub fn count_badge(ui: &mut egui::Ui, count: usize) {
     ui.painter().galley(text_pos, text_galley, TEXT_MUTED);
 }
 
+/// Standardized underline tab: height 40px, Label font, active 2px primary underline and TEXT_PRIMARY.
+pub fn underline_tab(
+    ui: &mut egui::Ui,
+    is_active: bool,
+    label: &str,
+    count: Option<usize>,
+) -> egui::Response {
+    let font_id = Typo::Label.font();
+    let text_color = if is_active {
+        TEXT_PRIMARY
+    } else {
+        TEXT_SECONDARY
+    };
+    let text_galley = ui
+        .painter()
+        .layout_no_wrap(label.to_string(), font_id, text_color);
+
+    let count_w = if let Some(c) = count {
+        let cg = ui
+            .painter()
+            .layout_no_wrap(c.to_string(), Typo::Caption.font(), TEXT_MUTED);
+        (cg.size().x + 10.0).max(18.0) + 6.0
+    } else {
+        0.0
+    };
+
+    let total_w = text_galley.size().x + count_w + 16.0;
+    let h = TAB_HEIGHT; // 40.0
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(total_w, h), Sense::click());
+    let resp = resp.on_hover_cursor(egui::CursorIcon::PointingHand);
+
+    let text_pos = Pos2::new(
+        rect.left() + 8.0,
+        rect.center().y - text_galley.size().y / 2.0,
+    );
+    let final_color = if is_active || resp.hovered() {
+        TEXT_PRIMARY
+    } else {
+        TEXT_SECONDARY
+    };
+    ui.painter()
+        .galley(text_pos, text_galley.clone(), final_color);
+
+    if let Some(c) = count {
+        let badge_x = text_pos.x + text_galley.size().x + 6.0;
+        let badge_h = 18.0;
+        let cg = ui
+            .painter()
+            .layout_no_wrap(c.to_string(), Typo::Caption.font(), TEXT_MUTED);
+        let badge_w = (cg.size().x + 10.0).max(18.0);
+        let badge_rect = Rect::from_min_size(
+            Pos2::new(badge_x, rect.center().y - badge_h / 2.0),
+            Vec2::new(badge_w, badge_h),
+        );
+        ui.painter()
+            .rect_filled(badge_rect, CornerRadius::same(9), SUBTLE_BG);
+        let c_pos = Pos2::new(
+            badge_rect.center().x - cg.size().x / 2.0,
+            badge_rect.center().y - cg.size().y / 2.0,
+        );
+        ui.painter().galley(c_pos, cg, TEXT_MUTED);
+    }
+
+    if is_active {
+        let underline_rect = Rect::from_min_max(
+            Pos2::new(rect.left(), rect.bottom() - 2.0),
+            Pos2::new(rect.right(), rect.bottom()),
+        );
+        ui.painter()
+            .rect_filled(underline_rect, CornerRadius::ZERO, PRIMARY_BLUE);
+    }
+
+    resp
+}
+
 /// Standardized card container with 1px CARD_BORDER, R_LG radius, CARD_BG, and subtle shadow.
 pub fn card<R>(
     ui: &mut egui::Ui,
@@ -301,10 +376,78 @@ pub fn card<R>(
             offset: [0, 1],
             blur: 2,
             spread: 0,
-            color: Color32::from_rgba_premultiplied(17, 24, 39, 13),
+            color: SHADOW_CARD,
         })
         .inner_margin(Margin::same(20))
         .show(ui, add_contents)
+}
+
+/// Standardized kit checkbox: 16x16, radius 4, primary fill when checked, LABEL text.
+pub fn checkbox(
+    ui: &mut egui::Ui,
+    checked: &mut bool,
+    label: impl Into<WidgetText>,
+) -> egui::Response {
+    let size = 16.0;
+    let radius = CornerRadius::same(4);
+    let label = label.into();
+    let text_style = Typo::Label;
+
+    let galley = label.into_galley(
+        ui,
+        Some(egui::TextWrapMode::Extend),
+        f32::INFINITY,
+        text_style.font(),
+    );
+    let total_w = size + 8.0 + galley.size().x;
+    let total_h = size.max(galley.size().y).max(20.0);
+    let (rect, mut resp) = ui.allocate_exact_size(Vec2::new(total_w, total_h), Sense::click());
+    if resp.clicked() {
+        *checked = !*checked;
+        resp.mark_changed();
+    }
+
+    let box_rect = Rect::from_min_size(
+        Pos2::new(rect.left(), rect.center().y - size / 2.0),
+        Vec2::splat(size),
+    );
+
+    if *checked {
+        ui.painter().rect_filled(box_rect, radius, PRIMARY_BLUE);
+        let p1 = Pos2::new(box_rect.left() + 3.5, box_rect.top() + 8.0);
+        let p2 = Pos2::new(box_rect.left() + 6.5, box_rect.top() + 11.5);
+        let p3 = Pos2::new(box_rect.left() + 12.5, box_rect.top() + 4.5);
+        ui.painter()
+            .line_segment([p1, p2], Stroke::new(1.8_f32, Color32::WHITE));
+        ui.painter()
+            .line_segment([p2, p3], Stroke::new(1.8_f32, Color32::WHITE));
+    } else {
+        let border_color = if resp.hovered() {
+            INPUT_BORDER_HOVER
+        } else {
+            INPUT_BORDER
+        };
+        ui.painter().rect_filled(box_rect, radius, CARD_BG);
+        ui.painter().rect_stroke(
+            box_rect,
+            radius,
+            Stroke::new(1.0_f32, border_color),
+            StrokeKind::Inside,
+        );
+    }
+
+    let text_pos = Pos2::new(
+        rect.left() + size + 8.0,
+        rect.center().y - galley.size().y / 2.0,
+    );
+    let text_color = if *checked {
+        TEXT_PRIMARY
+    } else {
+        TEXT_SECONDARY
+    };
+    ui.painter().galley(text_pos, galley, text_color);
+
+    resp
 }
 
 /// Standardized card with title header, right actions, and 1px separator line under the header.

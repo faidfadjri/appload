@@ -611,7 +611,7 @@ impl ShiplyApp {
                     let cred_title = if cred_avail_w < 580.0 {
                         "OS credentials setup guideline"
                     } else {
-                        "OS CREDENTIALS SETUP GUIDELINE (WINDOWS | LINUX | MAC)"
+                        "OS credentials setup guideline (Windows | Linux | macOS)"
                     };
                     ui.label(
                         RichText::new(cred_title)
@@ -958,7 +958,6 @@ impl ShiplyApp {
         let proj_path = self.storage.projects[proj_idx].local_path.clone();
         let path_exists = PathBuf::from(&proj_path).exists();
         let avail_w = ui.available_width();
-        let theme = self.theme();
 
         // 1. Top Project Header Bar (Fixed 36px height — all right-side controls vertically centered at 32px height)
         let mut delete_project_clicked = false;
@@ -1039,18 +1038,13 @@ impl ShiplyApp {
                 }
             });
 
-            let (r_txt, r_bg, r_fg) = if path_exists {
-                ("READY", SUCCESS_PILL_BG, SUCCESS_PILL_TEXT)
+            if path_exists {
+                status_badge(ui, StatusKind::Success, "Ready");
             } else {
-                ("Path missing", FAIL_PILL_BG, FAIL_PILL_TEXT)
-            };
-            render_pill(ui, r_txt, r_bg, r_fg);
+                status_badge(ui, StatusKind::Danger, "Path missing");
+            }
 
             let right_w = ui.available_width();
-            let screen_w = ui.ctx().screen_rect().width();
-            let is_narrow_header = screen_w < 720.0 || right_w < 320.0;
-            let is_icon_only_header = !is_narrow_header && right_w < 560.0;
-
             ui.allocate_ui_with_layout(
                 Vec2::new(right_w, 36.0),
                 Layout::right_to_left(Align::Center),
@@ -1059,175 +1053,92 @@ impl ShiplyApp {
                     ui.set_max_height(36.0);
                     ui.spacing_mut().item_spacing = Vec2::new(8.0, 0.0);
 
-                    if is_narrow_header {
-                        // Below 720px: move Edit/Duplicate/Refresh/Delete into a more-horizontal menu
-                        let more_resp = outline_icon_button(
-                            ui,
-                            ("hdr_more_menu_btn", project_id),
-                            OutlineIcon::MoreHorizontal,
-                            None,
-                            theme.text_muted,
-                            theme.surface,
-                            theme.surface_2,
-                            theme.border,
-                            true,
-                        )
-                        .on_hover_text("Project actions");
+                    // 1. "⋯" Overflow Menu (furthest right)
+                    let more_resp = outline_icon_button(
+                        ui,
+                        ("hdr_more_menu_btn", project_id),
+                        OutlineIcon::MoreHorizontal,
+                        None,
+                        TEXT_MUTED,
+                        CARD_BG,
+                        SUBTLE_BG,
+                        CARD_BORDER,
+                        true,
+                    )
+                    .on_hover_text("More actions");
 
-                        more_resp.context_menu(|ui| {
-                            ui.set_min_width(160.0);
-                            ui.spacing_mut().item_spacing = Vec2::new(0.0, 2.0);
-                            ui.spacing_mut().button_padding = Vec2::new(10.0, 6.0);
+                    more_resp.context_menu(|ui| {
+                        ui.set_min_width(170.0);
+                        ui.spacing_mut().item_spacing = Vec2::new(0.0, 2.0);
+                        ui.spacing_mut().button_padding = Vec2::new(10.0, 6.0);
 
-                            if ui
-                                .add(
-                                    egui::Button::new(
-                                        RichText::new("✎  Edit Project")
-                                            .typo(Typo::Label)
-                                            .color(theme.text),
-                                    )
-                                    .fill(theme.surface),
+                        if ui
+                            .add(
+                                egui::Button::new(
+                                    RichText::new("⧉  Duplicate project")
+                                        .typo(Typo::Label)
+                                        .color(TEXT_PRIMARY),
                                 )
-                                .clicked()
-                            {
-                                edit_project_clicked = true;
-                                ui.close_menu();
-                            }
-
-                            if ui
-                                .add(
-                                    egui::Button::new(
-                                        RichText::new("⧉  Duplicate Project")
-                                            .typo(Typo::Label)
-                                            .color(theme.text),
-                                    )
-                                    .fill(theme.surface),
-                                )
-                                .clicked()
-                            {
-                                duplicate_project_clicked = true;
-                                ui.close_menu();
-                            }
-
-                            if ui
-                                .add(
-                                    egui::Button::new(
-                                        RichText::new("↻  Refresh Metadata")
-                                            .typo(Typo::Label)
-                                            .color(theme.text_muted),
-                                    )
-                                    .fill(theme.surface),
-                                )
-                                .clicked()
-                            {
-                                self.refresh_selected_project_metadata(true);
-                                ui.close_menu();
-                            }
-
-                            ui.separator();
-
-                            if ui
-                                .add(
-                                    egui::Button::new(
-                                        RichText::new("🗑  Delete Project")
-                                            .typo(Typo::Label)
-                                            .color(theme.danger),
-                                    )
-                                    .fill(theme.surface),
-                                )
-                                .clicked()
-                            {
-                                delete_project_clicked = true;
-                                ui.close_menu();
-                            }
-                        });
-                    } else {
-                        if outline_icon_button(
-                            ui,
-                            ("hdr_delete_proj", project_id),
-                            OutlineIcon::Trash,
-                            if is_icon_only_header {
-                                None
-                            } else {
-                                Some("Delete")
-                            },
-                            theme.danger,
-                            theme.danger_soft,
-                            theme.danger_soft,
-                            theme.danger,
-                            true,
-                        )
-                        .on_hover_text("Delete this project")
-                        .clicked()
-                        {
-                            delete_project_clicked = true;
-                        }
-
-                        if outline_icon_button(
-                            ui,
-                            ("hdr_refresh_proj", project_id),
-                            OutlineIcon::Refresh,
-                            if is_icon_only_header {
-                                None
-                            } else {
-                                Some("Refresh")
-                            },
-                            theme.text_muted,
-                            theme.surface,
-                            theme.surface_2,
-                            theme.border,
-                            true,
-                        )
-                        .on_hover_text("Refresh Git branches, commits, and package.json version")
-                        .clicked()
-                        {
-                            self.refresh_selected_project_metadata(true);
-                        }
-
-                        if outline_icon_button(
-                            ui,
-                            ("hdr_dup_proj", project_id),
-                            OutlineIcon::Copy,
-                            if is_icon_only_header {
-                                None
-                            } else {
-                                Some("Duplicate")
-                            },
-                            theme.text,
-                            theme.surface,
-                            theme.surface_2,
-                            theme.border,
-                            true,
-                        )
-                        .on_hover_text("Duplicate this project and all its environments")
-                        .clicked()
+                                .fill(CARD_BG),
+                            )
+                            .clicked()
                         {
                             duplicate_project_clicked = true;
+                            ui.close_menu();
                         }
 
-                        if outline_icon_button(
-                            ui,
-                            ("hdr_edit_proj", project_id),
-                            OutlineIcon::Edit,
-                            if is_icon_only_header {
-                                None
-                            } else {
-                                Some("Edit Project")
-                            },
-                            theme.text,
-                            theme.surface,
-                            theme.surface_2,
-                            theme.border,
-                            true,
-                        )
-                        .on_hover_text("Edit project name, local directory path, or description")
-                        .clicked()
+                        if ui
+                            .add(
+                                egui::Button::new(
+                                    RichText::new("↻  Refresh metadata")
+                                        .typo(Typo::Label)
+                                        .color(TEXT_SECONDARY),
+                                )
+                                .fill(CARD_BG),
+                            )
+                            .clicked()
                         {
-                            edit_project_clicked = true;
+                            self.refresh_selected_project_metadata(true);
+                            ui.close_menu();
                         }
+
+                        ui.separator();
+
+                        if ui
+                            .add(
+                                egui::Button::new(
+                                    RichText::new("🗑  Delete project")
+                                        .typo(Typo::Label)
+                                        .color(DANGER),
+                                )
+                                .fill(CARD_BG),
+                            )
+                            .clicked()
+                        {
+                            delete_project_clicked = true;
+                            ui.close_menu();
+                        }
+                    });
+
+                    // 2. Secondary "Edit" Button
+                    if outline_icon_button(
+                        ui,
+                        ("hdr_edit_proj", project_id),
+                        OutlineIcon::Edit,
+                        Some("Edit Project"),
+                        TEXT_PRIMARY,
+                        CARD_BG,
+                        SUBTLE_BG,
+                        CARD_BORDER,
+                        true,
+                    )
+                    .on_hover_text("Edit project settings")
+                    .clicked()
+                    {
+                        edit_project_clicked = true;
                     }
 
-                    // Git Branch Selector Dropdown — exact 32px height to match Edit/Refresh/Delete buttons
+                    // 3. Git Branch Selector
                     if !self.cached_git_branches.is_empty() {
                         let current_b = if self.selected_git_branch.is_empty() {
                             "main".to_string()
@@ -1241,23 +1152,16 @@ impl ShiplyApp {
                             .map(|c| format!(" @ {c}"))
                             .unwrap_or_default();
 
-                        let branch_combo_w = if is_narrow_header {
-                            (right_w - 44.0).clamp(95.0, 130.0)
-                        } else if is_icon_only_header {
-                            (right_w - 164.0).clamp(115.0, 155.0)
-                        } else {
-                            185.0
-                        };
                         ui.scope(|ui| {
                             ui.spacing_mut().interact_size.y = 32.0;
                             ui.spacing_mut().button_padding = Vec2::new(10.0, 6.0);
                             egui::ComboBox::from_id_salt("header_git_branch_selector")
                                 .selected_text(
-                                    RichText::new(format!("Branch: {current_b}{commit_suffix}"))
+                                    RichText::new(format!("{current_b}{commit_suffix}"))
                                         .typo(Typo::SmallMedium)
-                                        .color(theme.text),
+                                        .color(TEXT_PRIMARY),
                                 )
-                                .width(branch_combo_w)
+                                .width(160.0)
                                 .show_ui(ui, |ui| {
                                     for branch in self.cached_git_branches.clone() {
                                         let is_sel = self.selected_git_branch == branch;
@@ -1316,73 +1220,51 @@ impl ShiplyApp {
         draw_divider(ui, CARD_BORDER);
         ui.add_space(6.0);
 
-        // 2. Sub-header description & folder path row (Responsive single or two-row layout)
-        let desc_galley =
-            ui.painter()
-                .layout_no_wrap(proj_desc, Typo::Small.font(), TEXT_SECONDARY);
-        let path_galley =
-            ui.painter()
-                .layout_no_wrap(proj_path.clone(), Typo::Small.font(), TEXT_SECONDARY);
-        let desc_w = desc_galley.size().x;
-        let path_w = path_galley.size().x;
-        let stack_subheader = 22.0 + desc_w + 46.0 + path_w > avail_w;
+        // 2. Sub-header description & folder path row
+        horizontal_row(ui, 24.0, |ui| {
+            if !proj_desc.is_empty() {
+                ui.label(
+                    RichText::new(&proj_desc)
+                        .typo(Typo::Small)
+                        .color(TEXT_SECONDARY),
+                );
+                ui.label(RichText::new("·").typo(Typo::Small).color(TEXT_MUTED));
+            }
 
-        if stack_subheader {
-            let (sub_rect, _) = ui.allocate_exact_size(Vec2::new(avail_w, 44.0), Sense::hover());
-            let clip = ui.painter().with_clip_rect(sub_rect);
-            let y1 = sub_rect.top() + 11.0;
-            let y2 = sub_rect.top() + 33.0;
-            draw_icon_server(&clip, Pos2::new(sub_rect.left() + 8.0, y1), TEXT_MUTED);
-            clip.galley(
-                Pos2::new(sub_rect.left() + 22.0, y1 - desc_galley.size().y / 2.0),
-                desc_galley,
-                TEXT_SECONDARY,
-            );
-            draw_icon_folder(&clip, Pos2::new(sub_rect.left() + 8.0, y2), TEXT_MUTED);
-            clip.galley(
-                Pos2::new(sub_rect.left() + 22.0, y2 - path_galley.size().y / 2.0),
-                path_galley,
-                TEXT_SECONDARY,
-            );
-        } else {
-            let (sub_rect, _) = ui.allocate_exact_size(Vec2::new(avail_w, 24.0), Sense::hover());
-            let clip = ui.painter().with_clip_rect(sub_rect);
-            draw_icon_server(
-                &clip,
-                Pos2::new(sub_rect.left() + 8.0, sub_rect.center().y),
-                TEXT_MUTED,
-            );
-            clip.galley(
-                Pos2::new(
-                    sub_rect.left() + 22.0,
-                    sub_rect.center().y - desc_galley.size().y / 2.0,
-                ),
-                desc_galley,
-                TEXT_SECONDARY,
-            );
+            let truncated_path = if proj_path.len() > 55 {
+                let start = &proj_path[..24];
+                let end = &proj_path[proj_path.len() - 26..];
+                format!("{start}...{end}")
+            } else {
+                proj_path.clone()
+            };
 
-            let sep_x = sub_rect.left() + 22.0 + desc_w + 14.0;
-            clip.line_segment(
-                [
-                    Pos2::new(sep_x, sub_rect.top() + 5.0),
-                    Pos2::new(sep_x, sub_rect.bottom() - 5.0),
-                ],
-                Stroke::new(1.0_f32, CARD_BORDER),
-            );
-            draw_icon_folder(
-                &clip,
-                Pos2::new(sep_x + 16.0, sub_rect.center().y),
-                TEXT_MUTED,
-            );
-            clip.galley(
-                Pos2::new(
-                    sep_x + 30.0,
-                    sub_rect.center().y - path_galley.size().y / 2.0,
-                ),
-                path_galley,
-                TEXT_SECONDARY,
-            );
-        }
+            let path_resp = ui
+                .horizontal(|ui| {
+                    ui.spacing_mut().item_spacing = Vec2::new(4.0, 0.0);
+                    draw_icon_folder(
+                        ui.painter(),
+                        Pos2::new(ui.cursor().min.x + 6.0, ui.cursor().center().y),
+                        TEXT_MUTED,
+                    );
+                    ui.add_space(14.0);
+                    ui.label(
+                        RichText::new(truncated_path)
+                            .typo(Typo::Mono)
+                            .color(TEXT_MUTED),
+                    )
+                })
+                .response;
+
+            if path_resp
+                .interact(Sense::click())
+                .on_hover_text(format!("Click to copy: {proj_path}"))
+                .clicked()
+            {
+                ui.ctx().copy_text(proj_path.clone());
+                self.set_status_banner(format!("Copied project path: {proj_path}"), false);
+            }
+        });
 
         ui.add_space(14.0);
 
@@ -1394,7 +1276,6 @@ impl ShiplyApp {
             .collect();
 
         let mut new_selected_env_key = None;
-        let mut delete_env_key = None;
         let card_spacing = 14.0;
         let cols = if avail_w >= 650.0 {
             3
@@ -1421,157 +1302,118 @@ impl ShiplyApp {
                     ui.allocate_exact_size(Vec2::new(card_w, ENV_CARD_HEIGHT), Sense::click());
                 let card_resp = card_resp.on_hover_cursor(egui::CursorIcon::PointingHand);
 
-                // Outline Trash delete button rect at top-right of the card
-                let del_rect = Rect::from_center_size(
-                    Pos2::new(card_rect.right() - 22.0, card_rect.top() + 24.0),
-                    Vec2::new(24.0, 24.0),
-                );
-                let del_resp = ui
-                    .interact(
-                        del_rect,
-                        egui::Id::new(("del_env_card_btn", project_id, env_key)),
-                        Sense::click(),
+                let (bg_fill, stroke) = if is_active {
+                    (
+                        Color32::from_rgb(240, 246, 255),
+                        Stroke::new(1.5_f32, PRIMARY_BLUE),
                     )
-                    .on_hover_cursor(egui::CursorIcon::PointingHand);
-
-                let stroke = if is_active {
-                    Stroke::new(2.0_f32, theme.primary)
                 } else if card_resp.hovered() {
-                    Stroke::new(1.5_f32, theme.primary_hover)
+                    (CARD_BG, Stroke::new(1.0_f32, INPUT_BORDER_HOVER))
                 } else {
-                    Stroke::new(1.0_f32, theme.border)
+                    (CARD_BG, Stroke::new(1.0_f32, CARD_BORDER))
                 };
 
-                draw_elevated_card(ui.painter(), card_rect, theme.surface_tint_top, stroke);
-
-                // Top-left: Environment pastel pill
-                let is_prod = env_key.to_lowercase().contains("prod");
-                let (pill_bg, pill_fg) = if is_prod {
-                    (theme.purple_soft, theme.purple)
-                } else {
-                    (theme.primary_soft, theme.primary)
-                };
-                paint_pill_left_aligned(
-                    ui.painter(),
-                    Pos2::new(card_rect.left() + 16.0, card_rect.top() + 24.0),
-                    &env_name.to_uppercase(),
-                    pill_bg,
-                    pill_fg,
+                ui.painter()
+                    .rect_filled(card_rect, CornerRadius::same(10), bg_fill);
+                ui.painter().rect_stroke(
+                    card_rect,
+                    CornerRadius::same(10),
+                    stroke,
+                    StrokeKind::Inside,
                 );
 
-                // Top-right (left of delete button): Status pill or "Not deployed"
+                // Top row: Environment Name as H3 (sentence case)
+                ui.painter().text(
+                    Pos2::new(card_rect.left() + 16.0, card_rect.top() + 20.0),
+                    Align2::LEFT_CENTER,
+                    env_name,
+                    Typo::H3.font(),
+                    TEXT_PRIMARY,
+                );
+
+                // Top-right: Status badge ("Succeeded", "Running", "Failed", "Not deployed")
+                let right_badge_pos = Pos2::new(card_rect.right() - 16.0, card_rect.top() + 20.0);
                 if let Some(latest) = latest_any {
                     let (s_bg, s_fg) = status_pill_colors(latest.status);
+                    let label = latest.status.label();
                     if latest.status == DeploymentStatus::Running {
                         ui.ctx().request_repaint();
                         let time = ui.input(|i| i.time);
                         paint_running_pill_right_aligned(
                             ui.painter(),
-                            Pos2::new(del_rect.left() - 6.0, card_rect.top() + 24.0),
-                            &latest.status.label().to_uppercase(),
+                            right_badge_pos,
+                            label,
                             s_bg,
                             s_fg,
                             time,
                         );
                     } else {
-                        paint_pill_right_aligned(
-                            ui.painter(),
-                            Pos2::new(del_rect.left() - 6.0, card_rect.top() + 24.0),
-                            &latest.status.label().to_uppercase(),
-                            s_bg,
-                            s_fg,
-                        );
+                        paint_pill_right_aligned(ui.painter(), right_badge_pos, label, s_bg, s_fg);
                     }
                 } else {
                     ui.painter().text(
-                        Pos2::new(del_rect.left() - 8.0, card_rect.top() + 24.0),
+                        right_badge_pos,
                         Align2::RIGHT_CENTER,
                         "Not deployed",
                         Typo::Caption.font(),
-                        theme.text_muted,
+                        TEXT_MUTED,
                     );
                 }
 
-                // Paint the outline Trash delete environment button
-                ui.painter().rect_filled(
-                    del_rect,
-                    CornerRadius::same(5),
-                    if del_resp.hovered() {
-                        theme.danger_soft
-                    } else {
-                        theme.surface_2
-                    },
-                );
-                ui.painter().rect_stroke(
-                    del_rect,
-                    CornerRadius::same(5),
-                    Stroke::new(
-                        1.0_f32,
-                        if del_resp.hovered() {
-                            theme.danger
-                        } else {
-                            theme.border
-                        },
-                    ),
-                    StrokeKind::Inside,
-                );
-                draw_outline_icon(
-                    ui.painter(),
-                    del_rect.center(),
-                    OutlineIcon::Trash,
-                    if del_resp.hovered() {
-                        theme.danger
-                    } else {
-                        theme.text_muted
-                    },
-                );
-
-                // Bottom area of card: Active version or "No Active Build"
-                if let Some(ok_dep) = last_ok {
+                // Middle: Version in Typo::MonoLg (20px mono-medium)
+                if let Some(ok_dep) = &last_ok {
                     ui.painter().text(
-                        Pos2::new(card_rect.left() + 16.0, card_rect.top() + 58.0),
+                        Pos2::new(card_rect.left() + 16.0, card_rect.top() + 52.0),
                         Align2::LEFT_CENTER,
-                        format!("Active: v{}", ok_dep.version),
-                        Typo::H3.font(),
-                        theme.text,
+                        format!("v{}", ok_dep.version),
+                        Typo::MonoLg.font(),
+                        TEXT_PRIMARY,
                     );
                     ui.painter().text(
-                        Pos2::new(card_rect.left() + 16.0, card_rect.top() + 78.0),
+                        Pos2::new(card_rect.left() + 16.0, card_rect.top() + 74.0),
                         Align2::LEFT_CENTER,
                         "Current version",
-                        Typo::MonoSm.font(),
-                        theme.text_muted,
+                        Typo::Small.font(),
+                        TEXT_MUTED,
+                    );
+
+                    // Bottom: "Deployed 2h ago · main@852f02f"
+                    let rel_time = format_relative_time(ok_dep.started_at);
+                    let git_str = match (&ok_dep.git_branch, &ok_dep.git_commit) {
+                        (Some(b), Some(c)) => format!(" · {b}@{}", &c[..7.min(c.len())]),
+                        (Some(b), None) => format!(" · {b}"),
+                        _ => String::new(),
+                    };
+                    ui.painter().text(
+                        Pos2::new(card_rect.left() + 16.0, card_rect.top() + 94.0),
+                        Align2::LEFT_CENTER,
+                        format!("Deployed {rel_time}{git_str}"),
+                        Typo::Small.font(),
+                        TEXT_MUTED,
                     );
                 } else {
                     ui.painter().text(
-                        Pos2::new(card_rect.left() + 16.0, card_rect.top() + 62.0),
+                        Pos2::new(card_rect.left() + 16.0, card_rect.top() + 56.0),
                         Align2::LEFT_CENTER,
-                        "No Active Build",
+                        "No active build",
                         Typo::H3.font(),
-                        theme.text_subtle,
+                        TEXT_MUTED,
                     );
                 }
 
-                if del_resp.on_hover_text("Delete this environment").clicked() {
-                    delete_env_key = Some((env_key.clone(), env_name.clone()));
-                } else if card_resp.clicked() {
+                if card_resp.clicked() {
                     new_selected_env_key = Some(env_key.clone());
                 }
             }
 
-            // "+ ADD / IMPORT ENVIRONMENT" Card with exact same 96px height!
+            // "Add environment" tile: same size (card_w x 112px)
             let (add_rect, add_resp) =
                 ui.allocate_exact_size(Vec2::new(card_w, ENV_CARD_HEIGHT), Sense::click());
             let add_resp = add_resp.on_hover_cursor(egui::CursorIcon::PointingHand);
-            let add_bg = if add_resp.hovered() {
-                theme.surface
+            let (add_bg, add_stroke) = if add_resp.hovered() {
+                (CARD_BG, Stroke::new(1.0_f32, PRIMARY_BLUE))
             } else {
-                theme.surface_2
-            };
-            let add_stroke = if add_resp.hovered() {
-                Stroke::new(1.5_f32, theme.primary)
-            } else {
-                Stroke::new(1.0_f32, theme.border)
+                (SUBTLE_BG, Stroke::new(1.0_f32, CARD_BORDER))
             };
             ui.painter()
                 .rect_filled(add_rect, CornerRadius::same(10), add_bg);
@@ -1582,14 +1424,33 @@ impl ShiplyApp {
                 StrokeKind::Inside,
             );
 
-            let plus_center = Pos2::new(add_rect.center().x, add_rect.center().y - 10.0);
-            draw_icon_plus(ui.painter(), plus_center, theme.text_muted);
+            let plus_center = Pos2::new(add_rect.center().x, add_rect.center().y - 18.0);
+            draw_icon_plus(
+                ui.painter(),
+                plus_center,
+                if add_resp.hovered() {
+                    PRIMARY_BLUE
+                } else {
+                    TEXT_MUTED
+                },
+            );
             ui.painter().text(
-                Pos2::new(add_rect.center().x, add_rect.center().y + 14.0),
+                Pos2::new(add_rect.center().x, add_rect.center().y + 4.0),
                 Align2::CENTER_CENTER,
                 "Add environment",
+                Typo::Label.font(),
+                if add_resp.hovered() {
+                    PRIMARY_BLUE
+                } else {
+                    TEXT_PRIMARY
+                },
+            );
+            ui.painter().text(
+                Pos2::new(add_rect.center().x, add_rect.center().y + 24.0),
+                Align2::CENTER_CENTER,
+                "or import from .ps1",
                 Typo::Small.font(),
-                theme.text_muted,
+                TEXT_MUTED,
             );
 
             if add_resp.clicked() {
@@ -1598,14 +1459,7 @@ impl ShiplyApp {
             }
         });
 
-        if let Some((del_key, del_name)) = delete_env_key {
-            self.pending_delete_confirm = Some(ConfirmDeleteAction::Environment {
-                project_id: project_id.to_string(),
-                project_name: proj_name.clone(),
-                env_key: del_key,
-                env_name: del_name,
-            });
-        } else if let Some(env_key) = new_selected_env_key {
+        if let Some(env_key) = new_selected_env_key {
             self.servers_edit_buffer = None;
             self.selected_env_key = env_key;
             self.refresh_selected_project_metadata(true);
@@ -1659,11 +1513,7 @@ impl ShiplyApp {
 
         ui.add_space(18.0);
 
-        // 5. Clean Section Tabs — Identical 10px gap and consistent bordered styling
-        let enabled_count = self.storage.projects[proj_idx]
-            .get_env(&self.selected_env_key)
-            .map(|e| e.steps.iter().filter(|s| s.enabled).count())
-            .unwrap_or(0);
+        // 5. Section Tabs: Underline tabs with 1px baseline CARD_BORDER across avail_w
         let total_steps = self.storage.projects[proj_idx]
             .get_env(&self.selected_env_key)
             .map(|e| e.steps.len())
@@ -1673,42 +1523,37 @@ impl ShiplyApp {
             .filter_deployments(Some(project_id), Some(&self.selected_env_key), None)
             .len();
 
-        egui::ScrollArea::horizontal()
-            .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
-            .show(ui, |ui| {
-                horizontal_row(ui, TAB_HEIGHT, |ui| {
-                    ui.spacing_mut().item_spacing = Vec2::new(10.0, 0.0);
-                    for (tab, label) in [
-                        (
-                            WorkspaceTab::PipelineSteps,
-                            format!("Pipeline Steps ({enabled_count}/{total_steps})"),
-                        ),
-                        (
-                            WorkspaceTab::HistoryAndLogs,
-                            format!("Deployments & Logs ({history_count})"),
-                        ),
-                        (
-                            WorkspaceTab::ServerSettings,
-                            "Environment & SSH Settings".to_string(),
-                        ),
-                    ] {
-                        let is_active = self.active_tab == tab;
-                        let btn_resp = render_uniform_tab_button(
-                            ui,
-                            ("workspace_tab_btn", project_id, &label),
-                            &label,
-                            is_active,
-                            TAB_HEIGHT,
-                        );
-                        if is_active {
-                            btn_resp.scroll_to_me(Some(Align::Center));
-                        }
-                        if btn_resp.clicked() {
-                            self.active_tab = tab;
-                        }
-                    }
-                });
-            });
+        let tab_bar_y = ui.cursor().min.y;
+        ui.painter().line_segment(
+            [
+                Pos2::new(ui.cursor().min.x, tab_bar_y + TAB_HEIGHT - 1.0),
+                Pos2::new(ui.cursor().min.x + avail_w, tab_bar_y + TAB_HEIGHT - 1.0),
+            ],
+            Stroke::new(1.0_f32, CARD_BORDER),
+        );
+
+        horizontal_row(ui, TAB_HEIGHT, |ui| {
+            ui.spacing_mut().item_spacing = Vec2::new(12.0, 0.0);
+            for (tab, label, count) in [
+                (
+                    WorkspaceTab::PipelineSteps,
+                    "Pipeline steps",
+                    Some(total_steps),
+                ),
+                (
+                    WorkspaceTab::HistoryAndLogs,
+                    "Deployments",
+                    Some(history_count),
+                ),
+                (WorkspaceTab::ServerSettings, "Settings", None),
+            ] {
+                let is_active = self.active_tab == tab;
+                let resp = kit::underline_tab(ui, is_active, label, count);
+                if resp.clicked() {
+                    self.active_tab = tab;
+                }
+            }
+        });
 
         ui.add_space(14.0);
 
@@ -2000,8 +1845,6 @@ impl ShiplyApp {
         let mut trigger_deploy = false;
         let mut trigger_rollback = None;
         let avail_w = ui.available_width();
-        let screen_w = ui.ctx().screen_rect().width();
-        let theme = self.theme();
 
         let project_id_owned = match &self.selection {
             SidebarSelection::Project(pid) => pid.clone(),
@@ -2021,119 +1864,109 @@ impl ShiplyApp {
             }
         };
 
-        let deploy_galley =
-            ui.painter()
-                .layout_no_wrap(btn_text, Typo::Body.font(), Color32::WHITE);
-        let deploy_icon_w = 14.0;
-        let deploy_gap = 8.0;
-        let deploy_pad_x = 16.0;
-        let deploy_content_w = deploy_icon_w + deploy_gap + deploy_galley.size().x;
-        let btn_h = BTN_PRIMARY_HEIGHT; // 36px
-
-        let rollback_info = rollback_candidate.as_ref().map(|prev_dep| {
-            let rb_text = format!("Rollback v{}", prev_dep.version);
-            let rb_galley = ui
-                .painter()
-                .layout_no_wrap(rb_text, Typo::Small.font(), theme.warning);
-            let rb_icon_w = 14.0;
-            let rb_gap = 6.0;
-            let rb_pad_x = 12.0;
-            let rb_content_w = rb_icon_w + rb_gap + rb_galley.size().x;
-            let rb_w = (rb_content_w + rb_pad_x * 2.0).max(120.0);
-            (rb_galley, rb_icon_w, rb_gap, rb_content_w, rb_w)
-        });
-
-        let natural_deploy_w = (deploy_content_w + deploy_pad_x * 2.0).max(180.0);
-        let natural_rb_w = rollback_info
-            .as_ref()
-            .map(|(_, _, _, _, w)| *w)
-            .unwrap_or(0.0);
-        let right_btns_w = natural_deploy_w
-            + if natural_rb_w > 0.0 {
-                natural_rb_w + 10.0
-            } else {
-                0.0
-            };
-        let left_controls_w = 575.0;
-
-        let is_two_rows = screen_w < 900.0 || avail_w < (left_controls_w + right_btns_w + 48.0);
-        let is_compact_controls = is_two_rows && avail_w < 600.0;
-        let is_mobile_deploy = screen_w < 600.0 || avail_w < 480.0;
-        let bar_h = if is_compact_controls {
-            154.0
-        } else if is_two_rows {
-            122.0
-        } else {
-            78.0
-        };
+        let is_two_rows = avail_w < 960.0;
+        let bar_h = if is_two_rows { 116.0 } else { 68.0 };
 
         let (bar_rect, _) = ui.allocate_exact_size(Vec2::new(avail_w, bar_h), Sense::hover());
         draw_elevated_card(
             ui.painter(),
             bar_rect,
-            theme.surface,
-            Stroke::new(1.0_f32, theme.border),
+            CARD_BG,
+            Stroke::new(1.0_f32, CARD_BORDER),
         );
 
-        ui.painter().text(
-            Pos2::new(bar_rect.left() + 20.0, bar_rect.top() + 16.0),
-            Align2::LEFT_CENTER,
-            "Release",
-            Typo::MonoSm.font(),
-            theme.text_muted,
-        );
+        let row1_rect = if is_two_rows {
+            Rect::from_min_size(
+                Pos2::new(bar_rect.left() + 16.0, bar_rect.top() + 16.0),
+                Vec2::new(bar_rect.width() - 32.0, 36.0),
+            )
+        } else {
+            Rect::from_min_size(
+                Pos2::new(bar_rect.left() + 16.0, bar_rect.center().y - 18.0),
+                Vec2::new(bar_rect.width() - 32.0, 36.0),
+            )
+        };
 
-        let row1_rect = Rect::from_min_max(
-            Pos2::new(bar_rect.left() + 20.0, bar_rect.top() + 28.0),
-            Pos2::new(
-                if is_two_rows {
-                    bar_rect.right() - 20.0
-                } else {
-                    bar_rect.right() - 24.0 - right_btns_w
-                },
-                bar_rect.top() + 66.0,
-            ),
-        );
-
+        // Render Left & Middle Controls in row1_rect
         let mut child = ui.new_child(
             egui::UiBuilder::new()
-                .id_salt("deploy_bar_controls")
+                .id_salt("deploy_bar_left_controls")
                 .max_rect(row1_rect)
                 .layout(Layout::left_to_right(Align::Center)),
         );
 
+        // 1. Version input (width 110, Typo::Mono, height 36)
         styled_text_edit(
             &mut child,
             "deploy_version_input",
             &mut self.deploy_version_input,
-            if is_compact_controls { 78.0 } else { 92.0 },
+            110.0,
             Some("1.0.0"),
         );
         let ver_id = child.make_persistent_id("deploy_version_input");
         self.is_version_input_focused = child.memory(|m| m.has_focus(ver_id));
-        child.add_space(6.0);
+        child.add_space(8.0);
 
-        for (lbl, bump) in [
+        // 2. Segmented buttons [+Patch | +Minor | +Major] (height 36, attached)
+        let seg_h = 36.0;
+        let seg_w = 54.0;
+        let bumps = [
             ("+Patch", VersionBump::Patch),
             ("+Minor", VersionBump::Minor),
             ("+Major", VersionBump::Major),
-        ] {
-            let b = egui::Button::new(RichText::new(lbl).typo(Typo::SmallMedium).color(theme.text))
-                .fill(theme.surface)
-                .stroke(Stroke::new(1.0_f32, theme.border_strong))
-                .corner_radius(R_MD as u8)
-                .min_size(Vec2::new(
-                    if is_compact_controls { 48.0 } else { 54.0 },
-                    BTN_HEIGHT,
-                ));
-            if child.add(b).clicked() {
-                self.deploy_version_input = bump_semver(&self.deploy_version_input, bump);
+        ];
+        for (i, (lbl, bump)) in bumps.iter().enumerate() {
+            let (rect, resp) = child.allocate_exact_size(Vec2::new(seg_w, seg_h), Sense::click());
+            let resp = resp.on_hover_cursor(egui::CursorIcon::PointingHand);
+            if resp.clicked() {
+                self.deploy_version_input = bump_semver(&self.deploy_version_input, *bump);
             }
+            let bg = if resp.is_pointer_button_down_on() {
+                CARD_BORDER
+            } else if resp.hovered() {
+                SUBTLE_BG
+            } else {
+                CARD_BG
+            };
+            let radius = if i == 0 {
+                CornerRadius {
+                    nw: R_MD as u8,
+                    ne: 0,
+                    sw: R_MD as u8,
+                    se: 0,
+                }
+            } else if i == bumps.len() - 1 {
+                CornerRadius {
+                    nw: 0,
+                    ne: R_MD as u8,
+                    sw: 0,
+                    se: R_MD as u8,
+                }
+            } else {
+                CornerRadius::ZERO
+            };
+            child.painter().rect_filled(rect, radius, bg);
+            child.painter().rect_stroke(
+                rect,
+                radius,
+                Stroke::new(1.0_f32, CARD_BORDER),
+                StrokeKind::Inside,
+            );
+            let galley = child.painter().layout_no_wrap(
+                lbl.to_string(),
+                Typo::SmallMedium.font(),
+                TEXT_PRIMARY,
+            );
+            let text_pos = Pos2::new(
+                rect.center().x - galley.size().x / 2.0,
+                rect.center().y - galley.size().y / 2.0,
+            );
+            child.painter().galley(text_pos, galley, TEXT_PRIMARY);
         }
+        child.add_space(8.0);
 
-        child.add_space(4.0);
+        // 3. Sync button (36x36 OutlineIcon::Refresh)
         let sync_candidates = self.sync_version_candidates(project_id);
-        let sync_btn_text = "Sync";
         let sync_tooltip = if sync_candidates.is_empty() {
             "Sync version across environments (no other deployed versions found yet)".to_string()
         } else if let Some(latest) = sync_candidates.iter().find(|c| c.is_latest) {
@@ -2145,32 +1978,12 @@ impl ShiplyApp {
             "Sync version across environments".to_string()
         };
 
-        let sync_resp = outline_icon_button(
-            &mut child,
-            ("sync_version_btn", project_id),
-            OutlineIcon::Refresh,
-            Some(sync_btn_text),
-            if self.sync_version_dropdown_open {
-                theme.primary
-            } else {
-                theme.text
-            },
-            if self.sync_version_dropdown_open {
-                theme.primary_soft
-            } else {
-                theme.surface
-            },
-            theme.surface_2,
-            if self.sync_version_dropdown_open {
-                theme.primary
-            } else {
-                theme.border_strong
-            },
-            true,
-        )
-        .on_hover_text(sync_tooltip);
-
-        *sync_trigger_rect_out = Some(sync_resp.rect);
+        let (sync_rect, sync_resp) =
+            child.allocate_exact_size(Vec2::new(36.0, 36.0), Sense::click());
+        let sync_resp = sync_resp
+            .on_hover_cursor(egui::CursorIcon::PointingHand)
+            .on_hover_text(sync_tooltip);
+        *sync_trigger_rect_out = Some(sync_rect);
 
         if sync_resp.clicked() {
             if sync_candidates.len() == 1 {
@@ -2180,126 +1993,168 @@ impl ShiplyApp {
                 self.sync_version_dropdown_open = !self.sync_version_dropdown_open;
             }
         }
-
-        if is_compact_controls {
-            let row_chk_rect = Rect::from_min_max(
-                Pos2::new(bar_rect.left() + 20.0, bar_rect.top() + 68.0),
-                Pos2::new(bar_rect.right() - 20.0, bar_rect.top() + 98.0),
-            );
-            let mut chk_ui = ui.new_child(
-                egui::UiBuilder::new()
-                    .id_salt("deploy_bar_checkboxes_compact")
-                    .max_rect(row_chk_rect)
-                    .layout(Layout::left_to_right(Align::Center)),
-            );
-            chk_ui.checkbox(
-                &mut self.bump_package_json,
-                RichText::new("Bump package.json")
-                    .typo(Typo::SmallMedium)
-                    .color(theme.text),
-            );
-            chk_ui.add_space(12.0);
-            chk_ui.checkbox(
-                &mut self.create_git_tag,
-                RichText::new("Git Tag")
-                    .typo(Typo::SmallMedium)
-                    .color(theme.text_muted),
-            );
+        let sync_bg = if self.sync_version_dropdown_open {
+            BLUE_PILL_BG
+        } else if sync_resp.hovered() {
+            SUBTLE_BG
         } else {
-            child.add_space(10.0);
-            let sep_x = child.cursor().min.x;
-            child.painter().line_segment(
-                [
-                    Pos2::new(sep_x, row1_rect.top() + 4.0),
-                    Pos2::new(sep_x, row1_rect.bottom() - 4.0),
-                ],
-                Stroke::new(1.0_f32, theme.border),
-            );
-            child.add_space(10.0);
+            CARD_BG
+        };
+        let sync_border = if self.sync_version_dropdown_open {
+            PRIMARY_BLUE
+        } else {
+            CARD_BORDER
+        };
+        let sync_icon_color = if self.sync_version_dropdown_open {
+            PRIMARY_BLUE
+        } else {
+            TEXT_PRIMARY
+        };
+        child
+            .painter()
+            .rect_filled(sync_rect, CornerRadius::same(R_MD as u8), sync_bg);
+        child.painter().rect_stroke(
+            sync_rect,
+            CornerRadius::same(R_MD as u8),
+            Stroke::new(1.0_f32, sync_border),
+            StrokeKind::Inside,
+        );
+        draw_outline_icon(
+            child.painter(),
+            sync_rect.center(),
+            OutlineIcon::Refresh,
+            sync_icon_color,
+        );
 
-            child.checkbox(
-                &mut self.bump_package_json,
-                RichText::new("Bump package.json")
-                    .typo(Typo::SmallMedium)
-                    .color(theme.text),
-            );
-            child.add_space(8.0);
-            child.checkbox(
-                &mut self.create_git_tag,
-                RichText::new("Git Tag")
-                    .typo(Typo::SmallMedium)
-                    .color(theme.text_muted),
-            );
-        }
+        // 4. Vertical Separator
+        child.add_space(12.0);
+        let sep_x = child.cursor().min.x;
+        child.painter().line_segment(
+            [
+                Pos2::new(sep_x, row1_rect.top() + 6.0),
+                Pos2::new(sep_x, row1_rect.bottom() - 6.0),
+            ],
+            Stroke::new(1.0_f32, CARD_BORDER),
+        );
+        child.add_space(12.0);
 
-        let (btn_rect, rb_rect_opt) = if is_two_rows {
-            // Row 2 (or Row 3 when compact) below controls
-            let row2_y = if is_compact_controls {
-                bar_rect.top() + 104.0
-            } else {
-                bar_rect.top() + 74.0
-            };
-            if is_mobile_deploy {
-                // Full width deploy button below 600px
-                let w = bar_rect.width() - 40.0;
-                let b_rect = Rect::from_min_size(
-                    Pos2::new(bar_rect.left() + 20.0, row2_y),
-                    Vec2::new(w, btn_h),
+        // 5. Checkboxes (using kit::checkbox)
+        kit::checkbox(&mut child, &mut self.bump_package_json, "Bump package.json");
+        child.add_space(12.0);
+        kit::checkbox(&mut child, &mut self.create_git_tag, "Create git tag");
+
+        // Now calculate right buttons (Rollback + Deploy)
+        let deploy_galley =
+            ui.painter()
+                .layout_no_wrap(btn_text.clone(), Typo::Label.font(), Color32::WHITE);
+        let deploy_w = (deploy_galley.size().x + 14.0 + 8.0 + 32.0).max(160.0);
+
+        let rb_data = rollback_candidate.as_ref().map(|prev_dep| {
+            let label = format!("Rollback to v{}", prev_dep.version);
+            let galley = ui
+                .painter()
+                .layout_no_wrap(label, Typo::Label.font(), TEXT_PRIMARY);
+            let w = (galley.size().x + 14.0 + 8.0 + 24.0).max(120.0);
+            (prev_dep.clone(), galley, w)
+        });
+
+        let rb_w = rb_data.as_ref().map(|(_, _, w)| *w).unwrap_or(0.0);
+
+        let (deploy_rect, rb_rect_opt) = if is_two_rows {
+            // Row 2: aligned right (or full width if very narrow < 480)
+            let row2_y = bar_rect.top() + 64.0;
+            if avail_w < 480.0 {
+                let d_rect = Rect::from_min_size(
+                    Pos2::new(bar_rect.left() + 16.0, row2_y),
+                    Vec2::new(bar_rect.width() - 32.0, 36.0),
                 );
-                (b_rect, None)
+                (d_rect, None)
             } else {
-                let b_w = natural_deploy_w;
-                let rb_w = natural_rb_w;
-                let b_rect = Rect::from_min_size(
-                    Pos2::new(bar_rect.right() - 20.0 - b_w, row2_y),
-                    Vec2::new(b_w, btn_h),
+                let d_rect = Rect::from_min_size(
+                    Pos2::new(bar_rect.right() - 16.0 - deploy_w, row2_y),
+                    Vec2::new(deploy_w, 36.0),
                 );
                 let r_rect = if rb_w > 0.0 {
                     Some(Rect::from_min_size(
-                        Pos2::new(
-                            b_rect.left() - 10.0 - rb_w,
-                            row2_y + (btn_h - BTN_HEIGHT) / 2.0,
-                        ),
-                        Vec2::new(rb_w, BTN_HEIGHT),
+                        Pos2::new(d_rect.left() - 10.0 - rb_w, row2_y),
+                        Vec2::new(rb_w, 36.0),
                     ))
                 } else {
                     None
                 };
-                (b_rect, r_rect)
+                (d_rect, r_rect)
             }
         } else {
-            // Single row: right-aligned
-            let mut b_w = natural_deploy_w;
-            let rb_w = natural_rb_w;
-            let total_needed = b_w + if rb_w > 0.0 { rb_w + 10.0 } else { 0.0 };
-            let max_r_w = (bar_rect.right() - 20.0 - (child.cursor().min.x + 16.0)).max(180.0);
-            if total_needed > max_r_w {
-                b_w = (b_w - (total_needed - max_r_w)).max(140.0);
-            }
-            let b_rect = Rect::from_min_size(
+            // Single row: aligned right
+            let d_rect = Rect::from_min_size(
                 Pos2::new(
-                    bar_rect.right() - 20.0 - b_w,
-                    bar_rect.center().y - btn_h / 2.0,
+                    bar_rect.right() - 16.0 - deploy_w,
+                    bar_rect.center().y - 18.0,
                 ),
-                Vec2::new(b_w, btn_h),
+                Vec2::new(deploy_w, 36.0),
             );
             let r_rect = if rb_w > 0.0 {
                 Some(Rect::from_min_size(
-                    Pos2::new(
-                        b_rect.left() - 10.0 - rb_w,
-                        bar_rect.center().y - BTN_HEIGHT / 2.0,
-                    ),
-                    Vec2::new(rb_w, BTN_HEIGHT),
+                    Pos2::new(d_rect.left() - 10.0 - rb_w, bar_rect.center().y - 18.0),
+                    Vec2::new(rb_w, 36.0),
                 ))
             } else {
                 None
             };
-            (b_rect, r_rect)
+            (d_rect, r_rect)
         };
 
-        let btn_resp = ui
+        // Render Rollback Button if present
+        if let (Some(r_rect), Some((prev_dep, rb_galley, _))) = (rb_rect_opt, rb_data) {
+            let rb_resp = ui
+                .interact(r_rect, egui::Id::new("quick_rollback_btn"), Sense::click())
+                .on_hover_cursor(if is_busy {
+                    egui::CursorIcon::NotAllowed
+                } else {
+                    egui::CursorIcon::PointingHand
+                })
+                .on_hover_text(format!(
+                    "Rollback {} to previous successful release v{}",
+                    env_display_name, prev_dep.version
+                ));
+            let rb_bg = if rb_resp.is_pointer_button_down_on() {
+                CARD_BORDER
+            } else if rb_resp.hovered() && !is_busy {
+                SUBTLE_BG
+            } else {
+                CARD_BG
+            };
+            ui.painter()
+                .rect_filled(r_rect, CornerRadius::same(R_MD as u8), rb_bg);
+            ui.painter().rect_stroke(
+                r_rect,
+                CornerRadius::same(R_MD as u8),
+                Stroke::new(1.0_f32, CARD_BORDER),
+                StrokeKind::Inside,
+            );
+            let content_w = 14.0 + 8.0 + rb_galley.size().x;
+            let start_x = r_rect.center().x - content_w / 2.0;
+            draw_outline_icon(
+                ui.painter(),
+                Pos2::new(start_x + 7.0, r_rect.center().y),
+                OutlineIcon::RotateCcw,
+                TEXT_PRIMARY,
+            );
+            let text_pos = Pos2::new(
+                start_x + 14.0 + 8.0,
+                r_rect.center().y - rb_galley.size().y / 2.0,
+            );
+            ui.painter().galley(text_pos, rb_galley, TEXT_PRIMARY);
+
+            if !is_busy && rb_resp.clicked() {
+                trigger_rollback = Some(prev_dep);
+            }
+        }
+
+        // Render Primary Deploy Button
+        let deploy_resp = ui
             .interact(
-                btn_rect,
+                deploy_rect,
                 egui::Id::new("primary_deploy_btn"),
                 Sense::click(),
             )
@@ -2308,87 +2163,36 @@ impl ShiplyApp {
             } else {
                 egui::CursorIcon::PointingHand
             });
-        let btn_bg = if is_busy {
-            theme.text_subtle
-        } else if btn_resp.is_pointer_button_down_on() {
-            theme.primary_active
-        } else if btn_resp.hovered() {
-            theme.primary_hover
-        } else {
-            theme.primary
-        };
-        ui.painter()
-            .rect_filled(btn_rect, CornerRadius::same(R_MD as u8), btn_bg);
 
-        // Center icon and text together
-        let deploy_start_x =
-            (btn_rect.center().x - deploy_content_w / 2.0).max(btn_rect.left() + 10.0);
+        let deploy_bg = if is_busy {
+            TEXT_MUTED
+        } else if deploy_resp.is_pointer_button_down_on() {
+            PRIMARY_BLUE_ACTIVE
+        } else if deploy_resp.hovered() {
+            PRIMARY_BLUE_HOVER
+        } else {
+            PRIMARY_BLUE
+        };
+
+        ui.painter()
+            .rect_filled(deploy_rect, CornerRadius::same(R_MD as u8), deploy_bg);
+
+        let d_content_w = 14.0 + 8.0 + deploy_galley.size().x;
+        let d_start_x = deploy_rect.center().x - d_content_w / 2.0;
         draw_icon_send(
             ui.painter(),
-            Pos2::new(deploy_start_x + deploy_icon_w / 2.0, btn_rect.center().y),
+            Pos2::new(d_start_x + 7.0, deploy_rect.center().y),
             Color32::WHITE,
         );
-        let text_pos = Pos2::new(
-            deploy_start_x + deploy_icon_w + deploy_gap,
-            btn_rect.center().y - deploy_galley.size().y / 2.0,
+        let d_text_pos = Pos2::new(
+            d_start_x + 14.0 + 8.0,
+            deploy_rect.center().y - deploy_galley.size().y / 2.0,
         );
-        ui.painter().galley(text_pos, deploy_galley, Color32::WHITE);
+        ui.painter()
+            .galley(d_text_pos, deploy_galley, Color32::WHITE);
 
-        if !is_busy && btn_resp.clicked() {
+        if !is_busy && deploy_resp.clicked() {
             trigger_deploy = true;
-        }
-
-        // Quick Rollback Button
-        if let (
-            Some(prev_dep),
-            Some(rb_rect),
-            Some((rb_galley, rb_icon_w, rb_gap, rb_content_w, _)),
-        ) = (rollback_candidate, rb_rect_opt, rollback_info)
-        {
-            let rb_resp = ui
-                .interact(rb_rect, egui::Id::new("quick_rollback_btn"), Sense::click())
-                .on_hover_cursor(if is_busy {
-                    egui::CursorIcon::NotAllowed
-                } else {
-                    egui::CursorIcon::PointingHand
-                });
-            let rb_bg = if rb_resp.hovered() && !is_busy {
-                theme.warning_soft
-            } else {
-                theme.surface
-            };
-            ui.painter()
-                .rect_filled(rb_rect, CornerRadius::same(R_MD as u8), rb_bg);
-            ui.painter().rect_stroke(
-                rb_rect,
-                CornerRadius::same(R_MD as u8),
-                Stroke::new(1.0_f32, theme.warning),
-                StrokeKind::Inside,
-            );
-
-            let rb_start_x = (rb_rect.center().x - rb_content_w / 2.0).max(rb_rect.left() + 8.0);
-            draw_outline_icon(
-                ui.painter(),
-                Pos2::new(rb_start_x + rb_icon_w / 2.0, rb_rect.center().y),
-                OutlineIcon::RotateCcw,
-                theme.warning,
-            );
-            let rb_text_pos = Pos2::new(
-                rb_start_x + rb_icon_w + rb_gap,
-                rb_rect.center().y - rb_galley.size().y / 2.0,
-            );
-            ui.painter().galley(rb_text_pos, rb_galley, theme.warning);
-
-            if !is_busy
-                && rb_resp
-                    .on_hover_text(format!(
-                        "Rollback {} to previous successful release v{}",
-                        env_display_name, prev_dep.version
-                    ))
-                    .clicked()
-            {
-                trigger_rollback = Some(prev_dep);
-            }
         }
 
         if let Some(rb_record) = trigger_rollback {
@@ -2767,7 +2571,7 @@ impl ShiplyApp {
                                 ("SCP upload", PURPLE_PILL_BG, PURPLE_PILL_TEXT)
                             }
                             StepKind::RemoteCommand { .. } => {
-                                ("REMOTE SSH", TEAL_PILL_BG, TEAL_PILL_TEXT)
+                                ("Remote SSH", TEAL_PILL_BG, TEAL_PILL_TEXT)
                             }
                         };
 
@@ -2822,7 +2626,7 @@ impl ShiplyApp {
 
                                 let is_remote = matches!(step.kind, StepKind::RemoteCommand { .. });
                                 if ui
-                                    .selectable_label(is_remote, "REMOTE SSH — Server Command")
+                                    .selectable_label(is_remote, "Remote SSH — Server command")
                                     .clicked()
                                     && !is_remote
                                 {
@@ -3103,11 +2907,8 @@ impl ShiplyApp {
             );
             if is_being_dragged {
                 let shadow_rect = card_rect.translate(Vec2::new(0.0, 4.0)).expand(1.0);
-                ui.painter().rect_filled(
-                    shadow_rect,
-                    CornerRadius::same(10),
-                    Color32::from_rgba_premultiplied(0, 0, 0, 40),
-                );
+                ui.painter()
+                    .rect_filled(shadow_rect, CornerRadius::same(10), OVERLAY_SCRIM_LIGHT);
             }
             if let Some(from_idx) = self.dragged_step_idx {
                 if from_idx != idx {
@@ -3205,7 +3006,7 @@ impl ShiplyApp {
             } else {
                 render_pill(
                     ui,
-                    "SSH KEY / MANUAL PASSWORD",
+                    "SSH key / manual password",
                     WARN_PILL_BG,
                     WARN_PILL_TEXT,
                 );
@@ -3959,7 +3760,7 @@ impl ShiplyApp {
                         ui.add_sized(
                             [155.0, 20.0],
                             egui::Label::new(
-                                RichText::new("TIMESTAMP (LOCAL)")
+                                RichText::new("Timestamp (local)")
                                     .typo(Typo::Caption)
                                     .color(TEXT_MUTED),
                             ),
@@ -5070,11 +4871,11 @@ impl ShiplyApp {
         let avail_w = ui.available_width();
         let is_compact_hdr = avail_w < 580.0;
         let os_vault_badge = if cfg!(windows) {
-            "WINDOWS CREDENTIAL MANAGER"
+            "Windows Credential Manager"
         } else if cfg!(target_os = "macos") {
-            "MACOS KEYCHAIN"
+            "macOS Keychain"
         } else {
-            "LINUX SECRET SERVICE"
+            "Linux Secret Service"
         };
 
         horizontal_row(ui, 38.0, |ui| {
@@ -5503,7 +5304,7 @@ impl ShiplyApp {
                         ui.add_sized(
                             [135.0, 20.0],
                             egui::Label::new(
-                                RichText::new("UPDATED (LOCAL)")
+                                RichText::new("Updated (local)")
                                     .typo(Typo::Caption)
                                     .color(TEXT_MUTED),
                             ),

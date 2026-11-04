@@ -173,11 +173,22 @@ impl ShiplyApp {
             .unwrap_or(false);
         let initial_selected_dep = storage.deployments.first().map(|d| d.id.clone());
 
+        let mut active_tab = WorkspaceTab::HistoryAndLogs;
+        if let Ok(val) = std::env::var("SHIPLY_INITIAL_TAB") {
+            if val.eq_ignore_ascii_case("pipeline_steps") || val.eq_ignore_ascii_case("steps") {
+                active_tab = WorkspaceTab::PipelineSteps;
+            } else if val.eq_ignore_ascii_case("deployments") || val.eq_ignore_ascii_case("history") {
+                active_tab = WorkspaceTab::HistoryAndLogs;
+            } else if val.eq_ignore_ascii_case("settings") {
+                active_tab = WorkspaceTab::ServerSettings;
+            }
+        }
+
         let mut app = Self {
             storage,
             selection,
             selected_env_key: initial_env_key.clone(),
-            active_tab: WorkspaceTab::HistoryAndLogs,
+            active_tab,
             history_env_filter: None,
             history_visible_limit: 5,
             selected_deployment_id: initial_selected_dep,

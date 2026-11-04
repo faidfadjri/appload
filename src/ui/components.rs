@@ -569,7 +569,7 @@ pub(crate) fn modal_dialog_frame_for(ctx: &egui::Context) -> egui::Frame {
                 offset: [0, 24],
                 blur: 60,
                 spread: 0,
-                color: Color32::from_rgba_unmultiplied(2, 6, 23, 89),
+                color: SHADOW_MODAL,
             }
         })
         .inner_margin(if is_sheet {

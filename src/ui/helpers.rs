@@ -236,8 +236,7 @@ pub(crate) fn status_pill_colors(status: DeploymentStatus) -> (Color32, Color32)
 pub(crate) fn paint_shimmer_rect(painter: &egui::Painter, rect: Rect, radius: f32, time: f64) {
     let phase = ((time % 1.4) / 1.4) as f32;
     let alpha_f = 0.06 + 0.06 * (0.5 + 0.5 * (phase * std::f32::consts::TAU).sin());
-    let a = (alpha_f * 255.0).clamp(15.0, 31.0) as u8;
-    let fill = Color32::from_rgba_premultiplied(a, a, a, a);
+    let fill = CARD_BG.gamma_multiply(alpha_f);
     painter.rect_filled(rect, CornerRadius::same(radius as u8), fill);
 }
 
@@ -578,7 +577,7 @@ pub(crate) fn render_project_loading_indicator(ui: &mut egui::Ui, proj_name: &st
 
 pub(crate) fn render_light_status_badge(ui: &mut egui::Ui, status: DeploymentStatus) {
     let (bg, fg) = status_pill_colors(status);
-    let text = status.label().to_uppercase();
+    let text = status.label().to_string();
     if status == DeploymentStatus::Running {
         ui.ctx().request_repaint();
         let time = ui.input(|i| i.time);

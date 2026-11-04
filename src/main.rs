@@ -77,13 +77,26 @@ fn main() -> eframe::Result<()> {
     let storage_path = AppStorage::default_storage_path();
     let storage = AppStorage::load_or_default(storage_path);
 
+    let mut width = 1280.0;
+    let mut height = 800.0;
+    if let Ok(w) = env::var("SHIPLY_WINDOW_WIDTH") {
+        if let Ok(val) = w.parse::<f32>() {
+            width = val;
+        }
+    }
+    if let Ok(h) = env::var("SHIPLY_WINDOW_HEIGHT") {
+        if let Ok(val) = h.parse::<f32>() {
+            height = val;
+        }
+    }
+
     let native_options = eframe::NativeOptions {
         centered: true,
         viewport: egui::ViewportBuilder::default()
             .with_title(format!("Shiply v{APP_VERSION} — Mini Deployment Platform"))
             .with_icon(app_icon)
             .with_decorations(false)
-            .with_inner_size([1280.0, 800.0])
+            .with_inner_size([width, height])
             .with_min_inner_size([520.0, 420.0]),
         ..Default::default()
     };

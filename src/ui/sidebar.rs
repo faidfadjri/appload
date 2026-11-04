@@ -1324,7 +1324,7 @@ impl ShiplyApp {
                                     ui.painter().rect_filled(
                                         shadow_rect,
                                         CornerRadius::same(8),
-                                        Color32::from_rgba_premultiplied(0, 0, 0, 80),
+                                        SB_MENU_SHADOW_SOFT,
                                     );
                                 }
                                 ui.painter()
@@ -1394,7 +1394,7 @@ impl ShiplyApp {
                                                 ui.painter().rect_filled(
                                                     p_rect,
                                                     CornerRadius::same(8),
-                                                    Color32::from_rgba_premultiplied(20, 110, 245, 25),
+                                                    SB_SELECTED_BG,
                                                 );
                                                 if is_pointer_released {
                                                     drag_reorder = Some((from_idx, proj_idx));
@@ -1508,7 +1508,7 @@ impl ShiplyApp {
                                     paint_sidebar_env_badge(
                                         ui.painter(),
                                         Pos2::new(content_x, row2_y),
-                                        "NO ENVS",
+                                        "No envs",
                                         SB_SURFACE,
                                         SB_TEXT_FAINT,
                                         Some(max_pill_x - content_x),
@@ -1665,7 +1665,7 @@ impl ShiplyApp {
                 ui.painter().rect_filled(
                     shadow_rect,
                     CornerRadius::same(R_MD as u8),
-                    Color32::from_rgba_premultiplied(0, 0, 0, 115),
+                    SB_MENU_SHADOW,
                 );
 
                 // Container: min-width 192px, bg --sb-surface, border 1px --sb-border, radius --r-md, padding 4px
@@ -1874,7 +1874,7 @@ impl ShiplyApp {
                 ui.painter().rect_filled(
                     shadow_rect,
                     CornerRadius::same(R_MD as u8),
-                    Color32::from_rgba_premultiplied(0, 0, 0, 115),
+                    SB_MENU_SHADOW,
                 );
 
                 // Container
@@ -2030,7 +2030,7 @@ impl ShiplyApp {
                         .rect_filled(r, CornerRadius::same(R_SM as u8), bg);
 
                     let fg = if is_set_group_disabled {
-                        Color32::from_rgba_premultiplied(55, 60, 69, 102) // opacity 0.4
+                        SB_DIVIDER_MUTED
                     } else {
                         SB_TEXT
                     };
@@ -2195,7 +2195,7 @@ impl ShiplyApp {
                     ui.painter().rect_filled(
                         shadow_rect,
                         CornerRadius::same(R_MD as u8),
-                        Color32::from_rgba_premultiplied(0, 0, 0, 115),
+                        SB_MENU_SHADOW,
                     );
 
                     // Submenu container

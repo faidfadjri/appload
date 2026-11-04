@@ -262,4 +262,15 @@ pub const TERM_YELLOW: Color32 = Color32::from_rgb(194, 106, 0);
 
 pub const SIDEBAR_TEXT_MUTED: Color32 = Color32::from_rgb(138, 138, 143);
 
-pub const ENV_CARD_HEIGHT: f32 = 96.0;
+pub const ENV_CARD_HEIGHT: f32 = 112.0;
+
+// Elevation, shadow and transparency tokens
+pub const SHADOW_CARD: Color32 = Color32::from_rgba_premultiplied(17, 24, 39, 13);
+pub const SHADOW_MODAL: Color32 = Color32::from_rgba_premultiplied(1, 2, 8, 89);
+pub const OVERLAY_SCRIM: Color32 = Color32::from_rgba_premultiplied(0, 0, 0, 180);
+pub const OVERLAY_SCRIM_LIGHT: Color32 = Color32::from_rgba_premultiplied(0, 0, 0, 40);
+pub const SB_SELECTED_BG: Color32 = Color32::from_rgba_premultiplied(20, 110, 245, 25);
+pub const SB_MENU_SHADOW: Color32 = Color32::from_rgba_premultiplied(0, 0, 0, 115);
+pub const SB_MENU_SHADOW_SOFT: Color32 = Color32::from_rgba_premultiplied(0, 0, 0, 80);
+pub const SB_DIVIDER_MUTED: Color32 = Color32::from_rgba_premultiplied(55, 60, 69, 102);
+pub const ICON_MUTED_SHADOW: Color32 = Color32::from_rgba_premultiplied(7, 10, 14, 60);

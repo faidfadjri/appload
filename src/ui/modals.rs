@@ -17,7 +17,7 @@ pub(crate) fn prepare_animated_modal(
         return None;
     }
 
-    let overlay_color = Color32::from_rgba_premultiplied(0, 0, 0, (180.0 * anim_t) as u8);
+    let overlay_color = OVERLAY_SCRIM.gamma_multiply(anim_t);
     egui::Area::new(egui::Id::new(("modal_backdrop", modal_id)))
         .order(egui::Order::Middle)
         .fixed_pos(Pos2::ZERO)

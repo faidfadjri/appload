@@ -37,6 +37,7 @@ pub(crate) enum ConfirmDeleteAction {
         project_id: String,
         project_name: String,
     },
+    #[allow(dead_code)]
     Environment {
         project_id: String,
         project_name: String,

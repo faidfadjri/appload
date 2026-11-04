@@ -114,6 +114,7 @@ pub(crate) fn draw_icon_git_branch(painter: &egui::Painter, c: Pos2, color: Colo
     );
 }
 
+#[allow(dead_code)]
 pub(crate) fn draw_icon_server(painter: &egui::Painter, c: Pos2, color: Color32) {
     let s = Stroke::new(1.75_f32, color);
     let top_r = Rect::from_center_size(Pos2::new(c.x, c.y - 2.5), Vec2::new(11.0, 4.0));
@@ -251,11 +252,7 @@ pub(crate) fn draw_shiply_logo(
     logo_texture: Option<&egui::TextureHandle>,
 ) {
     if let Some(tex) = logo_texture {
-        painter.rect_filled(
-            rect,
-            CornerRadius::same(corner_radius),
-            Color32::from_rgba_unmultiplied(30, 41, 59, 60),
-        );
+        painter.rect_filled(rect, CornerRadius::same(corner_radius), ICON_MUTED_SHADOW);
         let uv = Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0));
         painter.image(tex.id(), rect, uv, Color32::WHITE);
     } else {
