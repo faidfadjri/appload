@@ -227,10 +227,23 @@ pub fn count_projects_in_file(path: &Path) -> Result<usize, String> {
         .unwrap_or(false);
 
     if is_sqlite {
+        let uri_path = format!(
+            "file:{}?immutable=1",
+            path.to_string_lossy().replace('\\', "/")
+        );
         let conn = rusqlite::Connection::open_with_flags(
-            path,
-            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+            &uri_path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+                | rusqlite::OpenFlags::SQLITE_OPEN_URI
+                | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
         )
+        .or_else(|_| {
+            rusqlite::Connection::open_with_flags(
+                path,
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+                    | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+            )
+        })
         .map_err(|e| format!("Failed to open DB '{}': {e}", path.display()))?;
 
         // Verify projects table exists
@@ -378,28 +391,8 @@ pub fn execute_migration(best: &CandidateInfo, target_dir: &Path) -> Result<usiz
 
 /// Executes first-run data migration for both standard app-data and portable mode.
 pub fn run_first_run_data_migration() -> MigrationOutcome {
-    // Determine target directory: portable mode (if running next to existing state) vs data_dir()
-    let target_dir = if let Ok(exe_path) = env::current_exe() {
-        if let Some(exe_dir) = exe_path.parent() {
-            let allow_portable = match crate::paths::sandbox_root() {
-                Some(ref root) => exe_dir.starts_with(root),
-                None => true,
-            };
-            if allow_portable
-                && (exe_dir.join("shiply_state.db").exists()
-                    || exe_dir.join("appload_state.db").exists())
-                && crate::storage::is_dir_writable(exe_dir)
-            {
-                exe_dir.to_path_buf()
-            } else {
-                crate::paths::data_dir()
-            }
-        } else {
-            crate::paths::data_dir()
-        }
-    } else {
-        crate::paths::data_dir()
-    };
+    // Determine target directory strictly through centralized paths::data_dir()
+    let target_dir = crate::paths::data_dir();
 
     let candidates = collect_candidate_infos();
     let Some(best) = select_best_candidate(&candidates) else {

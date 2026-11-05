@@ -7,7 +7,6 @@ use crate::version::{bump_semver, VersionBump};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -398,31 +397,9 @@ pub fn upsert_deployment_to_db(
 }
 
 impl AppStorage {
-    /// Resolves `appload_state.db` directly inside the application executable's directory
-    /// so users can easily manage `appload_state.db` (or drop `.json` / `.ps1` files)
-    /// into the app folder and have AppLoad automatically recognize all projects and history.
+    /// Resolves `appload_state.db` strictly through `crate::paths::data_dir()`.
+    /// Portable mode is only active if an explicit `appload.portable` marker file sits next to the exe.
     pub fn default_storage_path() -> PathBuf {
-        if let Ok(exe_path) = env::current_exe() {
-            if let Some(exe_dir) = exe_path.parent() {
-                let allow_portable = match crate::paths::sandbox_root() {
-                    Some(ref root) => exe_dir.starts_with(root),
-                    None => true,
-                };
-                if allow_portable {
-                    let candidate_db = exe_dir.join("appload_state.db");
-                    let candidate_json = exe_dir.join("appload_state.json");
-                    let legacy_db = exe_dir.join("shiply_state.db");
-                    let legacy_json = exe_dir.join("shiply_state.json");
-                    if candidate_db.exists()
-                        || candidate_json.exists()
-                        || legacy_db.exists()
-                        || legacy_json.exists()
-                    {
-                        return candidate_db;
-                    }
-                }
-            }
-        }
         crate::paths::data_dir().join("appload_state.db")
     }
 
@@ -507,18 +484,6 @@ impl AppStorage {
                 // If using the default storage path, also check default global locations
                 let is_default = db_path == Self::default_storage_path();
                 if is_default {
-                    if let Ok(exe) = env::current_exe() {
-                        if let Some(exe_dir) = exe.parent() {
-                            let exe_appload_json = exe_dir.join("appload_state.json");
-                            let exe_shiply_json = exe_dir.join("shiply_state.json");
-                            if !legacy_candidates.contains(&exe_appload_json) {
-                                legacy_candidates.push(exe_appload_json);
-                            }
-                            if !legacy_candidates.contains(&exe_shiply_json) {
-                                legacy_candidates.push(exe_shiply_json);
-                            }
-                        }
-                    }
                     let data_appload_json = crate::paths::data_dir().join("appload_state.json");
                     if !legacy_candidates.contains(&data_appload_json) {
                         legacy_candidates.push(data_appload_json);
@@ -548,9 +513,22 @@ impl AppStorage {
                                     }
                                     needs_save = true;
 
-                                    // Preserve backup file so user data is never lost
-                                    let backup_path = candidate.with_extension("json.bak");
-                                    let _ = fs::copy(&candidate, &backup_path);
+                                    // Preserve backup file so user data is never lost, but NEVER write into legacy folders
+                                    if !crate::paths::is_in_legacy_dir(&candidate) {
+                                        let backup_path = candidate.with_extension("json.bak");
+                                        let _ = fs::copy(&candidate, &backup_path);
+                                    } else {
+                                        let backup_name = format!(
+                                            "{}.json.bak",
+                                            candidate
+                                                .file_stem()
+                                                .and_then(|s| s.to_str())
+                                                .unwrap_or("legacy_state")
+                                        );
+                                        let backup_path =
+                                            crate::paths::data_dir().join(backup_name);
+                                        let _ = fs::copy(&candidate, &backup_path);
+                                    }
 
                                     state.migration_notice = Some(format!(
                                         "Seamlessly migrated {} project(s) and {} deployment(s) from '{}' to SQLite database.",
@@ -559,7 +537,7 @@ impl AppStorage {
                                         candidate
                                             .file_name()
                                             .and_then(|s| s.to_str())
-                                            .unwrap_or("state.json")
+                                                .unwrap_or("state.json")
                                     ));
                                     break;
                                 }
@@ -602,6 +580,13 @@ impl AppStorage {
     }
 
     pub fn save_to(&self, path: &Path) -> Result<(), String> {
+        if crate::paths::is_in_legacy_dir(path) {
+            return Err(format!(
+                "Safety guard: refusing to write storage into legacy directory '{}'",
+                path.display()
+            ));
+        }
+
         let db_path = if path
             .extension()
             .is_some_and(|e| e.eq_ignore_ascii_case("json"))
@@ -1311,19 +1296,6 @@ impl AppStorage {
 
 fn file_mtime(path: &Path) -> Option<SystemTime> {
     fs::metadata(path).and_then(|m| m.modified()).ok()
-}
-
-pub(crate) fn is_dir_writable(dir: &Path) -> bool {
-    if !dir.is_dir() {
-        return false;
-    }
-    let probe = dir.join(".appload_write_probe.tmp");
-    if fs::write(&probe, b"ok").is_ok() {
-        let _ = fs::remove_file(&probe);
-        true
-    } else {
-        false
-    }
 }
 
 #[cfg(test)]

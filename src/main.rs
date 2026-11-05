@@ -56,6 +56,20 @@ fn main() -> eframe::Result<()> {
         }
         std::process::exit(if outcome.is_error { 1 } else { 0 });
     }
+
+    // 2c. Dedicated headless storage check entry point (--check-storage)
+    if args.iter().any(|a| a == "--check-storage") {
+        let storage_path = appload::storage::AppStorage::default_storage_path();
+        let storage = appload::storage::AppStorage::load_or_default(&storage_path);
+        let res = serde_json::json!({
+            "storage_path": storage_path.display().to_string(),
+            "projects_count": storage.projects.len(),
+            "deployments_count": storage.deployments.len(),
+            "secrets_count": storage.secrets.len(),
+        });
+        println!("{res}");
+        std::process::exit(0);
+    }
     if args
         .iter()
         .any(|a| a == "--install" || a == "install" || a == "--silent")

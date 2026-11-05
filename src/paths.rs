@@ -19,7 +19,7 @@
 //! at startup.
 
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 #[cfg(test)]
 use std::sync::Mutex;
 use std::sync::Once;
@@ -72,13 +72,39 @@ fn sandbox_local_data(root: &std::path::Path) -> PathBuf {
     }
 }
 
+/// Returns `true` if an explicit `appload.portable` marker file sits next to the currently running executable.
+/// In sandbox mode, the executable directory must also be inside the sandbox root.
+pub fn is_portable() -> bool {
+    if let Ok(exe_path) = env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            let allow_dir = match sandbox_root() {
+                Some(ref root) => exe_dir.starts_with(root),
+                None => true,
+            };
+            if allow_dir && exe_dir.join("appload.portable").is_file() {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 /// Returns the authoritative application data directory where AppLoad stores its database
 /// (`appload_state.db`), marker files, and drop-in configurations.
 ///
+/// - In portable mode (`appload.portable` marker present next to exe): the executable directory
 /// - In sandbox mode: `<APPLOAD_SANDBOX_ROOT>/local_app_data/appload` (or `<root>/LocalAppData/appload`)
 /// - On Windows: `%LOCALAPPDATA%\appload` (fallback to `dirs::data_local_dir()/appload`)
 /// - On macOS/Linux: `dirs::data_local_dir()/appload`
 pub fn data_dir() -> PathBuf {
+    if is_portable() {
+        if let Ok(exe_path) = env::current_exe() {
+            if let Some(exe_dir) = exe_path.parent() {
+                return exe_dir.to_path_buf();
+            }
+        }
+    }
+
     if let Some(root) = sandbox_root() {
         return sandbox_local_data(&root).join("appload");
     }
@@ -214,6 +240,41 @@ pub fn legacy_install_dir() -> Option<PathBuf> {
     }
 }
 
+/// Returns `true` if `path` is located inside any legacy Shiply directory (`legacy_install_dir` or `legacy_data_dir`).
+pub fn is_in_legacy_dir(path: &Path) -> bool {
+    fn is_subpath(parent: &Path, child: &Path) -> bool {
+        if let (Ok(p_canon), Ok(c_canon)) = (parent.canonicalize(), child.canonicalize()) {
+            if c_canon.starts_with(&p_canon) {
+                return true;
+            }
+        }
+        let parent_norm = parent.to_string_lossy().replace('/', "\\").to_lowercase();
+        let child_norm = child.to_string_lossy().replace('/', "\\").to_lowercase();
+        let parent_clean = parent_norm.trim_end_matches('\\');
+        if child_norm == parent_clean {
+            return true;
+        }
+        if let Some(remainder) = child_norm.strip_prefix(parent_clean) {
+            if remainder.starts_with('\\') {
+                return true;
+            }
+        }
+        false
+    }
+
+    if let Some(leg_install) = legacy_install_dir() {
+        if is_subpath(&leg_install, path) {
+            return true;
+        }
+    }
+    if let Some(leg_data) = legacy_data_dir() {
+        if is_subpath(&leg_data, path) {
+            return true;
+        }
+    }
+    false
+}
+
 /// Returns the user's Start Menu programs directory.
 ///
 /// - In sandbox mode: `<APPLOAD_SANDBOX_ROOT>/Start Menu/Programs`
@@ -316,8 +377,12 @@ pub fn legacy_data_candidates() -> Vec<PathBuf> {
                 None => true,
             };
             if allow_exe_dir {
-                candidates.push(exe_dir.join("shiply_state.db"));
-                candidates.push(exe_dir.join("shiply_state.json"));
+                let leg_db = exe_dir.join("shiply_state.db");
+                let leg_json = exe_dir.join("shiply_state.json");
+                if is_portable() || leg_db.exists() || leg_json.exists() {
+                    candidates.push(leg_db);
+                    candidates.push(leg_json);
+                }
             }
         }
     }
@@ -437,5 +502,28 @@ mod tests {
         // Clean up
         env::remove_var("APPLOAD_SANDBOX_ROOT");
         env::remove_var("APPLOAD_TEST");
+    }
+
+    #[test]
+    fn test_is_in_legacy_dir() {
+        let _lock = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
+        let tmp = TempDir::new().expect("tempdir");
+        let root = tmp.path();
+        env::set_var("APPLOAD_SANDBOX_ROOT", root);
+
+        let leg_inst = legacy_install_dir().expect("leg_inst");
+        let leg_data = legacy_data_dir().expect("leg_data");
+
+        assert!(is_in_legacy_dir(&leg_inst));
+        assert!(is_in_legacy_dir(&leg_inst.join("shiply_state.db")));
+        assert!(is_in_legacy_dir(&leg_inst.join("nested/folder/file.txt")));
+        assert!(is_in_legacy_dir(&leg_data));
+        assert!(is_in_legacy_dir(&leg_data.join("shiply_state.json")));
+
+        let safe_data = data_dir();
+        assert!(!is_in_legacy_dir(&safe_data));
+        assert!(!is_in_legacy_dir(&safe_data.join("appload_state.db")));
+
+        env::remove_var("APPLOAD_SANDBOX_ROOT");
     }
 }
