@@ -66,7 +66,8 @@ impl ShiplyApp {
 
                 // Card 1: General
                 kit::card(ui, |ui| {
-                    ui.set_width(full_w);
+                    ui.set_min_width(full_w);
+                    ui.set_max_width(full_w);
                     ui.label(Typo::H3.rich("General"));
                     ui.add_space(2.0);
                     ui.label(Typo::Small.rich("Environment name and local repository path").color(TEXT_SECONDARY));
@@ -128,7 +129,8 @@ impl ShiplyApp {
                         ui.add_space(SP_12);
                         kit::form_field(ui, "Local project directory", None, true, |ui| {
                             ui.horizontal(|ui| {
-                                let path_input_w = (full_w - 96.0).max(120.0);
+                                let browse_w = kit::button_width(ui, ButtonSize::Md, "Browse", true);
+                                let path_input_w = (full_w - browse_w - SP_8).max(120.0);
                                 if styled_text_edit(
                                     ui,
                                     "srv_local_path",
@@ -163,7 +165,8 @@ impl ShiplyApp {
 
                 // Card 2: Servers
                 kit::card(ui, |ui| {
-                    ui.set_width(full_w);
+                    ui.set_min_width(full_w);
+                    ui.set_max_width(full_w);
                     ui.label(Typo::H3.rich("Servers"));
                     ui.add_space(2.0);
                     ui.label(Typo::Small.rich("Target destination and SSH access").color(TEXT_SECONDARY));
@@ -261,6 +264,8 @@ impl ShiplyApp {
 
                 // Card 3: Authentication
                 kit::card(ui, |ui| {
+                    ui.set_min_width(full_w);
+                    ui.set_max_width(full_w);
                     ui.label(Typo::H3.rich("Authentication"));
                     ui.add_space(2.0);
                     ui.label(Typo::Small.rich("OS Credential Vault integration and passwords").color(TEXT_SECONDARY));
@@ -277,8 +282,9 @@ impl ShiplyApp {
                             false,
                             |ui| {
                                 ui.horizontal(|ui| {
-                                    let btn_reserve = 190.0;
-                                    let vault_input_w = (full_w - btn_reserve).max(120.0);
+                                    let verify_w = kit::button_width(ui, ButtonSize::Md, "Verify", true);
+                                    let set_secret_w = kit::button_width(ui, ButtonSize::Md, "Set secret", true);
+                                    let vault_input_w = (full_w - verify_w - set_secret_w - SP_8 - SP_8).max(120.0);
                                     if styled_text_edit(
                                         ui,
                                         ("srv_vault_target", &env_key),
@@ -344,6 +350,8 @@ impl ShiplyApp {
 
                 // Card 4: Runtime
                 kit::card(ui, |ui| {
+                    ui.set_min_width(full_w);
+                    ui.set_max_width(full_w);
                     ui.label(Typo::H3.rich("Runtime"));
                     ui.add_space(2.0);
                     ui.label(Typo::Small.rich("Environment variables and network proxy").color(TEXT_SECONDARY));
@@ -461,7 +469,8 @@ impl ShiplyApp {
                     })
                     .inner_margin(Margin::same(20))
                     .show(ui, |ui| {
-                        ui.set_width(full_w);
+                        ui.set_min_width(full_w);
+                        ui.set_max_width(full_w);
                         ui.horizontal(|ui| {
                             ui.vertical(|ui| {
                                 ui.label(Typo::H3.rich("Delete environment").color(DANGER));
