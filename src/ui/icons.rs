@@ -308,23 +308,49 @@ pub(crate) enum OutlineIcon {
     Shield,
 }
 
-#[allow(clippy::too_many_arguments)]
+#[derive(Clone, Copy)]
+pub(crate) struct IconButtonVisuals {
+    pub fg: Color32,
+    pub bg: Color32,
+    pub hover_bg: Color32,
+    pub border: Color32,
+}
+
+impl IconButtonVisuals {
+    pub const fn new(fg: Color32, bg: Color32, hover_bg: Color32, border: Color32) -> Self {
+        Self {
+            fg,
+            bg,
+            hover_bg,
+            border,
+        }
+    }
+}
+
+impl Default for IconButtonVisuals {
+    fn default() -> Self {
+        Self {
+            fg: TEXT_PRIMARY,
+            bg: SUBTLE_BG,
+            hover_bg: BLUE_PILL_HOVER_BG,
+            border: CARD_BORDER,
+        }
+    }
+}
+
 pub(crate) fn outline_icon_button(
     ui: &mut egui::Ui,
     id_salt: impl std::hash::Hash,
     icon: OutlineIcon,
     label: Option<&str>,
-    fg: Color32,
-    bg: Color32,
-    hover_bg: Color32,
-    border: Color32,
+    visuals: IconButtonVisuals,
     enabled: bool,
 ) -> egui::Response {
     let height = 32.0;
     let (width, galley_opt) = if let Some(text) = label {
         let g = ui
             .painter()
-            .layout_no_wrap(text.to_string(), Typo::SmallMedium.font(), fg);
+            .layout_no_wrap(text.to_string(), Typo::SmallMedium.font(), visuals.fg);
         let w = 10.0 + 14.0 + 6.0 + g.size().x + 12.0;
         (w, Some(g))
     } else {
@@ -346,14 +372,14 @@ pub(crate) fn outline_icon_button(
     }
 
     let fill = if enabled && resp.hovered() {
-        hover_bg
+        visuals.hover_bg
     } else {
-        bg
+        visuals.bg
     };
     let stroke_color = if enabled && resp.hovered() {
-        fg
+        visuals.fg
     } else {
-        border
+        visuals.border
     };
 
     ui.painter().rect_filled(rect, CornerRadius::same(6), fill);
@@ -366,14 +392,14 @@ pub(crate) fn outline_icon_button(
 
     if let Some(galley) = galley_opt {
         let icon_center = Pos2::new(rect.left() + 16.0, rect.center().y);
-        draw_outline_icon(ui.painter(), icon_center, icon, fg);
+        draw_outline_icon(ui.painter(), icon_center, icon, visuals.fg);
         ui.painter().galley(
             Pos2::new(rect.left() + 28.0, rect.center().y - galley.size().y / 2.0),
             galley,
-            fg,
+            visuals.fg,
         );
     } else {
-        draw_outline_icon(ui.painter(), rect.center(), icon, fg);
+        draw_outline_icon(ui.painter(), rect.center(), icon, visuals.fg);
     }
 
     resp

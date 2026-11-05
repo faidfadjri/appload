@@ -123,10 +123,12 @@ impl ShiplyApp {
                         ("stacked_del_dep_btn", &dep.id),
                         OutlineIcon::Trash,
                         None,
-                        FAIL_PILL_TEXT,
-                        SUBTLE_BG,
-                        FAIL_PILL_BG,
-                        CARD_BORDER,
+                        IconButtonVisuals::new(
+                            FAIL_PILL_TEXT,
+                            SUBTLE_BG,
+                            FAIL_PILL_BG,
+                            CARD_BORDER,
+                        ),
                         can_delete,
                     )
                     .on_hover_text("Delete this deployment record")
@@ -141,10 +143,12 @@ impl ShiplyApp {
                         ("stacked_rerun_btn", &dep.id),
                         OutlineIcon::Refresh,
                         None,
-                        TEXT_SECONDARY,
-                        SUBTLE_BG,
-                        PILL_CONTAINER_BG,
-                        CARD_BORDER,
+                        IconButtonVisuals::new(
+                            TEXT_SECONDARY,
+                            SUBTLE_BG,
+                            PILL_CONTAINER_BG,
+                            CARD_BORDER,
+                        ),
                         !is_busy,
                     )
                     .on_hover_text("Re-run this deployment")
@@ -160,10 +164,12 @@ impl ShiplyApp {
                             ("stacked_cancel_btn", &dep.id),
                             OutlineIcon::X,
                             Some("Cancel"),
-                            FAIL_PILL_TEXT,
-                            FAIL_PILL_BG,
-                            DANGER_SOFT,
-                            DANGER_SOFT,
+                            IconButtonVisuals::new(
+                                FAIL_PILL_TEXT,
+                                FAIL_PILL_BG,
+                                DANGER_SOFT,
+                                DANGER_SOFT,
+                            ),
                             true,
                         )
                         .on_hover_text("Cancel this running deployment")
@@ -178,10 +184,12 @@ impl ShiplyApp {
                             ("stacked_rollback_btn", &dep.id),
                             OutlineIcon::RotateCcw,
                             Some("Rollback"),
-                            WARN_PILL_TEXT,
-                            WARN_PILL_BG,
-                            WARNING_SOFT,
-                            WARNING,
+                            IconButtonVisuals::new(
+                                WARN_PILL_TEXT,
+                                WARN_PILL_BG,
+                                WARNING_SOFT,
+                                WARNING,
+                            ),
                             !is_busy,
                         )
                         .on_hover_text(format!("Rollback {} to v{}", dep.environment, dep.version))

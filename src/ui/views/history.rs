@@ -120,10 +120,7 @@ impl ShiplyApp {
                     ("history_more_btn", project_filter.unwrap_or("all")),
                     OutlineIcon::MoreHorizontal,
                     None,
-                    TEXT_PRIMARY,
-                    CARD_BG,
-                    SUBTLE_BG,
-                    CARD_BORDER,
+                    IconButtonVisuals::new(TEXT_PRIMARY, CARD_BG, SUBTLE_BG, CARD_BORDER),
                     true,
                 )
                 .on_hover_text("More actions");

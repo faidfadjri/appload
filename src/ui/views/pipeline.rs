@@ -342,10 +342,12 @@ impl ShiplyApp {
                                 ("step_del_btn", &step.id),
                                 OutlineIcon::Trash,
                                 None,
-                                FAIL_PILL_TEXT,
-                                FAIL_PILL_BG,
-                                DANGER_SOFT,
-                                DANGER_SOFT,
+                                IconButtonVisuals::new(
+                                    FAIL_PILL_TEXT,
+                                    FAIL_PILL_BG,
+                                    DANGER_SOFT,
+                                    DANGER_SOFT,
+                                ),
                                 true,
                             )
                             .on_hover_text("Delete step")
@@ -360,14 +362,16 @@ impl ShiplyApp {
                                 ("step_down_btn", &step.id),
                                 OutlineIcon::ArrowDown,
                                 None,
-                                if can_down {
-                                    TEXT_SECONDARY
-                                } else {
-                                    TEXT_PLACEHOLDER
-                                },
-                                SUBTLE_BG,
-                                INPUT_BG_HOVER,
-                                CARD_BORDER,
+                                IconButtonVisuals::new(
+                                    if can_down {
+                                        TEXT_SECONDARY
+                                    } else {
+                                        TEXT_PLACEHOLDER
+                                    },
+                                    SUBTLE_BG,
+                                    INPUT_BG_HOVER,
+                                    CARD_BORDER,
+                                ),
                                 can_down,
                             )
                             .on_hover_text("Move step down")
@@ -383,14 +387,16 @@ impl ShiplyApp {
                                 ("step_up_btn", &step.id),
                                 OutlineIcon::ArrowUp,
                                 None,
-                                if can_up {
-                                    TEXT_SECONDARY
-                                } else {
-                                    TEXT_PLACEHOLDER
-                                },
-                                SUBTLE_BG,
-                                INPUT_BG_HOVER,
-                                CARD_BORDER,
+                                IconButtonVisuals::new(
+                                    if can_up {
+                                        TEXT_SECONDARY
+                                    } else {
+                                        TEXT_PLACEHOLDER
+                                    },
+                                    SUBTLE_BG,
+                                    INPUT_BG_HOVER,
+                                    CARD_BORDER,
+                                ),
                                 can_up,
                             )
                             .on_hover_text("Move step up")

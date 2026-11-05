@@ -15,7 +15,7 @@ fn main() {
     let ico_path = manifest_dir.join("logo.ico");
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
 
-    let version = env::var("CARGO_PKG_VERSION").unwrap_or_else(|_| "0.10.16".to_string());
+    let version = env::var("CARGO_PKG_VERSION").expect("CARGO_PKG_VERSION must be set by Cargo");
     let version_parts: Vec<&str> = version.split('.').collect();
     let major = version_parts
         .first()

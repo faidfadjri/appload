@@ -153,10 +153,7 @@ impl ShiplyApp {
                         ("row_more_btn", &dep.id),
                         OutlineIcon::MoreHorizontal,
                         None,
-                        TEXT_PRIMARY,
-                        CARD_BG,
-                        SUBTLE_BG,
-                        CARD_BORDER,
+                        IconButtonVisuals::new(TEXT_PRIMARY, CARD_BG, SUBTLE_BG, CARD_BORDER),
                         true,
                     )
                     .on_hover_text("Row actions");
@@ -201,10 +198,12 @@ impl ShiplyApp {
                             ("hist_rollback_btn", &dep.id),
                             OutlineIcon::RotateCcw,
                             Some("Rollback"),
-                            WARN_PILL_TEXT,
-                            WARN_PILL_BG,
-                            WARNING_SOFT,
-                            WARNING,
+                            IconButtonVisuals::new(
+                                WARN_PILL_TEXT,
+                                WARN_PILL_BG,
+                                WARNING_SOFT,
+                                WARNING,
+                            ),
                             !is_busy,
                         )
                         .on_hover_text(format!("Rollback {} to v{}", dep.environment, dep.version))
@@ -219,10 +218,12 @@ impl ShiplyApp {
                             ("hist_rerun_btn", &dep.id),
                             OutlineIcon::Refresh,
                             None,
-                            TEXT_SECONDARY,
-                            SUBTLE_BG,
-                            PILL_CONTAINER_BG,
-                            CARD_BORDER,
+                            IconButtonVisuals::new(
+                                TEXT_SECONDARY,
+                                SUBTLE_BG,
+                                PILL_CONTAINER_BG,
+                                CARD_BORDER,
+                            ),
                             !is_busy,
                         )
                         .on_hover_text("Re-run this deployment")
@@ -239,10 +240,12 @@ impl ShiplyApp {
                             ("hist_cancel_btn", &dep.id),
                             OutlineIcon::X,
                             Some("Cancel"),
-                            FAIL_PILL_TEXT,
-                            FAIL_PILL_BG,
-                            DANGER_SOFT,
-                            DANGER_SOFT,
+                            IconButtonVisuals::new(
+                                FAIL_PILL_TEXT,
+                                FAIL_PILL_BG,
+                                DANGER_SOFT,
+                                DANGER_SOFT,
+                            ),
                             true,
                         )
                         .on_hover_text("Cancel this running deployment")

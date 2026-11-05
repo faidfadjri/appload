@@ -148,10 +148,7 @@ impl ShiplyApp {
                         ("hdr_more_menu_btn", project_id),
                         OutlineIcon::MoreHorizontal,
                         None,
-                        TEXT_MUTED,
-                        CARD_BG,
-                        SUBTLE_BG,
-                        CARD_BORDER,
+                        IconButtonVisuals::new(TEXT_MUTED, CARD_BG, SUBTLE_BG, CARD_BORDER),
                         true,
                     )
                     .on_hover_text("More actions");
@@ -215,10 +212,7 @@ impl ShiplyApp {
                         ("hdr_edit_proj", project_id),
                         OutlineIcon::Edit,
                         Some("Edit Project"),
-                        TEXT_PRIMARY,
-                        CARD_BG,
-                        SUBTLE_BG,
-                        CARD_BORDER,
+                        IconButtonVisuals::new(TEXT_PRIMARY, CARD_BG, SUBTLE_BG, CARD_BORDER),
                         true,
                     )
                     .on_hover_text("Edit project settings")

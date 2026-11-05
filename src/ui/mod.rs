@@ -17,7 +17,7 @@ mod tests;
 pub use app::ShiplyApp;
 pub(crate) use components::*;
 pub(crate) use helpers::*;
-pub(crate) use icons::*;
+pub(crate) use icons::{IconButtonVisuals, *};
 pub use kit::*;
 #[cfg(test)]
 pub(crate) use modals::*;
