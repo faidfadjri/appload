@@ -4,11 +4,11 @@ use super::*;
 
 #[test]
 fn test_secret_management_page_and_os_vault_roundtrip() {
+    let _sandbox = crate::paths::TestSandbox::new();
     let ctx = egui::Context::default();
     AppLoadApp::configure_light_workspace_style(&ctx);
 
-    let dir = tempfile::tempdir().unwrap();
-    let db_path = dir.path().join("appload_state.db");
+    let db_path = _sandbox.path().join("appload_state.db");
     let storage = crate::storage::AppStorage::load_or_default(&db_path);
     let mut app = AppLoadApp::new(storage);
 

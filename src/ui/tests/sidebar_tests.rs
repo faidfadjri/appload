@@ -78,6 +78,7 @@ fn test_async_git_inspect_channel_and_project_switch() {
 
 #[test]
 fn test_project_menu_sidebar_running_deployment_circle_loading_indicator() {
+    let _sandbox = crate::paths::TestSandbox::new();
     let ctx = egui::Context::default();
     AppLoadApp::configure_light_workspace_style(&ctx);
 
@@ -162,6 +163,7 @@ fn test_project_menu_sidebar_running_deployment_circle_loading_indicator() {
 
 #[test]
 fn test_sidebar_project_loading_indicator_positioned_without_overlap() {
+    let _sandbox = crate::paths::TestSandbox::new();
     let ctx = egui::Context::default();
     AppLoadApp::configure_light_workspace_style(&ctx);
 
@@ -270,6 +272,7 @@ fn test_sidebar_project_loading_indicator_positioned_without_overlap() {
 
 #[test]
 fn test_project_sorting_and_drag_reordering_ui() {
+    let _sandbox = crate::paths::TestSandbox::new();
     let ctx = egui::Context::default();
     AppLoadApp::configure_light_workspace_style(&ctx);
 
@@ -356,6 +359,7 @@ fn test_project_sorting_and_drag_reordering_ui() {
 
 #[test]
 fn test_project_grouping_and_collapsible_sections_ui() {
+    let _sandbox = crate::paths::TestSandbox::new();
     let ctx = egui::Context::default();
     AppLoadApp::configure_light_workspace_style(&ctx);
 
@@ -441,6 +445,7 @@ fn test_project_grouping_and_collapsible_sections_ui() {
 
 #[test]
 fn test_sidebar_design_tokens_skeleton_loading_and_modals() {
+    let _sandbox = crate::paths::TestSandbox::new();
     let ctx = egui::Context::default();
     AppLoadApp::configure_light_workspace_style(&ctx);
 
@@ -579,6 +584,7 @@ fn test_sidebar_design_tokens_skeleton_loading_and_modals() {
 
 #[test]
 fn test_sidebar_sort_dropdown_menu_interaction() {
+    let _sandbox = crate::paths::TestSandbox::new();
     let ctx = egui::Context::default();
     AppLoadApp::configure_light_workspace_style(&ctx);
 
@@ -726,6 +732,7 @@ fn test_sidebar_footer_bounds_prevent_overflow_under_taskbar() {
 
 #[test]
 fn test_sidebar_width_and_symmetric_padding() {
+    let _sandbox = crate::paths::TestSandbox::new();
     let ctx = egui::Context::default();
     AppLoadApp::configure_light_workspace_style(&ctx);
     AppLoadApp::install_fonts(&ctx);
@@ -755,6 +762,7 @@ fn test_sidebar_width_and_symmetric_padding() {
 
 #[test]
 fn test_sidebar_project_row_borderless_and_env_badges_overflow() {
+    let _sandbox = crate::paths::TestSandbox::new();
     let ctx = egui::Context::default();
     AppLoadApp::configure_light_workspace_style(&ctx);
     AppLoadApp::install_fonts(&ctx);

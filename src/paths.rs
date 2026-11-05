@@ -20,11 +20,65 @@
 
 use std::env;
 use std::path::{Path, PathBuf};
-#[cfg(test)]
 use std::sync::Mutex;
 use std::sync::Once;
 
 static SANDBOX_LOGGED: Once = Once::new();
+
+/// Global test synchronization lock to serialize all tests that set APPLOAD_SANDBOX_ROOT.
+pub static TEST_MUTEX: Mutex<()> = Mutex::new(());
+pub static ENV_MUTEX: &Mutex<()> = &TEST_MUTEX;
+
+/// Hard guard: under `cfg(test)` or when `APPLOAD_TEST` is set, all path resolutions
+/// MUST panic if no sandbox root is set, guaranteeing zero possibility of touching the real profile.
+fn assert_sandbox_guard() {
+    let requires_guard = cfg!(test) || env::var("APPLOAD_TEST").is_ok();
+    if requires_guard && sandbox_root().is_none() {
+        panic!(
+            "TEST ISOLATION VIOLATION: paths::* was invoked in test mode without APPLOAD_SANDBOX_ROOT set! Operations must NEVER resolve real user profile paths."
+        );
+    }
+}
+
+/// RAII test sandbox helper: acquires `TEST_MUTEX`, creates a temporary sandbox folder,
+/// and sets `APPLOAD_SANDBOX_ROOT` for the lifetime of this guard.
+/// On drop, unsets `APPLOAD_SANDBOX_ROOT` and releases `TEST_MUTEX`.
+#[cfg(test)]
+pub struct TestSandbox {
+    _lock: std::sync::MutexGuard<'static, ()>,
+    temp_dir: tempfile::TempDir,
+}
+
+#[cfg(test)]
+impl TestSandbox {
+    pub fn new() -> Self {
+        let lock = TEST_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
+        let temp_dir = tempfile::TempDir::new().expect("create test sandbox tempdir");
+        env::set_var("APPLOAD_SANDBOX_ROOT", temp_dir.path());
+        Self {
+            _lock: lock,
+            temp_dir,
+        }
+    }
+
+    pub fn path(&self) -> &Path {
+        self.temp_dir.path()
+    }
+}
+
+#[cfg(test)]
+impl Default for TestSandbox {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+impl Drop for TestSandbox {
+    fn drop(&mut self) {
+        env::remove_var("APPLOAD_SANDBOX_ROOT");
+    }
+}
 
 /// Returns the current sandbox root directory if `APPLOAD_SANDBOX_ROOT` is set and non-empty.
 pub fn sandbox_root() -> Option<PathBuf> {
@@ -97,6 +151,7 @@ pub fn is_portable() -> bool {
 /// - On Windows: `%LOCALAPPDATA%\appload` (fallback to `dirs::data_local_dir()/appload`)
 /// - On macOS/Linux: `dirs::data_local_dir()/appload`
 pub fn data_dir() -> PathBuf {
+    assert_sandbox_guard();
     if is_portable() {
         if let Ok(exe_path) = env::current_exe() {
             if let Some(exe_dir) = exe_path.parent() {
@@ -134,6 +189,7 @@ pub fn data_dir() -> PathBuf {
 
 /// Returns the legacy Shiply application data directory (`%LOCALAPPDATA%\shiply`).
 pub fn legacy_data_dir() -> Option<PathBuf> {
+    assert_sandbox_guard();
     if let Some(root) = sandbox_root() {
         return Some(sandbox_local_data(&root).join("shiply"));
     }
@@ -162,6 +218,7 @@ pub fn legacy_data_dir() -> Option<PathBuf> {
 /// - On macOS: `~/Applications/AppLoad`
 /// - On Linux: `~/.local/bin`
 pub fn install_dir() -> PathBuf {
+    assert_sandbox_guard();
     if let Some(root) = sandbox_root() {
         let p_local = root.join("LocalAppData").join("Programs").join("AppLoad");
         if p_local.exists() || root.join("LocalAppData").exists() {
@@ -206,6 +263,7 @@ pub fn install_dir() -> PathBuf {
 
 /// Returns the legacy Shiply installation directory (`%LOCALAPPDATA%\Programs\Shiply`).
 pub fn legacy_install_dir() -> Option<PathBuf> {
+    assert_sandbox_guard();
     if let Some(root) = sandbox_root() {
         let p_local = root.join("LocalAppData").join("Programs").join("Shiply");
         if p_local.exists() {
@@ -280,6 +338,7 @@ pub fn is_in_legacy_dir(path: &Path) -> bool {
 /// - In sandbox mode: `<APPLOAD_SANDBOX_ROOT>/Start Menu/Programs`
 /// - On Windows: `%APPDATA%\Microsoft\Windows\Start Menu\Programs`
 pub fn start_menu_dir() -> Option<PathBuf> {
+    assert_sandbox_guard();
     if let Some(root) = sandbox_root() {
         let p_roaming = root
             .join("AppData")
@@ -326,6 +385,7 @@ pub fn start_menu_dir() -> Option<PathBuf> {
 /// - In sandbox mode: `<APPLOAD_SANDBOX_ROOT>/Desktop`
 /// - On Windows: `%USERPROFILE%\Desktop` (or `dirs::desktop_dir()`)
 pub fn desktop_dir() -> Option<PathBuf> {
+    assert_sandbox_guard();
     if let Some(root) = sandbox_root() {
         return Some(root.join("Desktop"));
     }
@@ -354,6 +414,7 @@ pub fn desktop_dir() -> Option<PathBuf> {
 /// 4. `%LOCALAPPDATA%\shiply\shiply_state.json`
 /// 5. Same files next to currently running executable (portable mode)
 pub fn legacy_data_candidates() -> Vec<PathBuf> {
+    assert_sandbox_guard();
     let mut candidates = Vec::new();
 
     // 1 & 2: Legacy install dir (Programs\Shiply)
@@ -397,9 +458,6 @@ pub fn legacy_data_candidates() -> Vec<PathBuf> {
 
     unique
 }
-
-#[cfg(test)]
-pub static ENV_MUTEX: Mutex<()> = Mutex::new(());
 
 #[cfg(test)]
 mod tests {
@@ -525,5 +583,13 @@ mod tests {
         assert!(!is_in_legacy_dir(&safe_data.join("appload_state.db")));
 
         env::remove_var("APPLOAD_SANDBOX_ROOT");
+    }
+
+    #[test]
+    #[should_panic(expected = "TEST ISOLATION VIOLATION")]
+    fn test_paths_panics_in_test_without_sandbox() {
+        let _lock = TEST_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
+        env::remove_var("APPLOAD_SANDBOX_ROOT");
+        let _ = data_dir();
     }
 }

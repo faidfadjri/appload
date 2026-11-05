@@ -12,16 +12,14 @@
 //! Built self-contained for CI runners, with an `#[ignore]` variant for real recovery validation.
 
 use appload::migration::run_first_run_data_migration;
+use appload::paths::TEST_MUTEX;
 use appload::storage::AppStorage;
 use std::collections::BTreeMap;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::Mutex;
 use tempfile::TempDir;
-
-static TEST_MUTEX: Mutex<()> = Mutex::new(());
 
 fn hash_file(path: &Path) -> (u64, u64) {
     let Ok(bytes) = fs::read(path) else {

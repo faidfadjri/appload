@@ -4,6 +4,7 @@ use super::*;
 
 #[test]
 fn test_project_context_menu_and_duplication_ui() {
+    let _sandbox = crate::paths::TestSandbox::new();
     let ctx = egui::Context::default();
     AppLoadApp::configure_light_workspace_style(&ctx);
 

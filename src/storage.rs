@@ -1302,7 +1302,6 @@ fn file_mtime(path: &Path) -> Option<SystemTime> {
 mod tests {
     use super::*;
     use chrono::Utc;
-    use tempfile::TempDir;
 
     fn dummy_record(
         id: &str,
@@ -1334,8 +1333,8 @@ mod tests {
 
     #[test]
     fn test_first_time_install_is_empty_without_project_or_environment() {
-        let tmp = TempDir::new().expect("tempdir");
-        let file_path = tmp.path().join("appload_state.db");
+        let sandbox = crate::paths::TestSandbox::new();
+        let file_path = sandbox.path().join("appload_state.db");
 
         let storage = AppStorage::load_or_default(&file_path);
         assert!(storage.projects.is_empty());
@@ -1345,9 +1344,9 @@ mod tests {
 
     #[test]
     fn test_seamless_migration_from_legacy_json_to_sqlite() {
-        let tmp = TempDir::new().expect("tempdir");
-        let json_path = tmp.path().join("shiply_state.json");
-        let db_path = tmp.path().join("shiply_state.db");
+        let sandbox = crate::paths::TestSandbox::new();
+        let json_path = sandbox.path().join("shiply_state.json");
+        let db_path = sandbox.path().join("shiply_state.db");
 
         // 1. Create a legacy shiply_state.json with projects and deployments
         let sample_proj = Project {
@@ -1390,7 +1389,7 @@ mod tests {
         assert_eq!(storage.deployments[0].version, "1.2.3");
 
         // 4. Verify backup was preserved
-        assert!(tmp.path().join("shiply_state.json.bak").exists());
+        assert!(sandbox.path().join("shiply_state.json.bak").exists());
 
         // 5. Subsequent load reads directly from SQLite
         let reloaded = AppStorage::load_or_default(&db_path);
@@ -1400,8 +1399,8 @@ mod tests {
 
     #[test]
     fn test_storage_persistence_and_auto_recognize_pasted_files() {
-        let tmp = TempDir::new().expect("tempdir");
-        let file_path = tmp.path().join("appload_state.db");
+        let sandbox = crate::paths::TestSandbox::new();
+        let file_path = sandbox.path().join("appload_state.db");
 
         let mut storage = AppStorage::load_or_default(&file_path);
         storage.upsert_deployment(dummy_record(
@@ -1430,7 +1429,7 @@ mod tests {
         assert_eq!(rollback_cand.version, "1.0.0");
 
         // Simulate user pasting a project JSON file into the app directory
-        let drop_json = tmp.path().join("my_project.json");
+        let drop_json = sandbox.path().join("my_project.json");
         let sample_proj = Project {
             id: "ndm-dq-subscription".to_string(),
             name: "ndm-dq-subscription".to_string(),
@@ -1518,8 +1517,8 @@ mod tests {
 
     #[test]
     fn test_storage_duplicate_project() {
-        let tmp = TempDir::new().expect("tempdir");
-        let db_path = tmp.path().join("appload_state.db");
+        let sandbox = crate::paths::TestSandbox::new();
+        let db_path = sandbox.path().join("appload_state.db");
         let mut storage = AppStorage::load_or_default(&db_path);
 
         let proj = Project {
@@ -1564,8 +1563,8 @@ mod tests {
 
     #[test]
     fn test_storage_project_sort_and_reorder() {
-        let tmp = TempDir::new().expect("tempdir");
-        let db_path = tmp.path().join("appload_state.db");
+        let sandbox = crate::paths::TestSandbox::new();
+        let db_path = sandbox.path().join("appload_state.db");
         let mut storage = AppStorage::load_or_default(&db_path);
 
         let p1 = Project {
@@ -1632,8 +1631,8 @@ mod tests {
 
     #[test]
     fn test_storage_project_grouping_and_persistence() {
-        let tmp = TempDir::new().expect("tempdir");
-        let db_path = tmp.path().join("appload_state.db");
+        let sandbox = crate::paths::TestSandbox::new();
+        let db_path = sandbox.path().join("appload_state.db");
         let mut storage = AppStorage::load_or_default(&db_path);
 
         let p1 = Project {
@@ -1702,8 +1701,8 @@ mod tests {
 
     #[test]
     fn test_reconcile_orphaned_running_deployments_on_load() {
-        let dir = tempfile::tempdir().unwrap();
-        let db_path = dir.path().join("appload_state.db");
+        let sandbox = crate::paths::TestSandbox::new();
+        let db_path = sandbox.path().join("appload_state.db");
 
         // 1. Create a deployment that is left in Running state (simulating crash or desktop restart)
         let mut storage = AppStorage::load_or_default(&db_path);
@@ -1753,8 +1752,8 @@ mod tests {
 
     #[test]
     fn test_remove_deployment_and_clear_deployment_history() {
-        let dir = tempfile::tempdir().unwrap();
-        let db_path = dir.path().join("appload_state.db");
+        let sandbox = crate::paths::TestSandbox::new();
+        let db_path = sandbox.path().join("appload_state.db");
 
         let mut storage = AppStorage::load_or_default(&db_path);
         let now = chrono::Utc::now();
@@ -1825,8 +1824,8 @@ mod tests {
 
     #[test]
     fn test_secrets_metadata_persistence_and_project_vault_sync() {
-        let dir = tempfile::tempdir().unwrap();
-        let db_path = dir.path().join("appload_state.db");
+        let sandbox = crate::paths::TestSandbox::new();
+        let db_path = sandbox.path().join("appload_state.db");
 
         let mut storage = AppStorage::load_or_default(&db_path);
         storage.upsert_secret_metadata(SecretEntry::new(

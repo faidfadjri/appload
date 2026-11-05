@@ -11,7 +11,11 @@ use tempfile::TempDir;
 
 #[test]
 fn test_presets_custom_environment_and_full_deployment_lifecycle() {
+    let _lock = appload::paths::TEST_MUTEX
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     let tmp = TempDir::new().expect("tempdir");
+    std::env::set_var("APPLOAD_SANDBOX_ROOT", tmp.path());
     let state_path = tmp.path().join("appload_state.json");
     let mut storage = AppStorage::load_or_default(&state_path);
 
@@ -96,6 +100,7 @@ fn test_presets_custom_environment_and_full_deployment_lifecycle() {
         .expect("should have succeeded uat deployment");
     assert_eq!(last_ok.version, "1.4.2");
     assert_eq!(last_ok.executed_steps.len(), 2);
+    std::env::remove_var("APPLOAD_SANDBOX_ROOT");
 }
 
 #[test]
