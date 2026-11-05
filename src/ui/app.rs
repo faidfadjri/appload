@@ -1,3 +1,5 @@
+//! Main ShiplyApp state container and top-level eframe/egui render loop.
+
 use super::*;
 
 pub struct ShiplyApp {

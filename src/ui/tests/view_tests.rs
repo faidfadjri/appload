@@ -1,3 +1,5 @@
+//! Tests for workspace code changes, deploy actions, and console output.
+
 use super::*;
 
 #[test]

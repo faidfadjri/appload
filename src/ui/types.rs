@@ -1,3 +1,5 @@
+//! UI-specific enums, workspace tabs, font definitions, and modal action types.
+
 use crate::version::GitMetadata;
 use eframe::egui::Pos2;
 

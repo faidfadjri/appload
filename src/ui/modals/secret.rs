@@ -1,3 +1,5 @@
+//! Secret creation and editing modal for OS Credential Vault.
+
 use super::*;
 
 impl ShiplyApp {

@@ -1,3 +1,5 @@
+//! Tests for project context menus, viewport boundary flips, and action dispatch.
+
 use super::*;
 
 #[test]

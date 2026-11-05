@@ -1,3 +1,5 @@
+//! Shiply library root: UI, pipeline execution, storage, and platform integration.
+
 pub mod credentials;
 pub mod domain;
 pub mod executor;

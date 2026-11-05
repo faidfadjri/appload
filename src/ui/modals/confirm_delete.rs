@@ -1,3 +1,5 @@
+//! Destructive confirmation dialogs for projects and environments.
+
 use super::*;
 
 impl ShiplyApp {

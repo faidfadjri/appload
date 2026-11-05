@@ -1,3 +1,5 @@
+//! Built-in project presets and learned deployment workflow templates.
+
 use crate::domain::{normalize_env_key, EnvironmentConfig, PipelineStep, Project, StepKind};
 
 pub fn default_projects() -> Vec<Project> {

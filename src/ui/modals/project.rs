@@ -1,3 +1,5 @@
+//! Project creation and configuration editing modals.
+
 use super::*;
 
 impl ShiplyApp {

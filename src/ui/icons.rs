@@ -1,3 +1,5 @@
+//! Vector-painted outline icons and icon buttons.
+
 use super::*;
 
 /// Draws a crisp outline notification bell icon (`🔔`) matching the Termius topbar.

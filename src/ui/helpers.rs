@@ -1,3 +1,5 @@
+//! Formatting helpers, relative timestamp formatting, and UI utility calculations.
+
 use super::*;
 
 // =============================================================================

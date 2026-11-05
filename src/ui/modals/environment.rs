@@ -1,3 +1,5 @@
+//! New environment creation and cloning modal.
+
 use super::*;
 
 impl ShiplyApp {

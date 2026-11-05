@@ -1,3 +1,5 @@
+//! SQLite and JSON storage persistence layer for projects, settings, and history.
+
 use crate::credentials::read_os_vault_credential;
 use crate::domain::{DeploymentRecord, DeploymentStatus, Project, SecretEntry, StepExecutionLog};
 use crate::ps1_importer::import_project_from_path;

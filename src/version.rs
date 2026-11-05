@@ -1,3 +1,5 @@
+//! Version synchronization, semantic version bumping, and Git metadata reader.
+
 use std::fs;
 use std::path::Path;
 use std::process::Command;

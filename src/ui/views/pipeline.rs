@@ -426,7 +426,9 @@ impl ShiplyApp {
                                         Some((id, buf)) if id == &step.id => buf,
                                         _ => {
                                             let joined = sources.join(", ");
-                                            let slot = self.step_scp_sources_buffer.insert((step.id.clone(), joined));
+                                            let slot = self
+                                                .step_scp_sources_buffer
+                                                .insert((step.id.clone(), joined));
                                             &mut slot.1
                                         }
                                     };

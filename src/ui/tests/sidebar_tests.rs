@@ -1,3 +1,5 @@
+//! Tests for sidebar project tree, search filtering, and loading indicators.
+
 use super::*;
 
 #[test]

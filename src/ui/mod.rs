@@ -1,3 +1,5 @@
+//! UI subsystem root: theme tokens, typography, kit, views, and modals.
+
 pub mod app;
 pub mod components;
 pub mod helpers;

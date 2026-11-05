@@ -1,3 +1,5 @@
+//! Pipeline execution engine for local, verification, SCP, and remote SSH stages.
+
 use crate::credentials::{
     interpolate_os_secrets, redact_secrets, resolve_credentials, ENV_ASKPASS_FILE, ENV_ASKPASS_MODE,
 };

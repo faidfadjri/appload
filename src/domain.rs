@@ -1,3 +1,5 @@
+//! Core domain types for projects, environments, pipeline steps, and deployment records.
+
 use chrono::{DateTime, Local, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

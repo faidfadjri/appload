@@ -1,3 +1,5 @@
+//! Tests for secret management page and OS vault roundtrip integration.
+
 use super::*;
 
 #[test]

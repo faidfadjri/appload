@@ -1,3 +1,5 @@
+//! Tests for modal window lifecycle, responsive breakpoints, and form reset behavior.
+
 use super::*;
 
 #[test]

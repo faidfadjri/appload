@@ -1,3 +1,5 @@
+//! Typography scales, Inter font loader, and RichText styling extensions.
+
 use super::theme::*;
 use eframe::egui::{FontFamily, FontId, RichText};
 

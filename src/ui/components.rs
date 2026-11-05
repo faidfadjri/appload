@@ -1,3 +1,5 @@
+//! Reusable UI widgets, form elements, status pills, and animated spinners.
+
 use super::*;
 
 // =============================================================================

@@ -1,3 +1,5 @@
+//! Characterization tests for concurrent deployments across projects and environments.
+
 use super::*;
 
 #[test]

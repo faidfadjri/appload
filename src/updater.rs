@@ -1,3 +1,5 @@
+//! Background GitHub releases check and atomic in-place executable updater.
+
 use crate::installer::{
     default_install_dir, install_binary_to_dir, installed_exe_name, unblock_file, APP_VERSION,
 };

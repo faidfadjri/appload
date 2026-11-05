@@ -1,3 +1,5 @@
+//! Application installation, icon generation, desktop shortcut, and PATH integration.
+
 use crate::version::configure_background_command;
 use eframe::egui::{
     self, Align, Align2, Color32, CornerRadius, FontId, Layout, Margin, Pos2, Rect, RichText,

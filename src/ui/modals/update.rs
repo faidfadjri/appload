@@ -1,3 +1,5 @@
+//! Application update availability and download progress modal.
+
 use super::*;
 
 impl ShiplyApp {

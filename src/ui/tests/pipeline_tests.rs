@@ -1,3 +1,5 @@
+//! Tests for pipeline syntax highlighting, step reordering, and settings input buffering.
+
 use super::*;
 
 #[test]

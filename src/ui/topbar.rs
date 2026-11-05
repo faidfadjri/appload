@@ -1,3 +1,5 @@
+//! Frameless custom window titlebar, window dragging, and caption controls.
+
 use super::*;
 
 impl ShiplyApp {

@@ -1,3 +1,5 @@
+//! Design system kit: cards, buttons, count badges, and empty states.
+
 use super::icons::*;
 use super::theme::*;
 use super::typography::*;

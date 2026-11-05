@@ -1,3 +1,5 @@
+//! Bulk multi-project deployment orchestration modal.
+
 use super::*;
 
 impl ShiplyApp {

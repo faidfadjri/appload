@@ -1,3 +1,5 @@
+//! Design system color palette, surface tokens, border radiuses, and spacing scales.
+
 use eframe::egui::Color32;
 
 // =============================================================================

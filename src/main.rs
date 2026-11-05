@@ -1,3 +1,5 @@
+//! Shiply application entry point and CLI mode dispatcher.
+
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use eframe::egui;
