@@ -180,15 +180,23 @@ impl ShiplyApp {
                 (SB_ACCENT, "Not installed".to_string(), "Install (.exe)")
             }
             InstallState::InstalledCurrent { version, .. } => {
-                (theme.success, format!("Installed v{version}"), "Reinstall")
+                let lbl = if full_w < 260.0 {
+                    format!("v{version}")
+                } else {
+                    format!("Installed v{version}")
+                };
+                (theme.success, lbl, "Reinstall")
             }
             InstallState::UpdateReady {
                 running_version, ..
-            } => (
-                theme.warning,
-                format!("Update to v{running_version}"),
-                "Apply",
-            ),
+            } => {
+                let lbl = if full_w < 260.0 {
+                    format!("v{running_version}")
+                } else {
+                    format!("Update to v{running_version}")
+                };
+                (theme.warning, lbl, "Apply")
+            }
         };
 
         footer_ui.painter().circle_filled(
@@ -201,16 +209,21 @@ impl ShiplyApp {
             footer_ui
                 .painter()
                 .layout_no_wrap(status_text, Typo::MonoSm.font(), SB_TEXT_MUTED);
-        footer_ui.painter().galley(
+        let st_rect = Rect::from_min_size(
             Pos2::new(
-                stat_rect.left() + 20.0,
+                stat_rect.left() + 18.0,
                 stat_rect.center().y - st_galley.size().y / 2.0,
             ),
-            st_galley.clone(),
-            SB_TEXT_MUTED,
+            st_galley.size(),
         );
+        footer_ui
+            .interact(st_rect, egui::Id::new("sidebar_status_lbl"), Sense::hover())
+            .on_hover_text(format!("Installed Shiply v{APP_VERSION}"));
+        footer_ui
+            .painter()
+            .galley(st_rect.min, st_galley, SB_TEXT_MUTED);
 
-        let link_x = stat_rect.left() + 20.0 + st_galley.size().x + 8.0;
+        let link_x = st_rect.right() + 6.0;
         let link_galley = footer_ui.painter().layout_no_wrap(
             action_text.to_string(),
             Typo::Small.font(),
