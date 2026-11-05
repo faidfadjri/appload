@@ -1177,7 +1177,7 @@ impl ShiplyApp {
         let tx = self.event_tx.clone();
 
         thread::spawn(move || {
-            run_deployment(req, Some(&tx));
+            run_deployment(&req, Some(&tx));
         });
     }
 

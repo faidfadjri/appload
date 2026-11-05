@@ -631,7 +631,7 @@ mod tests {
         assert_eq!(
             check_install_state(&install_dir, "0.2.0"),
             InstallState::UpdateReady {
-                exe_path: installed_path.clone(),
+                exe_path: installed_path,
                 installed_version: "0.1.0".to_string(),
                 running_version: "0.2.0".to_string(),
             }

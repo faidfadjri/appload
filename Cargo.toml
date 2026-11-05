@@ -24,3 +24,17 @@ opt-level = 3
 lto = "thin"
 codegen-units = 1
 strip = "symbols"
+
+[lints.rust]
+unsafe_code = "deny"
+unused_must_use = "deny"
+
+[lints.clippy]
+all = "warn"
+redundant_clone = "warn"
+needless_pass_by_value = "warn"
+inefficient_to_string = "warn"
+manual_let_else = "warn"
+semicolon_if_nothing_returned = "warn"
+uninlined_format_args = "warn"
+

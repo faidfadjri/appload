@@ -1353,7 +1353,7 @@ impl ShiplyApp {
         self.render_deploy_action_bar(
             ui,
             &active_env_name,
-            rollback_candidate,
+            rollback_candidate.as_ref(),
             &mut sync_trigger_rect,
         );
 
@@ -1685,7 +1685,7 @@ impl ShiplyApp {
         &mut self,
         ui: &mut egui::Ui,
         env_display_name: &str,
-        rollback_candidate: Option<DeploymentRecord>,
+        rollback_candidate: Option<&DeploymentRecord>,
         sync_trigger_rect_out: &mut Option<Rect>,
     ) {
         let mut trigger_deploy = false;
@@ -1892,10 +1892,10 @@ impl ShiplyApp {
         // Now calculate right buttons (Rollback + Deploy)
         let deploy_galley =
             ui.painter()
-                .layout_no_wrap(btn_text.clone(), Typo::Label.font(), Color32::WHITE);
+                .layout_no_wrap(btn_text, Typo::Label.font(), Color32::WHITE);
         let deploy_w = (deploy_galley.size().x + 14.0 + 8.0 + 32.0).max(160.0);
 
-        let rb_data = rollback_candidate.as_ref().map(|prev_dep| {
+        let rb_data = rollback_candidate.map(|prev_dep| {
             let label = format!("Rollback to v{}", prev_dep.version);
             let galley = ui
                 .painter()

@@ -611,7 +611,7 @@ impl Drop for PackageJsonRevertGuard {
 /// Runs the deployment pipeline synchronously (intended to be called on a background thread)
 /// and sends live updates through `tx` if provided.
 pub fn run_deployment(
-    req: DeploymentRequest,
+    req: &DeploymentRequest,
     tx: Option<&Sender<ExecutorEvent>>,
 ) -> DeploymentRecord {
     let started_instant = Instant::now();
@@ -711,7 +711,7 @@ pub fn run_deployment(
         };
     }
 
-    if let Err(val_err) = validate_deployment_request(&req) {
+    if let Err(val_err) = validate_deployment_request(req) {
         record.step_logs.push(StepExecutionLog {
             step_name: "Validate Deployment Parameters".to_string(),
             command_summary: "Security parameter validation".to_string(),
@@ -1031,7 +1031,7 @@ pub fn run_deployment(
                                 command_summary: summary,
                                 status: DeploymentStatus::Succeeded,
                                 output: if out.is_empty() {
-                                    format!("Command '{}' completed (exit 0).", interpolated)
+                                    format!("Command '{interpolated}' completed (exit 0).")
                                 } else {
                                     out
                                 },
@@ -1061,10 +1061,7 @@ pub fn run_deployment(
                                 command_summary: summary,
                                 status: DeploymentStatus::Failed,
                                 output: if out.is_empty() {
-                                    format!(
-                                        "Command '{}' failed with non-zero exit code.",
-                                        interpolated
-                                    )
+                                    format!("Command '{interpolated}' failed with non-zero exit code.")
                                 } else {
                                     out
                                 },
@@ -1446,7 +1443,7 @@ mod tests {
             is_rollback: false,
         };
 
-        let record = run_deployment(req, None);
+        let record = run_deployment(&req, None);
         assert_eq!(record.status, DeploymentStatus::Succeeded);
         assert_eq!(record.step_logs.len(), 3); // Bump + Echo + Check Artifact
         assert_eq!(
@@ -1471,7 +1468,7 @@ mod tests {
             previous_commit: None,
             is_rollback: true,
         };
-        let rollback_record = run_deployment(rollback_req, None);
+        let rollback_record = run_deployment(&rollback_req, None);
         assert_eq!(rollback_record.status, DeploymentStatus::Succeeded);
         assert!(rollback_record.is_rollback);
         assert_eq!(
@@ -1524,7 +1521,7 @@ mod tests {
             is_rollback: false,
         };
 
-        let record = run_deployment(req, None);
+        let record = run_deployment(&req, None);
         // Deployment failed!
         assert_eq!(record.status, DeploymentStatus::Failed);
 
@@ -1561,7 +1558,7 @@ mod tests {
             project_id: "demo".to_string(),
             project_name: "Demo".to_string(),
             local_path: PathBuf::from("."),
-            env_config: base_env.clone(),
+            env_config: base_env,
             version: "1.0.0; rm -rf /".to_string(),
             bump_package_json: false,
             create_git_tag_on_success: false,
@@ -1644,7 +1641,7 @@ mod tests {
             is_rollback: false,
         };
 
-        let record = run_deployment(req, None);
+        let record = run_deployment(&req, None);
         assert_eq!(record.status, DeploymentStatus::Succeeded);
         assert_eq!(record.step_logs.len(), 1);
         let log = &record.step_logs[0];

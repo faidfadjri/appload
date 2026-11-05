@@ -480,7 +480,7 @@ impl AppStorage {
             if db_projects.is_empty() && db_deployments.is_empty() {
                 let mut legacy_candidates = Vec::new();
                 if is_json_ext {
-                    legacy_candidates.push(input_path.clone());
+                    legacy_candidates.push(input_path);
                 } else {
                     legacy_candidates.push(input_path.with_extension("json"));
                 }
@@ -1010,17 +1010,17 @@ impl AppStorage {
     /// Inserts a new deployment record at the top (newest-first) or updates an existing record with the same ID,
     /// atomically persisting directly to SQLite.
     pub fn upsert_deployment(&mut self, record: DeploymentRecord) {
-        if let Some(existing) = self.deployments.iter_mut().find(|d| d.id == record.id) {
-            *existing = record.clone();
-        } else {
-            self.deployments.insert(0, record.clone());
-        }
-
         if let Some(path) = &self.storage_path {
             if let Ok(conn) = Connection::open(path) {
                 let _ = upsert_deployment_to_db(&conn, &record);
                 self.last_state_mtime = file_mtime(path);
             }
+        }
+
+        if let Some(existing) = self.deployments.iter_mut().find(|d| d.id == record.id) {
+            *existing = record;
+        } else {
+            self.deployments.insert(0, record);
         }
     }
 

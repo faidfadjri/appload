@@ -1,3 +1,5 @@
+#![allow(unsafe_code)] // Windows Credential Manager Win32 FFI requires unsafe blocks for CredReadW/CredWriteW/CredDeleteW
+
 use std::env;
 use std::fs;
 use std::io::{self, Write};

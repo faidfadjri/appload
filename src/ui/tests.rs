@@ -162,7 +162,7 @@ fn test_active_project_code_changes_isolation() {
         executed_steps: Vec::new(),
     };
 
-    storage.deployments = vec![dep_backend.clone(), dep_frontend.clone()];
+    storage.deployments = vec![dep_backend, dep_frontend];
 
     let mut app = ShiplyApp::new(storage);
     // Switch to Backend project and set an invalid foreign selected deployment ID
@@ -240,7 +240,7 @@ fn test_deploy_and_rollback_button_dynamic_sizing_no_offset() {
             app.render_deploy_action_bar(
                 ui,
                 "Development Customer Data Ops",
-                Some(rollback_dep.clone()),
+                Some(&rollback_dep),
                 &mut trigger_rect,
             );
         });

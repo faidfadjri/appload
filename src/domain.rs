@@ -257,7 +257,7 @@ impl Project {
 
         let base_slug = normalize_env_key(&self.name);
         let new_app_name = if key == "production" || key == "prod" {
-            base_slug.clone()
+            base_slug
         } else {
             format!("{base_slug}-{key}")
         };

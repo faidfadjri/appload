@@ -342,7 +342,7 @@ mod tests {
             c.current_dir(dir).args(args);
             configure_background_command(&mut c);
             let out = c.output().expect("git command");
-            assert!(out.status.success(), "git {:?} failed", args);
+            assert!(out.status.success(), "git {args:?} failed");
         };
 
         run_git(&["init", "-b", "main"]);

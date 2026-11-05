@@ -74,7 +74,7 @@ fn test_presets_custom_environment_and_full_deployment_lifecycle() {
         deployment_id: "dep-uat-1".to_string(),
         project_id: "ndm-dq-subscription".to_string(),
         project_name: "ndm-dq-subscription".to_string(),
-        local_path: proj_dir.clone(),
+        local_path: proj_dir,
         env_config,
         version: "1.4.2".to_string(),
         bump_package_json: true,
@@ -87,7 +87,7 @@ fn test_presets_custom_environment_and_full_deployment_lifecycle() {
         is_rollback: false,
     };
 
-    let record = run_deployment(req, None);
+    let record = run_deployment(&req, None);
     assert_eq!(record.status, DeploymentStatus::Succeeded);
     storage.upsert_deployment(record);
 

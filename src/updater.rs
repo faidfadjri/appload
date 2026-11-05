@@ -434,8 +434,7 @@ fn fetch_latest_release_json() -> Result<String, String> {
         let ps_latest_script = format!(
             "$ProgressPreference = 'SilentlyContinue'; \
              [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
-             (Invoke-WebRequest -Uri '{}' -Headers @{{'User-Agent'='Shiply-Desktop-Updater'}} -UseBasicParsing -TimeoutSec 10).Content",
-            GITHUB_RELEASES_LATEST_JSON_URL
+             (Invoke-WebRequest -Uri '{GITHUB_RELEASES_LATEST_JSON_URL}' -Headers @{{'User-Agent'='Shiply-Desktop-Updater'}} -UseBasicParsing -TimeoutSec 10).Content"
         );
         let mut ps_latest = Command::new("powershell");
         ps_latest.args([
@@ -460,8 +459,7 @@ fn fetch_latest_release_json() -> Result<String, String> {
         let ps_script = format!(
             "$ProgressPreference = 'SilentlyContinue'; \
              [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
-             (Invoke-WebRequest -Uri '{}' -Headers @{{'User-Agent'='Shiply-Desktop-Updater'; 'Accept'='application/vnd.github+json'}} -UseBasicParsing -TimeoutSec 12).Content",
-            GITHUB_RELEASES_LATEST_URL
+             (Invoke-WebRequest -Uri '{GITHUB_RELEASES_LATEST_URL}' -Headers @{{'User-Agent'='Shiply-Desktop-Updater'; 'Accept'='application/vnd.github+json'}} -UseBasicParsing -TimeoutSec 12).Content"
         );
         let mut ps = Command::new("powershell");
         ps.args(["-NoProfile", "-NonInteractive", "-Command", &ps_script]);
