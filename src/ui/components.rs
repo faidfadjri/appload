@@ -44,6 +44,135 @@ pub(crate) fn styled_password_edit(
     styled_text_edit_ext(ui, id_salt, value, width, hint, true)
 }
 
+pub(crate) type TextEditLayouter<'a> =
+    &'a mut dyn FnMut(&egui::Ui, &str, f32) -> std::sync::Arc<egui::Galley>;
+
+/// Options for the unified singleline input field core.
+pub(crate) struct InputCoreOpts<'a> {
+    pub hint: Option<&'a str>,
+    pub hint_color: Option<Color32>,
+    pub password: bool,
+    pub left_pad: f32,
+    pub right_pad: f32,
+    pub height: f32,
+    pub font: egui::FontId,
+    pub text_color: Color32,
+    pub bg_color: Color32,
+    pub border_color: Color32,
+    pub border_hover_color: Color32,
+    pub border_focus_color: Color32,
+    pub corner_radius: CornerRadius,
+    pub layouter: Option<TextEditLayouter<'a>>,
+    pub draw_bg_and_border: bool,
+}
+
+impl<'a> Default for InputCoreOpts<'a> {
+    fn default() -> Self {
+        Self {
+            hint: None,
+            hint_color: None,
+            password: false,
+            left_pad: 10.0,
+            right_pad: 10.0,
+            height: INPUT_HEIGHT, // 36.0
+            font: Typo::Body.font(),
+            text_color: TEXT_PRIMARY,
+            bg_color: INPUT_BG,
+            border_color: INPUT_BORDER,
+            border_hover_color: INPUT_BORDER_HOVER,
+            border_focus_color: PRIMARY_BLUE,
+            corner_radius: CornerRadius::same(6),
+            layouter: None,
+            draw_bg_and_border: true,
+        }
+    }
+}
+
+/// Shared single-line text input core for all Shiply text fields.
+///
+/// Allocates the entire input height (e.g. 36px) as the native `TextEdit`'s interactive area,
+/// vertically centers the text galley (`Align::Center`), and draws the background and border
+/// behind and around the field using the native response.
+pub(crate) fn input_core(
+    ui: &mut egui::Ui,
+    id_salt: impl std::hash::Hash,
+    value: &mut String,
+    width: f32,
+    mut opts: InputCoreOpts<'_>,
+) -> egui::text_edit::TextEditOutput {
+    let bg_idx = if opts.draw_bg_and_border {
+        Some(ui.painter().add(egui::Shape::Noop))
+    } else {
+        None
+    };
+
+    let left_pad = opts.left_pad;
+    let right_pad = opts.right_pad;
+    let height = opts.height;
+    let desired_text_w = (width - left_pad - right_pad).max(10.0);
+
+    let row_height = ui.fonts(|f| f.row_height(&opts.font));
+    let pad_y = ((height - row_height) * 0.5).floor().max(0.0) as i8;
+
+    let mut edit = egui::TextEdit::singleline(value)
+        .id_salt(&id_salt)
+        .font(opts.font.clone())
+        .text_color(opts.text_color)
+        .password(opts.password)
+        .frame(false)
+        .min_size(Vec2::new(width, height))
+        .desired_width(desired_text_w)
+        .vertical_align(Align::Center)
+        .margin(Margin {
+            left: left_pad.round() as i8,
+            right: right_pad.round() as i8,
+            top: pad_y,
+            bottom: pad_y,
+        });
+
+    if let Some(placeholder) = opts.hint {
+        let color = opts.hint_color.unwrap_or(TEXT_PLACEHOLDER);
+        edit = edit.hint_text(
+            RichText::new(placeholder)
+                .font(opts.font.clone())
+                .color(color),
+        );
+    }
+
+    let output = if let Some(layouter) = opts.layouter.as_mut() {
+        edit.layouter(*layouter).show(ui)
+    } else {
+        edit.show(ui)
+    };
+
+    let full_rect = Rect::from_center_size(output.response.rect.center(), Vec2::new(width, height));
+
+    if opts.draw_bg_and_border {
+        if let Some(bg) = bg_idx {
+            ui.painter().set(
+                bg,
+                egui::Shape::rect_filled(full_rect, opts.corner_radius, opts.bg_color),
+            );
+        }
+
+        let is_focused =
+            output.response.has_focus() || ui.memory(|mem| mem.has_focus(output.response.id));
+        let is_hovered = output.response.hovered() || ui.rect_contains_pointer(full_rect);
+
+        let stroke = if is_focused {
+            Stroke::new(1.5_f32, opts.border_focus_color)
+        } else if is_hovered {
+            Stroke::new(1.0_f32, opts.border_hover_color)
+        } else {
+            Stroke::new(1.0_f32, opts.border_color)
+        };
+        ui.painter()
+            .rect_stroke(full_rect, opts.corner_radius, stroke, StrokeKind::Inside);
+    }
+
+    output
+}
+
 pub(crate) fn styled_search_input(
     ui: &mut egui::Ui,
     id_salt: impl std::hash::Hash,
@@ -52,68 +181,25 @@ pub(crate) fn styled_search_input(
     hint: Option<&str>,
 ) -> bool {
     let placeholder_str = hint.unwrap_or("Search...");
-    let height = INPUT_HEIGHT; // 36.0
-    let (outer_rect, outer_resp) = ui.allocate_exact_size(Vec2::new(width, height), Sense::click());
-
-    // Single clean white background fill
-    ui.painter()
-        .rect_filled(outer_rect, CornerRadius::same(6), INPUT_BG);
+    let opts = InputCoreOpts {
+        hint: Some(placeholder_str),
+        left_pad: 32.0,
+        right_pad: 10.0,
+        ..Default::default()
+    };
+    let output = input_core(ui, id_salt, value, width, opts);
 
     // Left magnifying glass search icon
-    let icon_center = Pos2::new(outer_rect.left() + 16.0, outer_rect.center().y);
+    let icon_center = Pos2::new(
+        output.response.rect.left() + 16.0,
+        output.response.rect.center().y,
+    );
     draw_outline_icon(
         ui.painter(),
         icon_center,
         OutlineIcon::Search,
         TEXT_PLACEHOLDER,
     );
-
-    // Inner TextEdit child matching singleline text row height (22px) centered vertically
-    let text_h = 22.0_f32;
-    let text_y = outer_rect.center().y - text_h * 0.5;
-    let left_pad = 32.0_f32;
-    let right_pad = 10.0_f32;
-    let text_rect = Rect::from_min_size(
-        Pos2::new(outer_rect.left() + left_pad, text_y),
-        Vec2::new((width - left_pad - right_pad).max(10.0), text_h),
-    );
-
-    let mut child_ui = ui.new_child(egui::UiBuilder::new().max_rect(text_rect));
-    let edit = egui::TextEdit::singleline(value)
-        .id_salt(id_salt)
-        .font(Typo::Body.font())
-        .text_color(TEXT_PRIMARY)
-        .frame(false)
-        .margin(Margin::ZERO)
-        .cursor_at_end(true)
-        .desired_width(text_rect.width())
-        .min_size(Vec2::new(text_rect.width(), text_h))
-        .hint_text(Typo::Body.rich(placeholder_str).color(TEXT_PLACEHOLDER));
-    let mut output = edit.show(&mut child_ui);
-
-    if outer_resp.clicked() && !output.response.has_focus() {
-        ui.memory_mut(|mem| mem.request_focus(output.response.id));
-    }
-
-    let is_focused =
-        output.response.has_focus() || ui.memory(|mem| mem.has_focus(output.response.id));
-    let is_hovered = outer_resp.hovered() || output.response.hovered();
-
-    let stroke = if is_focused {
-        Stroke::new(1.5_f32, PRIMARY_BLUE)
-    } else if is_hovered {
-        Stroke::new(1.0_f32, INPUT_BORDER_HOVER)
-    } else {
-        Stroke::new(1.0_f32, INPUT_BORDER)
-    };
-    ui.painter().rect_stroke(
-        outer_rect,
-        CornerRadius::same(6),
-        stroke,
-        StrokeKind::Inside,
-    );
-
-    handle_text_edit_cursor_and_selection(ui.ctx(), &mut output, value);
 
     output.response.changed()
 }
@@ -127,114 +213,15 @@ pub(crate) fn styled_text_edit_ext(
     is_password: bool,
 ) -> bool {
     let placeholder_str = hint.unwrap_or("Enter value...");
-    let height = INPUT_HEIGHT; // 36.0
-    let (outer_rect, outer_resp) = ui.allocate_exact_size(Vec2::new(width, height), Sense::click());
-
-    // Single clean white background fill
-    ui.painter()
-        .rect_filled(outer_rect, CornerRadius::same(6), INPUT_BG);
-
-    // Inner TextEdit child matching singleline text row height (22px) centered vertically
-    let text_h = 22.0_f32;
-    let text_y = outer_rect.center().y - text_h * 0.5;
-    let text_rect = Rect::from_min_size(
-        Pos2::new(outer_rect.left() + 10.0, text_y),
-        Vec2::new((width - 20.0).max(10.0), text_h),
-    );
-
-    let mut child_ui = ui.new_child(egui::UiBuilder::new().max_rect(text_rect));
-    let edit = egui::TextEdit::singleline(value)
-        .id_salt(id_salt)
-        .font(Typo::Body.font())
-        .text_color(TEXT_PRIMARY)
-        .password(is_password)
-        .frame(false)
-        .margin(Margin::ZERO)
-        .cursor_at_end(true)
-        .desired_width(text_rect.width())
-        .min_size(Vec2::new(text_rect.width(), text_h))
-        .hint_text(Typo::Body.rich(placeholder_str).color(TEXT_PLACEHOLDER));
-    let mut output = edit.show(&mut child_ui);
-
-    if outer_resp.clicked() && !output.response.has_focus() {
-        ui.memory_mut(|mem| mem.request_focus(output.response.id));
-    }
-
-    let is_focused =
-        output.response.has_focus() || ui.memory(|mem| mem.has_focus(output.response.id));
-    let is_hovered = outer_resp.hovered() || output.response.hovered();
-
-    let stroke = if is_focused {
-        Stroke::new(1.5_f32, PRIMARY_BLUE)
-    } else if is_hovered {
-        Stroke::new(1.0_f32, INPUT_BORDER_HOVER)
-    } else {
-        Stroke::new(1.0_f32, INPUT_BORDER)
+    let opts = InputCoreOpts {
+        hint: Some(placeholder_str),
+        password: is_password,
+        left_pad: 10.0,
+        right_pad: 10.0,
+        ..Default::default()
     };
-    ui.painter().rect_stroke(
-        outer_rect,
-        CornerRadius::same(6),
-        stroke,
-        StrokeKind::Inside,
-    );
-
-    handle_text_edit_cursor_and_selection(ui.ctx(), &mut output, value);
-
+    let output = input_core(ui, id_salt, value, width, opts);
     output.response.changed()
-}
-
-pub(crate) fn handle_text_edit_cursor_and_selection(
-    ctx: &egui::Context,
-    output: &mut egui::text_edit::TextEditOutput,
-    value: &str,
-) {
-    // Preserve multi-character selections (e.g. from double-click word selection or drag selection)
-    if let Some(range) = output.state.cursor.char_range() {
-        if range.primary != range.secondary {
-            if output.response.dragged() || ctx.is_being_dragged(output.response.id) {
-                ctx.request_repaint();
-            }
-            return;
-        }
-    }
-
-    // Precise cursor placement on press/click without dragging:
-    let pointer_pressed = output.response.hovered() && ctx.input(|i| i.pointer.primary_pressed());
-    let is_click = output.response.clicked();
-    let gained_focus = output.response.gained_focus();
-
-    if (is_click || pointer_pressed || gained_focus)
-        && !output.response.double_clicked()
-        && !output.response.triple_clicked()
-        && !ctx.input(|i| i.pointer.is_decidedly_dragging())
-    {
-        if let Some(pos) = output
-            .response
-            .interact_pointer_pos()
-            .or_else(|| ctx.pointer_interact_pos())
-        {
-            let rel_x = pos.x - output.galley_pos.x;
-            let char_count = value.chars().count();
-            let ccursor = if rel_x >= output.galley.size().x {
-                egui::text::CCursor::new(char_count)
-            } else if rel_x <= 0.0 {
-                egui::text::CCursor::new(0)
-            } else {
-                let sample_pos = Vec2::new(rel_x, (output.galley.size().y * 0.5).max(1.0));
-                output.galley.cursor_from_pos(sample_pos).ccursor
-            };
-            output
-                .state
-                .cursor
-                .set_char_range(Some(egui::text_selection::CCursorRange::one(ccursor)));
-            output.state.clone().store(ctx, output.response.id);
-        }
-    }
-
-    // Smooth drag selection without lag: request continuous repaint while blocking/dragging text
-    if output.response.dragged() || ctx.is_being_dragged(output.response.id) {
-        ctx.request_repaint();
-    }
 }
 
 pub(crate) fn sidebar_search_text_edit(
@@ -246,14 +233,64 @@ pub(crate) fn sidebar_search_text_edit(
 ) -> bool {
     let placeholder_str = hint.unwrap_or("Search projects...");
     let height = 32.0_f32;
-    let (rect, outer_resp) = ui.allocate_exact_size(Vec2::new(width, height), Sense::click());
+    let has_clear = !value.is_empty();
+    let clear_w = if has_clear { 28.0_f32 } else { 0.0_f32 };
+    let edit_w = (width - clear_w).max(10.0);
 
-    // Single background fill
-    ui.painter()
-        .rect_filled(rect, CornerRadius::same(R_MD as u8), SB_SURFACE);
+    // Placeholder shape for outer container background
+    let bg_idx = ui.painter().add(egui::Shape::Noop);
 
-    // Left magnifying glass search icon (standard enterprise UX)
-    let icon_center = Pos2::new(rect.left() + 14.0, rect.center().y);
+    let mut value_cleared = false;
+    let mut output_resp = None;
+
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 0.0;
+
+        let opts = InputCoreOpts {
+            hint: Some(placeholder_str),
+            hint_color: Some(SB_TEXT_FAINT),
+            left_pad: 30.0,
+            right_pad: 6.0,
+            height,
+            font: Typo::Body.font(),
+            text_color: SB_TEXT,
+            bg_color: Color32::TRANSPARENT,
+            draw_bg_and_border: false,
+            ..Default::default()
+        };
+        let output = input_core(ui, id_salt, value, edit_w, opts);
+        let resp = output.response;
+
+        if has_clear {
+            let (clear_rect, clear_resp) =
+                ui.allocate_exact_size(Vec2::new(clear_w, height), Sense::click());
+            let clear_resp = clear_resp.on_hover_cursor(egui::CursorIcon::PointingHand);
+            let clear_fg = if clear_resp.hovered() {
+                SB_TEXT
+            } else {
+                SB_TEXT_FAINT
+            };
+            draw_outline_icon(ui.painter(), clear_rect.center(), OutlineIcon::X, clear_fg);
+            if clear_resp.clicked() {
+                value.clear();
+                value_cleared = true;
+            }
+        }
+
+        output_resp = Some(resp);
+    });
+
+    let resp = output_resp.unwrap();
+    let full_rect = Rect::from_min_size(resp.rect.min, Vec2::new(width, height));
+
+    // Single background fill for the entire container
+    ui.painter().set(
+        bg_idx,
+        egui::Shape::rect_filled(full_rect, CornerRadius::same(R_SM as u8), SB_SURFACE),
+    );
+
+    // Left magnifying glass search icon
+    let icon_center = Pos2::new(full_rect.left() + 14.0, full_rect.center().y);
     draw_outline_icon(
         ui.painter(),
         icon_center,
@@ -261,53 +298,9 @@ pub(crate) fn sidebar_search_text_edit(
         SB_TEXT_FAINT,
     );
 
-    // Optional clear button on right when search is non-empty
-    let has_clear = !value.is_empty();
-    let clear_w = if has_clear { 24.0_f32 } else { 0.0_f32 };
-    if has_clear {
-        let clear_rect = Rect::from_center_size(
-            Pos2::new(rect.right() - 12.0, rect.center().y),
-            Vec2::new(16.0, 16.0),
-        );
-        let clear_resp = ui
-            .interact(
-                clear_rect,
-                egui::Id::new("sidebar_search_clear_btn"),
-                Sense::click(),
-            )
-            .on_hover_cursor(egui::CursorIcon::PointingHand);
-        let clear_fg = if clear_resp.hovered() {
-            SB_TEXT
-        } else {
-            SB_TEXT_FAINT
-        };
-        draw_outline_icon(ui.painter(), clear_rect.center(), OutlineIcon::X, clear_fg);
-        if clear_resp.clicked() {
-            value.clear();
-        }
-    }
-
-    // Inner text edit child
-    let text_rect = Rect::from_min_max(
-        Pos2::new(rect.left() + 28.0, rect.top()),
-        Pos2::new(rect.right() - 8.0 - clear_w, rect.bottom()),
-    );
-    let mut child_ui = ui.new_child(egui::UiBuilder::new().max_rect(text_rect));
-    let edit = egui::TextEdit::singleline(value)
-        .id_salt(id_salt)
-        .font(Typo::Body.font())
-        .text_color(SB_TEXT)
-        .frame(false)
-        .desired_width(text_rect.width())
-        .min_size(Vec2::new(text_rect.width(), height))
-        .margin(Margin::symmetric(0, 6))
-        .hint_text(Typo::Body.rich(placeholder_str).color(SB_TEXT_FAINT));
-    let mut output = edit.show(&mut child_ui);
-
-    let is_focused = output.response.has_focus();
-    let is_hovered = outer_resp.hovered() || output.response.hovered();
-
-    // Exactly one single crisp outline (no double outline)
+    // Outline border
+    let is_focused = resp.has_focus() || ui.memory(|mem| mem.has_focus(resp.id));
+    let is_hovered = resp.hovered() || ui.rect_contains_pointer(full_rect);
     let stroke = if is_focused {
         Stroke::new(1.5_f32, SB_ACCENT)
     } else if is_hovered {
@@ -316,15 +309,13 @@ pub(crate) fn sidebar_search_text_edit(
         Stroke::new(1.0_f32, SB_BORDER_LINE)
     };
     ui.painter().rect_stroke(
-        rect,
+        full_rect,
         CornerRadius::same(R_SM as u8),
         stroke,
         StrokeKind::Inside,
     );
 
-    handle_text_edit_cursor_and_selection(ui.ctx(), &mut output, value);
-
-    output.response.changed()
+    resp.changed() || value_cleared
 }
 
 /// Syntax-highlighted single-line text editor for pipeline commands, paths, and SCP sources.
@@ -344,9 +335,9 @@ pub(crate) fn syntax_highlighted_text_edit(
         ui.fonts(|f| f.layout_job(job))
     };
     let is_multiline = value.contains('\n');
-    let edit = if is_multiline {
+    if is_multiline {
         let rows = value.lines().count().clamp(2, 8);
-        egui::TextEdit::multiline(value)
+        let edit = egui::TextEdit::multiline(value)
             .desired_rows(rows)
             .id_salt(id_salt)
             .font(Typo::Code.font())
@@ -354,23 +345,21 @@ pub(crate) fn syntax_highlighted_text_edit(
             .desired_width(width)
             .margin(Margin::symmetric(10, 8))
             .layouter(&mut layouter)
-            .hint_text(Typo::Code.rich(placeholder_str).color(TEXT_PLACEHOLDER))
+            .hint_text(Typo::Code.rich(placeholder_str).color(TEXT_PLACEHOLDER));
+        let output = edit.show(ui);
+        output.response.changed()
     } else {
-        egui::TextEdit::singleline(value)
-            .id_salt(id_salt)
-            .font(Typo::Code.font())
-            .background_color(INPUT_BG)
-            .desired_width(width)
-            .min_size(Vec2::new(width, INPUT_HEIGHT))
-            .margin(Margin::symmetric(10, 8))
-            .layouter(&mut layouter)
-            .hint_text(Typo::Code.rich(placeholder_str).color(TEXT_PLACEHOLDER))
-    };
-    let mut output = edit.show(ui);
-
-    handle_text_edit_cursor_and_selection(ui.ctx(), &mut output, value);
-
-    output.response.changed()
+        let opts = InputCoreOpts {
+            hint: Some(placeholder_str),
+            left_pad: 10.0,
+            right_pad: 10.0,
+            font: Typo::Code.font(),
+            layouter: Some(&mut layouter),
+            ..Default::default()
+        };
+        let output = input_core(ui, id_salt, value, width, opts);
+        output.response.changed()
+    }
 }
 
 pub fn build_pipeline_syntax_layout_job(text: &str) -> egui::text::LayoutJob {
@@ -665,58 +654,20 @@ pub(crate) fn modal_text_input(
     placeholder: Option<&str>,
 ) -> egui::Response {
     let hint_str = placeholder.unwrap_or("Enter value...");
-    let height = INPUT_HEIGHT; // 36.0
-    let (outer_rect, outer_resp) = ui.allocate_exact_size(Vec2::new(width, height), Sense::click());
-
-    // Single clean modal input background fill
-    ui.painter()
-        .rect_filled(outer_rect, CornerRadius::same(R_MD as u8), MD_INPUT_BG);
-
-    // Inner TextEdit child matching singleline text row height (22px) centered vertically
-    let text_h = 22.0_f32;
-    let text_y = outer_rect.center().y - text_h * 0.5;
-    let text_rect = Rect::from_min_size(
-        Pos2::new(outer_rect.left() + 12.0, text_y),
-        Vec2::new((width - 24.0).max(10.0), text_h),
-    );
-
-    let mut child_ui = ui.new_child(egui::UiBuilder::new().max_rect(text_rect));
-    let edit = egui::TextEdit::singleline(value)
-        .id_salt(id_salt)
-        .font(Typo::Body.font())
-        .text_color(MD_TEXT)
-        .frame(false)
-        .margin(Margin::ZERO)
-        .cursor_at_end(true)
-        .desired_width(text_rect.width())
-        .min_size(Vec2::new(text_rect.width(), text_h))
-        .hint_text(Typo::Body.rich(hint_str).color(TEXT_MUTED));
-    let mut output = edit.show(&mut child_ui);
-
-    if outer_resp.clicked() && !output.response.has_focus() {
-        ui.memory_mut(|mem| mem.request_focus(output.response.id));
-    }
-
-    let is_focused =
-        output.response.has_focus() || ui.memory(|mem| mem.has_focus(output.response.id));
-    let is_hovered = outer_resp.hovered() || output.response.hovered();
-
-    let stroke = if is_focused {
-        Stroke::new(1.5_f32, PRIMARY_BLUE)
-    } else if is_hovered {
-        Stroke::new(1.0_f32, ACCENT)
-    } else {
-        Stroke::new(1.0_f32, MD_BORDER)
+    let opts = InputCoreOpts {
+        hint: Some(hint_str),
+        hint_color: Some(TEXT_MUTED),
+        left_pad: 12.0,
+        right_pad: 12.0,
+        bg_color: MD_INPUT_BG,
+        border_color: MD_BORDER,
+        border_hover_color: ACCENT,
+        border_focus_color: PRIMARY_BLUE,
+        text_color: MD_TEXT,
+        corner_radius: CornerRadius::same(R_MD as u8),
+        ..Default::default()
     };
-    ui.painter().rect_stroke(
-        outer_rect,
-        CornerRadius::same(R_MD as u8),
-        stroke,
-        StrokeKind::Inside,
-    );
-
-    handle_text_edit_cursor_and_selection(ui.ctx(), &mut output, value);
-
+    let output = input_core(ui, id_salt, value, width, opts);
     output.response
 }
 
