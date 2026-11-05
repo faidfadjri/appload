@@ -1,5 +1,46 @@
 # Changelog
 
+## [0.11.0] - 2026-11-05
+
+### Added
+- **Modern SaaS Design System:**
+  - Redesigned the entire application into a clean, modern SaaS layout inspired by Webflow and Linear, featuring a `#F7F8FA` canvas, solid white cards (`#FFFFFF`), 1px hairline borders (`#E5E7EB`), standardized 36px inputs, 40px underline tabs, and consistent interactive states.
+  - Bundled high-legibility fonts: **Inter** (Regular, Medium, SemiBold) for all UI typography and **JetBrains Mono** (Regular, Medium) for monospace text and code blocks.
+  - Added `UI_FONT` compile switch with `SegoeUi` fallback option for instant font switching.
+- **High-DPI Display Support (Windows Per-Monitor v2):**
+  - Embedded Windows application manifest declaring `PerMonitorV2` DPI awareness via `build.rs` and `.rc` resources, eliminating bitmap stretching, fuzziness, and blur on 125%+ display scaling factors.
+- **Redesigned Secret Management View:**
+  - Modern SaaS secret management interface with 3 summary stat tiles (`Typo::H1`), segmented status filtering (`All`, `Stored`, `Missing`), search input with icon, and OS credential setup guidelines for Windows, Linux, and macOS.
+  - Added OS credential vault status caching to prevent redundant vault queries on render.
+  - Concise "Used by" environment pill badges showing at most 2 tags with `+N` remainder pills and complete environment breakdown in hover tooltips.
+- **Enhanced Deployment & History Experience:**
+  - Flexible "Changes" column in the Deployments table combining commit messages (truncated with ellipsis and full tooltip) and `branch @ sha` metadata.
+  - Added deployment duration display ("took Xs") under relative timestamps.
+  - Moved per-row rollback into a clean "⋯" dropdown menu alongside Redeploy, Copy version, and Delete record.
+  - Full narrow-viewport responsiveness hiding optional table columns simultaneously in headers and rows below 850px.
+- **Pipeline Configuration Polish:**
+  - Standardized editable 36px input fields with visible hover/focus borders and text cursor for pipeline step names.
+  - Restored canonical pipeline variable interpolation chips: `{remote_dir}`, `{remote_user}`, `{app_name}`, `{http_proxy}`, `{env_source}`, `{version}`, `${{ secrets.KEY }}`, and `${{ secrets.KEY.username }}` with informative tooltips.
+  - Attached segmented version bump group `[+Patch | +Minor | +Major]` in the release bar with shared outer border and segment dividers.
+
+### Fixed
+- **Table Header Left-Alignment:** Guaranteed exact column width allocation for table header cells across Deployments and Secrets tables, perfectly aligning headers with cell content below.
+- **Sidebar Footer Narrow Width Wrapping:** Shortened status label to `v{version}` at narrow sidebar widths, preventing clipping of the "Reinstall · Donate" actions.
+- **Pipeline Header Subtitle:** Clarified pipeline steps subtitle to "Runs top to bottom when you deploy to {env_name}."
+
+### Refactored
+- **Codebase Modularization (Rust Best Practices):**
+  - Split all oversized UI view, modal, sidebar, and test files into modular submodules:
+    - `src/ui/views/` split into 14 focused submodules (`pipeline`, `history`, `history_desktop`, `history_mobile`, `settings`, `release_bar`, `overview`, `secrets`, `guides`, `console`, `project_workspace`, etc.) all <= 705 lines.
+    - `src/ui/sidebar/` split into 5 submodules (`nav`, `project_list`, `context_menu`, `footer`, `mod.rs`) all <= 752 lines.
+    - `src/ui/modals/` split into 7 submodules (`project`, `environment`, `secret`, `bulk_deploy`, `confirm_delete`, `update`, `mod.rs`) all <= 462 lines.
+    - `src/ui/tests/` split into 10 domain-specific test suites all <= 696 lines.
+  - Enforced strict compiler lints via `Cargo.toml` `[lints]` configuration, eliminating all compiler and clippy warnings (`cargo clippy --all-targets -- -D warnings`).
+  - Audited all production code to remove raw `.unwrap()` calls, replacing them with safe insertions, pattern matching, or documented invariant expectations.
+  - Replaced long parameter lists with structured types (e.g., `IconButtonVisuals`).
+  - Added comprehensive top-level module documentation comments (`//!`) across all 37 crates and submodules.
+  - Preserved frozen storage schemas and process command strings, fortified with characterization tests.
+
 ## [0.10.19] - 2026-10-31
 
 ### Added

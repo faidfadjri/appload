@@ -150,6 +150,7 @@ pub struct ShiplyApp {
     pub(crate) server_env_source_buffer: Option<(String, String)>,
     pub(crate) server_http_proxy_buffer: Option<(String, String)>,
     pub refresh_anim_start: Option<Instant>,
+    #[cfg(debug_assertions)]
     pub(crate) dpi_diagnostics_logged: bool,
     pub(crate) screenshot_frames: usize,
 }
@@ -320,6 +321,7 @@ impl ShiplyApp {
             server_env_source_buffer: None,
             server_http_proxy_buffer: None,
             refresh_anim_start: None,
+            #[cfg(debug_assertions)]
             dpi_diagnostics_logged: false,
             screenshot_frames: 0,
             git_inspect_tx,
