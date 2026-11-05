@@ -345,3 +345,271 @@ fn test_storage_migration_with_real_recovery_data() {
 
     env::remove_var("APPLOAD_SANDBOX_ROOT");
 }
+
+#[cfg(windows)]
+#[allow(unsafe_code)]
+fn with_file_exclusive_lock<F: FnOnce()>(path: &Path, f: F) {
+    use std::os::windows::io::AsRawHandle;
+    extern "system" {
+        fn LockFile(
+            hFile: *mut std::ffi::c_void,
+            dwFileOffsetLow: u32,
+            dwFileOffsetHigh: u32,
+            nNumberOfBytesToLockLow: u32,
+            nNumberOfBytesToLockHigh: u32,
+        ) -> i32;
+        fn UnlockFile(
+            hFile: *mut std::ffi::c_void,
+            dwFileOffsetLow: u32,
+            dwFileOffsetHigh: u32,
+            nNumberOfBytesToLockLow: u32,
+            nNumberOfBytesToLockHigh: u32,
+        ) -> i32;
+    }
+    let file = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(path)
+        .expect("open file for locking");
+    let handle = file.as_raw_handle();
+    let res = unsafe { LockFile(handle as *mut _, 0, 0, u32::MAX, 0) };
+    assert_ne!(res, 0, "LockFile must succeed");
+
+    f();
+
+    unsafe {
+        UnlockFile(handle as *mut _, 0, 0, u32::MAX, 0);
+    }
+}
+
+#[cfg(not(windows))]
+fn with_file_exclusive_lock<F: FnOnce()>(path: &Path, f: F) {
+    let mut perms = fs::metadata(path).unwrap().permissions();
+    perms.set_readonly(true);
+    let _ = fs::set_permissions(path, perms.clone());
+    f();
+    perms.set_readonly(false);
+    let _ = fs::set_permissions(path, perms);
+}
+
+#[test]
+fn test_scenario_fresh_user_clean_start() {
+    let _lock = TEST_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
+
+    let sandbox = TempDir::new().expect("tempdir");
+    let sandbox_root = sandbox.path().to_path_buf();
+    env::set_var("APPLOAD_SANDBOX_ROOT", &sandbox_root);
+
+    let local_appload = sandbox_root.join("LocalAppData").join("appload");
+    fs::create_dir_all(&local_appload).expect("create appload dir");
+
+    // Migration on fresh user: no legacy files
+    let outcome = run_first_run_data_migration();
+    assert!(!outcome.data_migrated);
+    assert!(!outcome.is_error);
+    assert!(outcome.notice.is_none());
+
+    // No migration marker should exist
+    assert!(!local_appload.join("migrated_from_shiply.json").exists());
+
+    // Storage starts completely empty
+    let storage_path = AppStorage::default_storage_path();
+    let storage = AppStorage::load_or_default(&storage_path);
+    assert!(storage.projects.is_empty());
+    assert!(storage.deployments.is_empty());
+
+    env::remove_var("APPLOAD_SANDBOX_ROOT");
+}
+
+#[test]
+fn test_scenario_idempotent_second_launch() {
+    let _lock = TEST_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
+
+    let sandbox = TempDir::new().expect("tempdir");
+    let sandbox_root = sandbox.path().to_path_buf();
+    env::set_var("APPLOAD_SANDBOX_ROOT", &sandbox_root);
+
+    let prog_shiply = sandbox_root
+        .join("LocalAppData")
+        .join("Programs")
+        .join("Shiply");
+    let local_appload = sandbox_root.join("LocalAppData").join("appload");
+    fs::create_dir_all(&prog_shiply).expect("create prog_shiply");
+    fs::create_dir_all(&local_appload).expect("create local_appload");
+
+    let legacy_db = prog_shiply.join("shiply_state.db");
+    create_synthetic_legacy_db(&legacy_db);
+
+    // First migration run
+    let outcome1 = run_first_run_data_migration();
+    assert!(outcome1.data_migrated);
+    assert!(!outcome1.is_error);
+
+    let target_db = local_appload.join("appload_state.db");
+    assert!(target_db.exists());
+    let hash_after_first = hash_file(&target_db);
+
+    let pre_migration_count_1 = fs::read_dir(&local_appload)
+        .expect("read_dir")
+        .flatten()
+        .filter(|e| {
+            e.file_name()
+                .to_string_lossy()
+                .starts_with("appload_state.pre-migration-")
+        })
+        .count();
+
+    // Second launch: must be idempotent
+    let outcome2 = run_first_run_data_migration();
+    assert!(!outcome2.data_migrated, "Second launch must not re-migrate");
+    assert!(!outcome2.is_error);
+    assert!(outcome2.notice.is_none(), "No second toast on idempotence");
+
+    let hash_after_second = hash_file(&target_db);
+    assert_eq!(
+        hash_after_first, hash_after_second,
+        "Target DB hash must be unchanged"
+    );
+
+    let pre_migration_count_2 = fs::read_dir(&local_appload)
+        .expect("read_dir")
+        .flatten()
+        .filter(|e| {
+            e.file_name()
+                .to_string_lossy()
+                .starts_with("appload_state.pre-migration-")
+        })
+        .count();
+    assert_eq!(
+        pre_migration_count_1, pre_migration_count_2,
+        "No redundant pre-migration backups created"
+    );
+
+    env::remove_var("APPLOAD_SANDBOX_ROOT");
+}
+
+#[test]
+fn test_scenario_locked_legacy_db_surfaces_error_without_data_loss() {
+    let _lock = TEST_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
+
+    let sandbox = TempDir::new().expect("tempdir");
+    let sandbox_root = sandbox.path().to_path_buf();
+    env::set_var("APPLOAD_SANDBOX_ROOT", &sandbox_root);
+
+    let prog_shiply = sandbox_root
+        .join("LocalAppData")
+        .join("Programs")
+        .join("Shiply");
+    let local_appload = sandbox_root.join("LocalAppData").join("appload");
+    fs::create_dir_all(&prog_shiply).expect("create prog_shiply");
+    fs::create_dir_all(&local_appload).expect("create local_appload");
+
+    let legacy_db = prog_shiply.join("shiply_state.db");
+    create_synthetic_legacy_db(&legacy_db);
+    let hash_before = hash_file(&legacy_db);
+
+    // Hold exclusive lock while attempting migration
+    with_file_exclusive_lock(&legacy_db, || {
+        let outcome = run_first_run_data_migration();
+        assert!(
+            outcome.is_error,
+            "Migration must report error when DB is locked"
+        );
+        assert!(!outcome.data_migrated);
+        assert!(outcome.notice.is_some());
+    });
+
+    let hash_after = hash_file(&legacy_db);
+    assert_eq!(
+        hash_before, hash_after,
+        "Locked legacy DB must remain 100% byte-identical and untouched"
+    );
+
+    env::remove_var("APPLOAD_SANDBOX_ROOT");
+}
+
+#[test]
+fn test_scenario_manual_install_path() {
+    let _lock = TEST_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
+
+    let sandbox = TempDir::new().expect("tempdir");
+    let sandbox_root = sandbox.path().to_path_buf();
+    env::set_var("APPLOAD_SANDBOX_ROOT", &sandbox_root);
+
+    let prog_shiply = sandbox_root
+        .join("LocalAppData")
+        .join("Programs")
+        .join("Shiply");
+    let local_shiply = sandbox_root.join("LocalAppData").join("shiply");
+    let local_appload = sandbox_root.join("LocalAppData").join("appload");
+    fs::create_dir_all(&prog_shiply).expect("create prog_shiply");
+    fs::create_dir_all(&local_shiply).expect("create local_shiply");
+    fs::create_dir_all(&local_appload).expect("create local_appload");
+
+    let legacy_db = prog_shiply.join("shiply_state.db");
+    create_synthetic_legacy_db(&legacy_db);
+    let legacy_json = local_shiply.join("shiply_state.json");
+    create_synthetic_stale_json(&legacy_json);
+
+    let manifest_prog_before = get_dir_manifest(&prog_shiply);
+    let manifest_local_before = get_dir_manifest(&local_shiply);
+
+    // Run installer headlessly (--install) like setup.exe does
+    let bin_path = env!("CARGO_BIN_EXE_appload");
+    let setup_exe = sandbox_root.join("AppLoad-Setup.exe");
+    fs::copy(bin_path, &setup_exe).expect("copy setup binary");
+
+    let install_out = Command::new(&setup_exe)
+        .arg("--install")
+        .env("APPLOAD_SANDBOX_ROOT", &sandbox_root)
+        .output()
+        .expect("run setup.exe --install");
+    assert!(
+        install_out.status.success(),
+        "Setup failed: {}",
+        String::from_utf8_lossy(&install_out.stderr)
+    );
+
+    let installed_exe = sandbox_root
+        .join("LocalAppData")
+        .join("Programs")
+        .join("AppLoad")
+        .join("appload.exe");
+    assert!(
+        installed_exe.exists(),
+        "AppLoad must be installed in Programs\\AppLoad"
+    );
+
+    // Run migration via installed binary
+    let mig_out = Command::new(&installed_exe)
+        .arg("--migrate-only")
+        .arg("--json")
+        .env("APPLOAD_SANDBOX_ROOT", &sandbox_root)
+        .output()
+        .expect("run appload.exe --migrate-only");
+    assert!(mig_out.status.success());
+    let mig_val: serde_json::Value =
+        serde_json::from_slice(&mig_out.stdout).expect("parse mig json");
+    assert_eq!(mig_val["success"], true);
+    assert_eq!(mig_val["project_count"], 4);
+
+    // Verify storage loads 4 projects and 167 deployments
+    let chk_out = Command::new(&installed_exe)
+        .arg("--check-storage")
+        .env("APPLOAD_SANDBOX_ROOT", &sandbox_root)
+        .output()
+        .expect("run appload.exe --check-storage");
+    assert!(chk_out.status.success());
+    let chk_val: serde_json::Value =
+        serde_json::from_slice(&chk_out.stdout).expect("parse storage json");
+    assert_eq!(chk_val["projects_count"], 4);
+    assert_eq!(chk_val["deployments_count"], 167);
+
+    // Legacy directories must remain 100% byte-identical
+    let manifest_prog_after = get_dir_manifest(&prog_shiply);
+    let manifest_local_after = get_dir_manifest(&local_shiply);
+    assert_eq!(manifest_prog_before, manifest_prog_after);
+    assert_eq!(manifest_local_before, manifest_local_after);
+
+    env::remove_var("APPLOAD_SANDBOX_ROOT");
+}
