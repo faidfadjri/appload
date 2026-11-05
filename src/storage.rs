@@ -404,17 +404,22 @@ impl AppStorage {
     pub fn default_storage_path() -> PathBuf {
         if let Ok(exe_path) = env::current_exe() {
             if let Some(exe_dir) = exe_path.parent() {
-                let candidate_db = exe_dir.join("appload_state.db");
-                let candidate_json = exe_dir.join("appload_state.json");
-                let legacy_db = exe_dir.join("shiply_state.db");
-                let legacy_json = exe_dir.join("shiply_state.json");
-                if candidate_db.exists()
-                    || candidate_json.exists()
-                    || legacy_db.exists()
-                    || legacy_json.exists()
-                    || is_dir_writable(exe_dir)
-                {
-                    return candidate_db;
+                let allow_portable = match crate::paths::sandbox_root() {
+                    Some(ref root) => exe_dir.starts_with(root),
+                    None => true,
+                };
+                if allow_portable {
+                    let candidate_db = exe_dir.join("appload_state.db");
+                    let candidate_json = exe_dir.join("appload_state.json");
+                    let legacy_db = exe_dir.join("shiply_state.db");
+                    let legacy_json = exe_dir.join("shiply_state.json");
+                    if candidate_db.exists()
+                        || candidate_json.exists()
+                        || legacy_db.exists()
+                        || legacy_json.exists()
+                    {
+                        return candidate_db;
+                    }
                 }
             }
         }
@@ -719,10 +724,16 @@ impl AppStorage {
             }
 
             if ext.eq_ignore_ascii_case("json") {
-                // Ignore backup files
+                // Ignore backup files and migration markers
                 if file_path
-                    .to_str()
-                    .is_some_and(|s| s.ends_with(".bak") || s.ends_with(".tmp"))
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .is_some_and(|s| {
+                        s.ends_with(".bak")
+                            || s.ends_with(".tmp")
+                            || s.starts_with("appload_state.pre-migration-")
+                            || s.starts_with("migrated_from_shiply")
+                    })
                 {
                     continue;
                 }

@@ -63,15 +63,24 @@ pub fn check_startup_guard() {
     }
 }
 
+fn sandbox_local_data(root: &std::path::Path) -> PathBuf {
+    let p_local = root.join("LocalAppData");
+    if p_local.exists() {
+        p_local
+    } else {
+        root.join("local_app_data")
+    }
+}
+
 /// Returns the authoritative application data directory where AppLoad stores its database
 /// (`appload_state.db`), marker files, and drop-in configurations.
 ///
-/// - In sandbox mode: `<APPLOAD_SANDBOX_ROOT>/local_app_data/appload`
+/// - In sandbox mode: `<APPLOAD_SANDBOX_ROOT>/local_app_data/appload` (or `<root>/LocalAppData/appload`)
 /// - On Windows: `%LOCALAPPDATA%\appload` (fallback to `dirs::data_local_dir()/appload`)
 /// - On macOS/Linux: `dirs::data_local_dir()/appload`
 pub fn data_dir() -> PathBuf {
     if let Some(root) = sandbox_root() {
-        return root.join("local_app_data").join("appload");
+        return sandbox_local_data(&root).join("appload");
     }
 
     #[cfg(windows)]
@@ -100,7 +109,7 @@ pub fn data_dir() -> PathBuf {
 /// Returns the legacy Shiply application data directory (`%LOCALAPPDATA%\shiply`).
 pub fn legacy_data_dir() -> Option<PathBuf> {
     if let Some(root) = sandbox_root() {
-        return Some(root.join("local_app_data").join("shiply"));
+        return Some(sandbox_local_data(&root).join("shiply"));
     }
 
     #[cfg(windows)]
@@ -122,12 +131,20 @@ pub fn legacy_data_dir() -> Option<PathBuf> {
 
 /// Returns the application installation directory where `appload.exe` is installed.
 ///
-/// - In sandbox mode: `<APPLOAD_SANDBOX_ROOT>/Programs/AppLoad`
+/// - In sandbox mode: `<APPLOAD_SANDBOX_ROOT>/Programs/AppLoad` (or `<root>/LocalAppData/Programs/AppLoad`)
 /// - On Windows: `%LOCALAPPDATA%\Programs\AppLoad`
 /// - On macOS: `~/Applications/AppLoad`
 /// - On Linux: `~/.local/bin`
 pub fn install_dir() -> PathBuf {
     if let Some(root) = sandbox_root() {
+        let p_local = root.join("LocalAppData").join("Programs").join("AppLoad");
+        if p_local.exists() || root.join("LocalAppData").exists() {
+            return p_local;
+        }
+        let p_local2 = root.join("local_app_data").join("Programs").join("AppLoad");
+        if p_local2.exists() || root.join("local_app_data").exists() {
+            return p_local2;
+        }
         return root.join("Programs").join("AppLoad");
     }
 
@@ -164,6 +181,14 @@ pub fn install_dir() -> PathBuf {
 /// Returns the legacy Shiply installation directory (`%LOCALAPPDATA%\Programs\Shiply`).
 pub fn legacy_install_dir() -> Option<PathBuf> {
     if let Some(root) = sandbox_root() {
+        let p_local = root.join("LocalAppData").join("Programs").join("Shiply");
+        if p_local.exists() {
+            return Some(p_local);
+        }
+        let p_local2 = root.join("local_app_data").join("Programs").join("Shiply");
+        if p_local2.exists() {
+            return Some(p_local2);
+        }
         return Some(root.join("Programs").join("Shiply"));
     }
 
@@ -195,6 +220,16 @@ pub fn legacy_install_dir() -> Option<PathBuf> {
 /// - On Windows: `%APPDATA%\Microsoft\Windows\Start Menu\Programs`
 pub fn start_menu_dir() -> Option<PathBuf> {
     if let Some(root) = sandbox_root() {
+        let p_roaming = root
+            .join("AppData")
+            .join("Roaming")
+            .join("Microsoft")
+            .join("Windows")
+            .join("Start Menu")
+            .join("Programs");
+        if p_roaming.exists() {
+            return Some(p_roaming);
+        }
         return Some(root.join("Start Menu").join("Programs"));
     }
 

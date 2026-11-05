@@ -381,8 +381,13 @@ pub fn run_first_run_data_migration() -> MigrationOutcome {
     // Determine target directory: portable mode (if running next to existing state) vs data_dir()
     let target_dir = if let Ok(exe_path) = env::current_exe() {
         if let Some(exe_dir) = exe_path.parent() {
-            if (exe_dir.join("shiply_state.db").exists()
-                || exe_dir.join("appload_state.db").exists())
+            let allow_portable = match crate::paths::sandbox_root() {
+                Some(ref root) => exe_dir.starts_with(root),
+                None => true,
+            };
+            if allow_portable
+                && (exe_dir.join("shiply_state.db").exists()
+                    || exe_dir.join("appload_state.db").exists())
                 && crate::storage::is_dir_writable(exe_dir)
             {
                 exe_dir.to_path_buf()
