@@ -383,10 +383,7 @@ impl ShiplyApp {
                 let card_resp = card_resp.on_hover_cursor(egui::CursorIcon::PointingHand);
 
                 let (bg_fill, stroke) = if is_active {
-                    (
-                        CARD_SELECTED_BG,
-                        Stroke::new(1.5_f32, PRIMARY_BLUE),
-                    )
+                    (CARD_SELECTED_BG, Stroke::new(1.5_f32, PRIMARY_BLUE))
                 } else if card_resp.hovered() {
                     (CARD_BG, Stroke::new(1.0_f32, INPUT_BORDER_HOVER))
                 } else {
