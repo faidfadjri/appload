@@ -271,54 +271,12 @@ impl ShiplyApp {
 
                 if !is_stacked_view {
                     horizontal_row(ui, 24.0, |ui| {
-                        ui.add_sized(
-                            [col_status, 20.0],
-                            egui::Label::new(
-                                RichText::new("Status")
-                                    .typo(Typo::Caption)
-                                    .color(TEXT_MUTED),
-                            ),
-                        );
-                        ui.add_sized(
-                            [col_version, 20.0],
-                            egui::Label::new(
-                                RichText::new("Version")
-                                    .typo(Typo::Caption)
-                                    .color(TEXT_MUTED),
-                            ),
-                        );
-                        ui.add_sized(
-                            [col_branch, 20.0],
-                            egui::Label::new(
-                                RichText::new("Branch")
-                                    .typo(Typo::Caption)
-                                    .color(TEXT_MUTED),
-                            ),
-                        );
-                        ui.add_sized(
-                            [col_commit, 20.0],
-                            egui::Label::new(
-                                RichText::new("Commit")
-                                    .typo(Typo::Caption)
-                                    .color(TEXT_MUTED),
-                            ),
-                        );
-                        ui.add_sized(
-                            [col_deployed, 20.0],
-                            egui::Label::new(
-                                RichText::new("Deployed")
-                                    .typo(Typo::Caption)
-                                    .color(TEXT_MUTED),
-                            ),
-                        );
-                        ui.add_sized(
-                            [col_trigger, 20.0],
-                            egui::Label::new(
-                                RichText::new("Trigger / User")
-                                    .typo(Typo::Caption)
-                                    .color(TEXT_MUTED),
-                            ),
-                        );
+                        table_header_cell(ui, col_status, "Status");
+                        table_header_cell(ui, col_version, "Version");
+                        table_header_cell(ui, col_branch, "Branch");
+                        table_header_cell(ui, col_commit, "Commit");
+                        table_header_cell(ui, col_deployed, "Deployed");
+                        table_header_cell(ui, col_trigger, "Trigger / User");
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             ui.label(
                                 RichText::new("Actions")

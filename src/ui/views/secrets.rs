@@ -248,39 +248,44 @@ impl ShiplyApp {
             if !is_stacked_view {
                 egui::Frame::new()
                     .fill(SUBTLE_BG)
-                    .inner_margin(Margin::symmetric(12, 8))
+                    .inner_margin(Margin::symmetric(8, 8))
                     .corner_radius(CornerRadius::same(R_SM as u8))
                     .show(ui, |ui| {
                         horizontal_row(ui, 20.0, |ui| {
-                            ui.add_sized(
-                                [key_col_w, 20.0],
-                                egui::Label::new(
-                                    Typo::SmallMedium.rich("Name").color(TEXT_SECONDARY),
-                                ),
+                            table_header_cell_styled(
+                                ui,
+                                key_col_w - 8.0,
+                                "Name",
+                                Typo::SmallMedium,
+                                TEXT_SECONDARY,
                             );
-                            ui.add_sized(
-                                [120.0, 20.0],
-                                egui::Label::new(
-                                    Typo::SmallMedium.rich("Username").color(TEXT_SECONDARY),
-                                ),
+                            table_header_cell_styled(
+                                ui,
+                                120.0,
+                                "Username",
+                                Typo::SmallMedium,
+                                TEXT_SECONDARY,
                             );
-                            ui.add_sized(
-                                [140.0, 20.0],
-                                egui::Label::new(
-                                    Typo::SmallMedium.rich("Status").color(TEXT_SECONDARY),
-                                ),
+                            table_header_cell_styled(
+                                ui,
+                                140.0,
+                                "Status",
+                                Typo::SmallMedium,
+                                TEXT_SECONDARY,
                             );
-                            ui.add_sized(
-                                [190.0, 20.0],
-                                egui::Label::new(
-                                    Typo::SmallMedium.rich("Used by").color(TEXT_SECONDARY),
-                                ),
+                            table_header_cell_styled(
+                                ui,
+                                190.0,
+                                "Used by",
+                                Typo::SmallMedium,
+                                TEXT_SECONDARY,
                             );
-                            ui.add_sized(
-                                [130.0, 20.0],
-                                egui::Label::new(
-                                    Typo::SmallMedium.rich("Updated").color(TEXT_SECONDARY),
-                                ),
+                            table_header_cell_styled(
+                                ui,
+                                130.0,
+                                "Updated",
+                                Typo::SmallMedium,
+                                TEXT_SECONDARY,
                             );
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                                 ui.label(Typo::SmallMedium.rich("Actions").color(TEXT_SECONDARY));
