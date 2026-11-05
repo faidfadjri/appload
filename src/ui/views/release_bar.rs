@@ -75,7 +75,7 @@ impl ShiplyApp {
         self.is_version_input_focused = child.memory(|m| m.has_focus(ver_id));
         child.add_space(8.0);
 
-        // 2. Segmented buttons [+Patch | +Minor | +Major] (height 36, attached)
+        // 2. Segmented buttons [+Patch | +Minor | +Major] as one attached group (shared border, no gaps)
         let seg_h = 36.0;
         let seg_w = 54.0;
         let bumps = [
@@ -83,19 +83,30 @@ impl ShiplyApp {
             ("+Minor", VersionBump::Minor),
             ("+Major", VersionBump::Major),
         ];
+        let total_seg_w = seg_w * bumps.len() as f32;
+        let (group_rect, _) =
+            child.allocate_exact_size(Vec2::new(total_seg_w, seg_h), Sense::hover());
+
+        // Base background for the entire attached group
+        child
+            .painter()
+            .rect_filled(group_rect, CornerRadius::same(R_MD as u8), CARD_BG);
+
         for (i, (lbl, bump)) in bumps.iter().enumerate() {
-            let (rect, resp) = child.allocate_exact_size(Vec2::new(seg_w, seg_h), Sense::click());
-            let resp = resp.on_hover_cursor(egui::CursorIcon::PointingHand);
+            let btn_rect = Rect::from_min_size(
+                Pos2::new(group_rect.left() + i as f32 * seg_w, group_rect.top()),
+                Vec2::new(seg_w, seg_h),
+            );
+            let resp = child
+                .interact(
+                    btn_rect,
+                    child.make_persistent_id(("bump_btn", i)),
+                    Sense::click(),
+                )
+                .on_hover_cursor(egui::CursorIcon::PointingHand);
             if resp.clicked() {
                 self.deploy_version_input = bump_semver(&self.deploy_version_input, *bump);
             }
-            let bg = if resp.is_pointer_button_down_on() {
-                CARD_BORDER
-            } else if resp.hovered() {
-                SUBTLE_BG
-            } else {
-                CARD_BG
-            };
             let radius = if i == 0 {
                 CornerRadius {
                     nw: R_MD as u8,
@@ -113,31 +124,48 @@ impl ShiplyApp {
             } else {
                 CornerRadius::ZERO
             };
-            child.painter().rect_filled(rect, radius, bg);
-            child.painter().rect_stroke(
-                rect,
-                radius,
-                Stroke::new(1.0_f32, CARD_BORDER),
-                StrokeKind::Inside,
-            );
+
+            if resp.is_pointer_button_down_on() {
+                child.painter().rect_filled(btn_rect, radius, CARD_BORDER);
+            } else if resp.hovered() {
+                child.painter().rect_filled(btn_rect, radius, SUBTLE_BG);
+            }
+
+            // Divider between segments
+            if i > 0 {
+                child.painter().line_segment(
+                    [
+                        Pos2::new(btn_rect.left(), group_rect.top()),
+                        Pos2::new(btn_rect.left(), group_rect.bottom()),
+                    ],
+                    Stroke::new(1.0_f32, CARD_BORDER),
+                );
+            }
+
             let galley = child.painter().layout_no_wrap(
                 lbl.to_string(),
                 Typo::SmallMedium.font(),
                 TEXT_PRIMARY,
             );
             let text_pos = Pos2::new(
-                rect.center().x - galley.size().x / 2.0,
-                rect.center().y - galley.size().y / 2.0,
+                btn_rect.center().x - galley.size().x / 2.0,
+                btn_rect.center().y - galley.size().y / 2.0,
             );
             child.painter().galley(text_pos, galley, TEXT_PRIMARY);
         }
+
+        // Shared outer stroke around the entire attached group
+        child.painter().rect_stroke(
+            group_rect,
+            CornerRadius::same(R_MD as u8),
+            Stroke::new(1.0_f32, CARD_BORDER),
+            StrokeKind::Inside,
+        );
         child.add_space(8.0);
 
         // 3. Sync button (36x36 OutlineIcon::Refresh)
         let sync_candidates = self.sync_version_candidates(project_id);
-        let sync_tooltip = if sync_candidates.is_empty() {
-            "Sync version across environments (no other deployed versions found yet)".to_string()
-        } else if let Some(latest) = sync_candidates.iter().find(|c| c.is_latest) {
+        let sync_tooltip = if let Some(latest) = sync_candidates.iter().find(|c| c.is_latest) {
             format!(
                 "Sync version across environments (latest: v{} from {})",
                 latest.version, latest.source_name
