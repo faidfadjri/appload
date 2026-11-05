@@ -4,26 +4,36 @@ use super::*;
 
 impl ShiplyApp {
     pub(crate) fn render_onboarding_guideline_card(&mut self, ui: &mut egui::Ui) {
-        kit::card(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.label(Typo::H3.rich("Get started"));
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    let toggle_lbl = if self.show_onboarding_guide {
-                        "Hide"
-                    } else {
-                        "Show"
-                    };
-                    if kit::button(ui, ButtonVariant::Ghost, ButtonSize::Sm, toggle_lbl, None)
-                        .clicked()
-                    {
-                        self.show_onboarding_guide = !self.show_onboarding_guide;
-                    }
+        let pad_y = if self.show_onboarding_guide { 16 } else { 12 };
+        egui::Frame::new()
+            .fill(CARD_BG)
+            .stroke(Stroke::new(1.0_f32, CARD_BORDER))
+            .corner_radius(CornerRadius::same(R_LG as u8))
+            .shadow(Shadow {
+                offset: [0, 1],
+                blur: 2,
+                spread: 0,
+                color: SHADOW_CARD,
+            })
+            .inner_margin(Margin::symmetric(20, pad_y))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(Typo::H3.rich("Get started"));
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        let (chevron, tip) = if self.show_onboarding_guide {
+                            (OutlineIcon::ChevronUp, "Hide")
+                        } else {
+                            (OutlineIcon::ChevronDown, "Show")
+                        };
+                        if kit::icon_button(ui, chevron, ButtonSize::Sm, tip).clicked() {
+                            self.show_onboarding_guide = !self.show_onboarding_guide;
+                        }
+                    });
                 });
-            });
 
-            if !self.show_onboarding_guide {
-                return;
-            }
+                if !self.show_onboarding_guide {
+                    return;
+                }
 
             ui.add_space(SP_12);
             let line_w = ui.available_width();
@@ -121,46 +131,50 @@ impl ShiplyApp {
         };
         let vault_ready = read_os_vault_credential(&target_example).is_some();
 
-        kit::card(ui, |ui| {
-            ui.horizontal(|ui| {
-                let (ic_r, _) = ui.allocate_exact_size(Vec2::splat(20.0), Sense::hover());
-                draw_outline_icon(ui.painter(), ic_r.center(), OutlineIcon::Key, PRIMARY_BLUE);
-                ui.add_space(4.0);
-                ui.label(Typo::H3.rich("Set up OS credentials"));
-                ui.add_space(SP_8);
-                ui.label(
-                    Typo::Small
-                        .rich("Store SSH passwords securely in your OS vault without plain-text configs")
-                        .color(TEXT_MUTED),
-                );
-                if vault_ready {
+        let pad_y = if self.show_credential_guide { 16 } else { 12 };
+        egui::Frame::new()
+            .fill(CARD_BG)
+            .stroke(Stroke::new(1.0_f32, CARD_BORDER))
+            .corner_radius(CornerRadius::same(R_LG as u8))
+            .shadow(Shadow {
+                offset: [0, 1],
+                blur: 2,
+                spread: 0,
+                color: SHADOW_CARD,
+            })
+            .inner_margin(Margin::symmetric(20, pad_y))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    let (ic_r, _) = ui.allocate_exact_size(Vec2::splat(20.0), Sense::hover());
+                    draw_outline_icon(ui.painter(), ic_r.center(), OutlineIcon::Key, PRIMARY_BLUE);
+                    ui.add_space(4.0);
+                    ui.label(Typo::H3.rich("Set up OS credentials"));
                     ui.add_space(SP_8);
-                    kit::status_badge(ui, StatusKind::Success, "Vault ready");
-                }
-
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    let toggle_lbl = if self.show_credential_guide {
-                        "Hide"
-                    } else {
-                        "Show"
-                    };
-                    if kit::button(
-                        ui,
-                        ButtonVariant::Ghost,
-                        ButtonSize::Sm,
-                        toggle_lbl,
-                        None,
-                    )
-                    .clicked()
-                    {
-                        self.show_credential_guide = !self.show_credential_guide;
+                    ui.label(
+                        Typo::Small
+                            .rich("Store SSH passwords securely in your OS vault without plain-text configs")
+                            .color(TEXT_MUTED),
+                    );
+                    if vault_ready {
+                        ui.add_space(SP_8);
+                        kit::status_badge(ui, StatusKind::Success, "Vault ready");
                     }
-                });
-            });
 
-            if !self.show_credential_guide {
-                return;
-            }
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        let (chevron, tip) = if self.show_credential_guide {
+                            (OutlineIcon::ChevronUp, "Hide")
+                        } else {
+                            (OutlineIcon::ChevronDown, "Show")
+                        };
+                        if kit::icon_button(ui, chevron, ButtonSize::Sm, tip).clicked() {
+                            self.show_credential_guide = !self.show_credential_guide;
+                        }
+                    });
+                });
+
+                if !self.show_credential_guide {
+                    return;
+                }
 
             ui.add_space(SP_12);
             let line_w = ui.available_width();
