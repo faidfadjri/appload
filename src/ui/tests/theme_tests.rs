@@ -68,52 +68,339 @@ fn test_webflow_palette_and_theme_tokens() {
 }
 
 #[test]
-fn test_text_edit_cursor_and_selection_mechanics() {
+fn test_input_core_vertical_centring() {
     let ctx = egui::Context::default();
+    ShiplyApp::install_fonts(&ctx);
     ShiplyApp::configure_light_workspace_style(&ctx);
 
-    let mut test_value = "10.62.70.80".to_string();
+    let mut val = "Shiply Production Deployment".to_string();
 
     let _ = ctx.run(Default::default(), |ctx| {
         egui::CentralPanel::default().show(ctx, |ui| {
-            let changed = styled_text_edit(
-                ui,
-                "test_cursor_input",
-                &mut test_value,
-                300.0,
-                Some("Enter IP..."),
+            let opts = InputCoreOpts {
+                hint: Some("Enter text..."),
+                ..Default::default()
+            };
+            let output = input_core(ui, "test_centering", &mut val, 300.0, opts);
+            let field_center_y = output.response.rect.center().y;
+            let galley_center_y = output.galley_pos.y + output.galley.size().y * 0.5;
+            let diff = (galley_center_y - field_center_y).abs();
+            assert!(
+                diff <= 1.0,
+                "Galley vertical center ({galley_center_y:.2}) must be within ±1px of field center ({field_center_y:.2}), got diff {diff:.2}"
             );
-            assert!(!changed);
+        });
+    });
+}
+
+#[test]
+fn test_input_core_single_click_mid_text() {
+    let ctx = egui::Context::default();
+    ShiplyApp::install_fonts(&ctx);
+    ShiplyApp::configure_light_workspace_style(&ctx);
+
+    let mut val = "hello world foo bar".to_string();
+    let id_salt = "test_click_mid";
+
+    // Frame 1: Initial layout
+    let mut click_pos = Pos2::ZERO;
+    let _ = ctx.run(Default::default(), |ctx| {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            let output = input_core(ui, id_salt, &mut val, 300.0, InputCoreOpts::default());
+            click_pos = Pos2::new(
+                output.galley_pos.x + output.galley.size().x * 0.5,
+                output.response.rect.center().y,
+            );
         });
     });
 
-    // Test cursor math:
-    // Clicking beyond galley width places cursor at end of text (char count)
-    let char_count = test_value.chars().count();
-    let galley_w = 80.0_f32;
-    let click_rel_x_far_right = 250.0_f32;
-    let cursor_end = if click_rel_x_far_right >= galley_w {
-        egui::text::CCursor::new(char_count)
-    } else {
-        egui::text::CCursor::new(0)
+    // Frame 2: Primary press at click_pos
+    let mut raw = egui::RawInput {
+        time: Some(1.0),
+        ..Default::default()
     };
-    assert_eq!(cursor_end.index, 11); // "10.62.70.80".len() == 11
+    raw.events.push(egui::Event::PointerMoved(click_pos));
+    raw.events.push(egui::Event::PointerButton {
+        pos: click_pos,
+        button: egui::PointerButton::Primary,
+        pressed: true,
+        modifiers: egui::Modifiers::default(),
+    });
+    let _ = ctx.run(raw, |ctx| {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            input_core(ui, id_salt, &mut val, 300.0, InputCoreOpts::default());
+        });
+    });
 
-    // Clicking to the left places cursor at 0
-    let click_rel_x_left = -5.0_f32;
-    let cursor_start = if click_rel_x_left <= 0.0 {
-        egui::text::CCursor::new(0)
-    } else {
-        egui::text::CCursor::new(char_count)
+    // Frame 3: Primary release at click_pos
+    let mut raw2 = egui::RawInput {
+        time: Some(1.05),
+        ..Default::default()
     };
-    assert_eq!(cursor_start.index, 0);
+    raw2.events.push(egui::Event::PointerMoved(click_pos));
+    raw2.events.push(egui::Event::PointerButton {
+        pos: click_pos,
+        button: egui::PointerButton::Primary,
+        pressed: false,
+        modifiers: egui::Modifiers::default(),
+    });
+    let _ = ctx.run(raw2, |ctx| {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            let output = input_core(ui, id_salt, &mut val, 300.0, InputCoreOpts::default());
+            if let Some(state) = egui::text_edit::TextEditState::load(ctx, output.response.id) {
+                if let Some(range) = state.cursor.char_range() {
+                    let idx = range.primary.index;
+                    // Middle of "hello world foo bar" is around char 9 or 10.
+                    assert!(
+                        (6..=14).contains(&idx),
+                        "Caret must be placed in the middle near click position, got index {idx}"
+                    );
+                    assert_ne!(idx, 0);
+                    assert_ne!(idx, val.len());
+                } else {
+                    panic!("Cursor range should be present after click");
+                }
+            } else {
+                panic!("TextEditState should be present after click");
+            }
+        });
+    });
+}
 
-    // Multi-character selection range (drag/block text) must be preserved
-    let selection_range = egui::text_selection::CCursorRange {
-        primary: egui::text::CCursor::new(0),
-        secondary: egui::text::CCursor::new(11),
+#[test]
+fn test_input_core_drag_selection() {
+    let ctx = egui::Context::default();
+    ShiplyApp::install_fonts(&ctx);
+    ShiplyApp::configure_light_workspace_style(&ctx);
+
+    let mut val = "abcdefghijklmnopqrstuvwxyz".to_string();
+    let id_salt = "test_drag_select";
+
+    // Frame 1: Initial layout
+    let mut pos_x1 = Pos2::ZERO;
+    let mut pos_x2 = Pos2::ZERO;
+    let _ = ctx.run(Default::default(), |ctx| {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            let output = input_core(ui, id_salt, &mut val, 300.0, InputCoreOpts::default());
+            let cy = output.response.rect.center().y;
+            pos_x1 = Pos2::new(output.galley_pos.x + 30.0, cy);
+            pos_x2 = Pos2::new(output.galley_pos.x + 130.0, cy);
+        });
+    });
+
+    // Frame 2: Mouse press at pos_x1
+    let mut raw1 = egui::RawInput {
+        time: Some(1.0),
+        ..Default::default()
     };
-    assert_ne!(selection_range.primary, selection_range.secondary);
+    raw1.events.push(egui::Event::PointerMoved(pos_x1));
+    raw1.events.push(egui::Event::PointerButton {
+        pos: pos_x1,
+        button: egui::PointerButton::Primary,
+        pressed: true,
+        modifiers: egui::Modifiers::default(),
+    });
+    let _ = ctx.run(raw1, |ctx| {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            input_core(ui, id_salt, &mut val, 300.0, InputCoreOpts::default());
+        });
+    });
+
+    // Frame 3: Drag mouse to pos_x2
+    let mut raw2 = egui::RawInput {
+        time: Some(1.1),
+        ..Default::default()
+    };
+    raw2.events.push(egui::Event::PointerMoved(pos_x2));
+    let _ = ctx.run(raw2, |ctx| {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            input_core(ui, id_salt, &mut val, 300.0, InputCoreOpts::default());
+        });
+    });
+
+    // Frame 4: Release mouse at pos_x2
+    let mut raw3 = egui::RawInput {
+        time: Some(1.2),
+        ..Default::default()
+    };
+    raw3.events.push(egui::Event::PointerButton {
+        pos: pos_x2,
+        button: egui::PointerButton::Primary,
+        pressed: false,
+        modifiers: egui::Modifiers::default(),
+    });
+    let _ = ctx.run(raw3, |ctx| {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            let output = input_core(ui, id_salt, &mut val, 300.0, InputCoreOpts::default());
+            if let Some(state) = egui::text_edit::TextEditState::load(ctx, output.response.id) {
+                if let Some(range) = state.cursor.char_range() {
+                    assert_ne!(
+                        range.primary, range.secondary,
+                        "Drag select must produce a non-empty selection spanning x1..x2"
+                    );
+                    let span =
+                        (range.primary.index as isize - range.secondary.index as isize).abs();
+                    assert!(
+                        span >= 5,
+                        "Drag selection span should be at least 5 characters, got {span}"
+                    );
+                } else {
+                    panic!("Cursor range should be present after drag-select");
+                }
+            } else {
+                panic!("TextEditState should be present after drag-select");
+            }
+        });
+    });
+}
+
+#[test]
+fn test_input_core_double_click_word() {
+    let ctx = egui::Context::default();
+    ShiplyApp::install_fonts(&ctx);
+    ShiplyApp::configure_light_workspace_style(&ctx);
+
+    let mut val = "deploy staging server".to_string();
+    let id_salt = "test_double_click";
+
+    // Frame 1: Initial layout
+    let mut word_pos = Pos2::ZERO;
+    let _ = ctx.run(Default::default(), |ctx| {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            let output = input_core(ui, id_salt, &mut val, 300.0, InputCoreOpts::default());
+            word_pos = Pos2::new(
+                output.galley_pos.x + output.galley.size().x * 0.45,
+                output.response.rect.center().y,
+            );
+        });
+    });
+
+    // Click 1: press & release
+    let mut raw1 = egui::RawInput {
+        time: Some(1.00),
+        ..Default::default()
+    };
+    raw1.events.push(egui::Event::PointerMoved(word_pos));
+    raw1.events.push(egui::Event::PointerButton {
+        pos: word_pos,
+        button: egui::PointerButton::Primary,
+        pressed: true,
+        modifiers: egui::Modifiers::default(),
+    });
+    let _ = ctx.run(raw1, |ctx| {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            input_core(ui, id_salt, &mut val, 300.0, InputCoreOpts::default());
+        });
+    });
+
+    let mut raw2 = egui::RawInput {
+        time: Some(1.05),
+        ..Default::default()
+    };
+    raw2.events.push(egui::Event::PointerButton {
+        pos: word_pos,
+        button: egui::PointerButton::Primary,
+        pressed: false,
+        modifiers: egui::Modifiers::default(),
+    });
+    let _ = ctx.run(raw2, |ctx| {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            input_core(ui, id_salt, &mut val, 300.0, InputCoreOpts::default());
+        });
+    });
+
+    // Click 2: press & release within double-click threshold (<0.3s)
+    let mut raw3 = egui::RawInput {
+        time: Some(1.15),
+        ..Default::default()
+    };
+    raw3.events.push(egui::Event::PointerButton {
+        pos: word_pos,
+        button: egui::PointerButton::Primary,
+        pressed: true,
+        modifiers: egui::Modifiers::default(),
+    });
+    let _ = ctx.run(raw3, |ctx| {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            input_core(ui, id_salt, &mut val, 300.0, InputCoreOpts::default());
+        });
+    });
+
+    let mut raw4 = egui::RawInput {
+        time: Some(1.20),
+        ..Default::default()
+    };
+    raw4.events.push(egui::Event::PointerButton {
+        pos: word_pos,
+        button: egui::PointerButton::Primary,
+        pressed: false,
+        modifiers: egui::Modifiers::default(),
+    });
+    let _ = ctx.run(raw4, |ctx| {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            let output = input_core(ui, id_salt, &mut val, 300.0, InputCoreOpts::default());
+            if let Some(state) = egui::text_edit::TextEditState::load(ctx, output.response.id) {
+                if let Some(range) = state.cursor.char_range() {
+                    assert_ne!(
+                        range.primary, range.secondary,
+                        "Double click must select the word"
+                    );
+                    let min_idx = range.primary.index.min(range.secondary.index);
+                    let max_idx = range.primary.index.max(range.secondary.index);
+                    let selected = &val[min_idx..max_idx];
+                    assert_eq!(
+                        selected, "staging",
+                        "Double click should select the word 'staging', got '{selected}'"
+                    );
+                } else {
+                    panic!("Cursor range should be present after double click");
+                }
+            } else {
+                panic!("TextEditState should be present after double click");
+            }
+        });
+    });
+}
+
+#[test]
+fn test_settings_cards_equal_widths_and_grid_alignment() {
+    let ctx = egui::Context::default();
+    ShiplyApp::install_fonts(&ctx);
+    ShiplyApp::configure_light_workspace_style(&ctx);
+
+    let mut app = ShiplyApp::new(crate::storage::AppStorage::default());
+    let proj = crate::domain::Project {
+        id: "proj_settings_test".to_string(),
+        name: "Settings Test Project".to_string(),
+        description: "Test".to_string(),
+        local_path: r"C:\Projects\test".to_string(),
+        environments: vec![crate::domain::EnvironmentConfig {
+            key: "development".to_string(),
+            name: "Development".to_string(),
+            app_name: "test-app".to_string(),
+            remote_dir: "/var/www/test".to_string(),
+            remote_user: "deploy".to_string(),
+            servers: vec!["10.0.0.1".to_string()],
+            vault_target: "test-vault".to_string(),
+            env_source: None,
+            http_proxy: None,
+            steps: vec![],
+        }],
+        group: None,
+        sort_order: Some(0),
+    };
+    app.storage.projects = vec![proj];
+    app.selected_env_key = "development".to_string();
+
+    let mut browse_w = 0.0;
+    let _ = ctx.run(Default::default(), |ctx| {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            app.render_server_settings_tab(ui, 0);
+            browse_w = kit::button_width(ui, ButtonSize::Md, "Browse", true);
+        });
+    });
+
+    assert!(browse_w > 80.0 && browse_w < 120.0);
 }
 
 #[test]

@@ -663,22 +663,22 @@ fn test_sidebar_search_single_outline_and_clear_button() {
 
 #[test]
 fn test_sidebar_footer_bounds_prevent_overflow_under_taskbar() {
-    // Expanded sidebar footer total height: 138px
-    let expanded_footer_h = 138.0_f32;
-    let btn_h = 30.0_f32;
-    let btn1_top = 8.0_f32;
-    let btn2_top = 40.0_f32;
-    let btn3_top = 72.0_f32;
-    let status_top = 108.0_f32;
-    let status_h = 20.0_f32;
-    let status_bottom = status_top + status_h; // 128px
+    // Expanded sidebar footer total height: 160px per Addendum B
+    let expanded_footer_h = 160.0_f32;
+    let btn_h = 32.0_f32;
+    let btn1_top = 8.0_f32; // SP_8
+    let btn2_top = 8.0 + 32.0 + 2.0; // 42.0 (SP_2 gap)
+    let btn3_top = 42.0 + 32.0 + 2.0; // 76.0 (SP_2 gap)
+    let status_top = 76.0 + 32.0 + 8.0; // 116.0 (SP_8 gap)
+    let status_h = 28.0_f32;
+    let status_bottom = status_top + status_h; // 144px
 
-    // Verify status bottom is strictly within footer_h with at least 8px margin
+    // Verify status bottom is strictly within footer_h with exact 16px bottom margin
     assert!(status_bottom <= expanded_footer_h);
     let bottom_margin = expanded_footer_h - status_bottom;
-    assert!(
-        bottom_margin >= 8.0,
-        "Bottom margin {bottom_margin}px must be >= 8px to prevent overflow into taskbar"
+    assert_eq!(
+        bottom_margin, 16.0,
+        "Bottom margin {bottom_margin}px must be exactly 16px (SB_PAD_X)"
     );
 
     // Verify buttons do not overlap
@@ -686,11 +686,100 @@ fn test_sidebar_footer_bounds_prevent_overflow_under_taskbar() {
     assert!(btn2_top + btn_h <= btn3_top);
     assert!(btn3_top + btn_h <= status_top);
 
-    // Collapsed rail sidebar footer: 132px
-    let rail_footer_h = 132.0_f32;
-    let rail_dot_pos_y = 118.0_f32;
+    // Collapsed rail sidebar footer: 160px
+    let rail_footer_h = 160.0_f32;
+    let rail_dot_pos_y = 116.0 + 14.0; // 130.0
     assert!(
         rail_dot_pos_y + 4.0 <= rail_footer_h,
         "Rail status dot must not overflow footer bounds"
     );
+}
+
+#[test]
+fn test_sidebar_width_and_symmetric_padding() {
+    let ctx = egui::Context::default();
+    ShiplyApp::configure_light_workspace_style(&ctx);
+    ShiplyApp::install_fonts(&ctx);
+
+    assert_eq!(SIDEBAR_EXPANDED_WIDTH, 272.0);
+    assert_eq!(SB_PAD_X, 16.0);
+    assert_eq!(SP_2, 2.0);
+
+    let storage = crate::storage::AppStorage::default();
+    let mut app = ShiplyApp::new(storage);
+
+    let mut rendered_inner_width = 0.0;
+    let _ = ctx.run(
+        egui::RawInput {
+            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::new(1200.0, 800.0))),
+            ..Default::default()
+        },
+        |ctx| {
+            app.render_sidebar(ctx, 1.0);
+            rendered_inner_width = SIDEBAR_EXPANDED_WIDTH - 2.0 * SB_PAD_X;
+        },
+    );
+
+    // With 272px width and 16px padding on both sides, inner content width is exactly 240px
+    assert_eq!(rendered_inner_width, 240.0);
+}
+
+#[test]
+fn test_sidebar_project_row_borderless_and_env_badges_overflow() {
+    let ctx = egui::Context::default();
+    ShiplyApp::configure_light_workspace_style(&ctx);
+    ShiplyApp::install_fonts(&ctx);
+
+    let mut storage = crate::storage::AppStorage::default();
+    let mut project = Project {
+        id: "proj-many-envs".to_string(),
+        name: "Enterprise Microservices Hub".to_string(),
+        description: "".to_string(),
+        local_path: ".".to_string(),
+        environments: vec![],
+        group: None,
+        sort_order: Some(0),
+    };
+    for i in 1..=6 {
+        project.environments.push(crate::domain::EnvironmentConfig {
+            key: format!("env{i}"),
+            name: format!("Cluster {i}"),
+            app_name: format!("app-{i}"),
+            servers: vec!["10.0.0.1".to_string()],
+            remote_user: "deploy".to_string(),
+            vault_target: "v1".to_string(),
+            remote_dir: "/app".to_string(),
+            env_source: None,
+            http_proxy: None,
+            steps: vec![],
+        });
+    }
+    storage.projects = vec![project];
+
+    let mut app = ShiplyApp::new(storage);
+    app.selection = SidebarSelection::Project("proj-many-envs".to_string());
+
+    // Run layout with anim_t = 1.0 (expanded mode)
+    let _ = ctx.run(
+        egui::RawInput {
+            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::new(1200.0, 800.0))),
+            ..Default::default()
+        },
+        |ctx| {
+            app.render_sidebar(ctx, 1.0);
+        },
+    );
+
+    // Verify row dimensions
+    let row_height = 58.0_f32;
+    let row_pad_y = 10.0_f32;
+    let row_pad_x = 12.0_f32;
+    let badge_h = 18.0_f32;
+    let badge_gap = SP_4;
+
+    assert_eq!(row_height, 58.0);
+    assert_eq!(row_pad_y, 10.0);
+    assert_eq!(row_pad_x, 12.0);
+    assert_eq!(badge_h, 18.0);
+    assert_eq!(badge_gap, 4.0);
 }

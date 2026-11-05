@@ -543,3 +543,88 @@ fn test_cancel_running_deployment_clears_busy_state() {
     assert!(app.storage.deployments[0].finished_at.is_some());
     assert!(app.storage.deployments[0].duration_ms.is_some());
 }
+
+#[test]
+fn test_console_scroll_height_in_small_viewport() {
+    let mut storage = crate::storage::AppStorage::default();
+    let mut log_lines = String::new();
+    for i in 1..=100 {
+        log_lines.push_str(&format!(
+            "[OK] Log line item #{i}: building package assets\n"
+        ));
+    }
+    let dep = DeploymentRecord {
+        id: "dep-100-lines".to_string(),
+        project_id: "p1".to_string(),
+        project_name: "Test Project".to_string(),
+        environment: "production".to_string(),
+        app_name: "test-app".to_string(),
+        version: "1.0.0".to_string(),
+        git_branch: Some("main".to_string()),
+        git_commit: Some("abcdef".to_string()),
+        git_changes: vec![],
+        is_rollback: false,
+        servers: vec!["10.0.0.1".to_string()],
+        status: DeploymentStatus::Succeeded,
+        started_at: chrono::Utc::now(),
+        finished_at: Some(chrono::Utc::now()),
+        duration_ms: Some(1500),
+        step_logs: vec![crate::domain::StepExecutionLog {
+            step_name: "Deploy Step".to_string(),
+            command_summary: "deploy.sh".to_string(),
+            output: log_lines,
+            status: DeploymentStatus::Succeeded,
+            duration_ms: 1500,
+        }],
+        executed_steps: vec![],
+    };
+    storage.deployments.push(dep.clone());
+
+    let mut app = ShiplyApp::new(storage);
+    app.console_collapsed = false;
+    app.console_expanded_height = false; // compact mode: compact = 320.0
+
+    let ctx = egui::Context::default();
+    ShiplyApp::install_fonts(&ctx);
+    let mut inner_viewport_height = 0.0;
+
+    let raw_input = egui::RawInput {
+        screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::new(800.0, 400.0))),
+        ..Default::default()
+    };
+
+    let _ = ctx.run(raw_input, |ctx| {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            // Render inside an outer ScrollArea near the bottom of a small viewport
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                // Pre-allocate space so remaining available height in the viewport is very small (< 64px)
+                ui.allocate_space(Vec2::new(800.0, 350.0));
+                assert!(ui.available_height() < 64.0);
+
+                let scroll_inner_rect = app.render_terminal_window(ui, &dep);
+                inner_viewport_height = scroll_inner_rect.height();
+            });
+        });
+    });
+
+    assert!(
+        inner_viewport_height >= 320.0,
+        "Inner scroll viewport height ({inner_viewport_height}) must be >= configured compact height (320.0)"
+    );
+
+    // Also verify expanded mode on a 1080p-scale screen (height 1000.0 -> 60% = 600.0)
+    app.console_expanded_height = true;
+    let raw_input_large = egui::RawInput {
+        screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::new(1200.0, 1000.0))),
+        ..Default::default()
+    };
+    let _ = ctx.run(raw_input_large, |ctx| {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                let scroll_inner_rect = app.render_terminal_window(ui, &dep);
+                inner_viewport_height = scroll_inner_rect.height();
+            });
+        });
+    });
+    assert_eq!(inner_viewport_height, 600.0);
+}
