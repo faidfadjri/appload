@@ -223,54 +223,13 @@ impl ShiplyApp {
                         let name_input_w =
                             (rem_w - reserved_for_opts_and_actions).clamp(100.0, 320.0);
 
-                        let name_id = ui.make_persistent_id(("step_name_input", &step.id));
-                        let has_focus = ui.memory(|m| m.has_focus(name_id));
-                        let (outer_rect, outer_resp) =
-                            ui.allocate_exact_size(Vec2::new(name_input_w, 28.0), Sense::click());
-                        let is_hovered = outer_resp.hovered();
-                        let bg = if has_focus {
-                            INPUT_BG
-                        } else if is_hovered {
-                            SUBTLE_BG
-                        } else {
-                            Color32::TRANSPARENT
-                        };
-                        let stroke = if has_focus {
-                            Stroke::new(1.0_f32, PRIMARY_BLUE)
-                        } else if is_hovered {
-                            Stroke::new(1.0_f32, INPUT_BORDER)
-                        } else {
-                            Stroke::NONE
-                        };
-                        ui.painter()
-                            .rect_filled(outer_rect, CornerRadius::same(4), bg);
-                        if stroke != Stroke::NONE {
-                            ui.painter().rect_stroke(
-                                outer_rect,
-                                CornerRadius::same(4),
-                                stroke,
-                                StrokeKind::Inside,
-                            );
-                        }
-                        let inner_rect = outer_rect.shrink2(Vec2::new(6.0, 2.0));
-                        let mut child = ui.new_child(
-                            egui::UiBuilder::new()
-                                .id_salt(("step_name_child", &step.id))
-                                .max_rect(inner_rect),
-                        );
-                        let resp = child.add(
-                            egui::TextEdit::singleline(&mut step.name)
-                                .id_salt(name_id)
-                                .font(Typo::SmallMedium.font())
-                                .frame(false)
-                                .desired_width(inner_rect.width())
-                                .hint_text(
-                                    RichText::new("Step name")
-                                        .typo(Typo::Small)
-                                        .color(TEXT_PLACEHOLDER),
-                                ),
-                        );
-                        if resp.changed() {
+                        if styled_text_edit(
+                            ui,
+                            ("step_name_input", &step.id),
+                            &mut step.name,
+                            name_input_w,
+                            Some("Step name"),
+                        ) {
                             config_changed = true;
                         }
 
