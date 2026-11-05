@@ -325,12 +325,9 @@ impl ShiplyApp {
             let path_resp = ui
                 .horizontal(|ui| {
                     ui.spacing_mut().item_spacing = Vec2::new(4.0, 0.0);
-                    draw_icon_folder(
-                        ui.painter(),
-                        Pos2::new(ui.cursor().min.x + 6.0, ui.cursor().center().y),
-                        TEXT_MUTED,
-                    );
-                    ui.add_space(14.0);
+                    let (icon_rect, _) =
+                        ui.allocate_exact_size(Vec2::new(14.0, 14.0), Sense::hover());
+                    draw_icon_folder(ui.painter(), icon_rect.center(), TEXT_MUTED);
                     ui.label(
                         RichText::new(truncated_path)
                             .typo(Typo::Mono)
