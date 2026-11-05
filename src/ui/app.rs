@@ -1722,8 +1722,12 @@ impl eframe::App for AppLoadApp {
                     .id_salt("main_workspace_vertical_scroll")
                     .auto_shrink([false, false]);
                 #[cfg(debug_assertions)]
-                if app_env_is_ok("APPLOAD_SCROLL_TO_BOTTOM") {
-                    main_scroll = main_scroll.vertical_scroll_offset(99999.0);
+                if let Ok(offset_str) = app_env_var("APPLOAD_SCROLL_OFFSET") {
+                    if let Ok(offset) = offset_str.parse::<f32>() {
+                        main_scroll = main_scroll.vertical_scroll_offset(offset);
+                    }
+                } else if app_env_is_ok("APPLOAD_SCROLL_TO_BOTTOM") {
+                    main_scroll = main_scroll.vertical_scroll_offset(400.0);
                 }
                 #[cfg(not(debug_assertions))]
                 let main_scroll = ScrollArea::vertical()

@@ -137,6 +137,11 @@ pub(crate) fn input_core(
         );
     }
 
+    if opts.draw_bg_and_border {
+        ui.painter()
+            .rect_filled(outer_rect, opts.corner_radius, opts.bg_color);
+    }
+
     let mut child_ui = ui.new_child(
         egui::UiBuilder::new()
             .max_rect(outer_rect)
@@ -153,9 +158,6 @@ pub(crate) fn input_core(
     output.response.rect = outer_rect;
 
     if opts.draw_bg_and_border {
-        ui.painter()
-            .rect_filled(outer_rect, opts.corner_radius, opts.bg_color);
-
         let is_focused =
             output.response.has_focus() || ui.memory(|mem| mem.has_focus(output.response.id));
         let is_hovered = output.response.hovered()

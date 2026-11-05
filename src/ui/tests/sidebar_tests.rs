@@ -662,6 +662,35 @@ fn test_sidebar_search_single_outline_and_clear_button() {
 }
 
 #[test]
+fn test_sidebar_search_bounds_and_insets_in_sidebar() {
+    let ctx = egui::Context::default();
+    AppLoadApp::install_fonts(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
+
+    let _ = ctx.run(Default::default(), |ctx| {
+        egui::SidePanel::left("test_sidebar_panel")
+            .exact_width(272.0)
+            .frame(egui::Frame::new().inner_margin(egui::Margin::symmetric(16, 0)))
+            .show(ctx, |ui| {
+                let full_w = ui.available_width();
+                assert_eq!(
+                    full_w, 240.0,
+                    "Inner sidebar width must be exactly 272 - 32 = 240px"
+                );
+
+                let mut query = "".to_string();
+                let _ = sidebar_search_text_edit(
+                    ui,
+                    "test_search_bounds",
+                    &mut query,
+                    full_w,
+                    Some("Search projects..."),
+                );
+            });
+    });
+}
+
+#[test]
 fn test_sidebar_footer_bounds_prevent_overflow_under_taskbar() {
     // Expanded sidebar footer total height: 160px per Addendum B
     let expanded_footer_h = 160.0_f32;
