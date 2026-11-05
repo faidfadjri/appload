@@ -1559,46 +1559,117 @@ impl AppLoadApp {
     }
 }
 
-fn save_color_image_as_bmp(
+fn crc32(data: &[u8]) -> u32 {
+    let mut crc: u32 = 0xffff_ffff;
+    for &byte in data {
+        crc ^= byte as u32;
+        for _ in 0..8 {
+            if crc & 1 != 0 {
+                crc = (crc >> 1) ^ 0xedb8_8320;
+            } else {
+                crc >>= 1;
+            }
+        }
+    }
+    !crc
+}
+
+fn adler32(data: &[u8]) -> u32 {
+    const MOD_ADLER: u32 = 65521;
+    let mut a: u32 = 1;
+    let mut b: u32 = 0;
+    for &byte in data {
+        a = (a + byte as u32) % MOD_ADLER;
+        b = (b + a) % MOD_ADLER;
+    }
+    (b << 16) | a
+}
+
+fn write_png_chunk(out: &mut Vec<u8>, chunk_type: &[u8; 4], data: &[u8]) {
+    out.extend_from_slice(&(data.len() as u32).to_be_bytes());
+    let mut crc_input = Vec::with_capacity(4 + data.len());
+    crc_input.extend_from_slice(chunk_type);
+    crc_input.extend_from_slice(data);
+    let crc = crc32(&crc_input);
+    out.extend_from_slice(chunk_type);
+    out.extend_from_slice(data);
+    out.extend_from_slice(&crc.to_be_bytes());
+}
+
+pub fn encode_color_image_as_png_bytes(image: &egui::ColorImage) -> Vec<u8> {
+    let [w, h] = image.size;
+    let mut png = Vec::new();
+
+    // 1. PNG Signature (8 bytes)
+    png.extend_from_slice(&[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+    // 2. IHDR Chunk (13 bytes)
+    let mut ihdr_data = Vec::with_capacity(13);
+    ihdr_data.extend_from_slice(&(w as u32).to_be_bytes());
+    ihdr_data.extend_from_slice(&(h as u32).to_be_bytes());
+    ihdr_data.push(8); // bit depth: 8
+    ihdr_data.push(6); // color type: 6 (RGBA)
+    ihdr_data.push(0); // compression method: 0 (deflate)
+    ihdr_data.push(0); // filter method: 0
+    ihdr_data.push(0); // interlace method: 0 (no interlace)
+    write_png_chunk(&mut png, b"IHDR", &ihdr_data);
+
+    // 3. Construct uncompressed scanlines with filter type 0 (None)
+    let mut scanlines = Vec::with_capacity(h * (1 + w * 4));
+    for y in 0..h {
+        scanlines.push(0); // filter byte: None
+        let row_start = y * w;
+        for x in 0..w {
+            let p = image.pixels[row_start + x];
+            scanlines.push(p.r());
+            scanlines.push(p.g());
+            scanlines.push(p.b());
+            scanlines.push(p.a());
+        }
+    }
+
+    // 4. Wrap into RFC 1950 zlib stream with RFC 1951 uncompressed DEFLATE blocks
+    let mut zlib_data = Vec::new();
+    zlib_data.push(0x78); // CMF: Deflate, 32K window
+    zlib_data.push(0x01); // FLG: FCHECK=1 ((0x78 * 256 + 0x01) % 31 == 0)
+
+    let chunk_size = 32768;
+    let chunks: Vec<&[u8]> = scanlines.chunks(chunk_size).collect();
+    let total_chunks = chunks.len();
+    if total_chunks == 0 {
+        zlib_data.push(0x01); // BFINAL=1, BTYPE=00
+        zlib_data.extend_from_slice(&0u16.to_le_bytes());
+        zlib_data.extend_from_slice(&0xffffu16.to_le_bytes());
+    } else {
+        for (i, chunk) in chunks.iter().enumerate() {
+            let is_last = i == total_chunks - 1;
+            let bfinal_btype = if is_last { 0x01 } else { 0x00 };
+            zlib_data.push(bfinal_btype);
+            let len = chunk.len() as u16;
+            let nlen = !len;
+            zlib_data.extend_from_slice(&len.to_le_bytes());
+            zlib_data.extend_from_slice(&nlen.to_le_bytes());
+            zlib_data.extend_from_slice(chunk);
+        }
+    }
+    let adler = adler32(&scanlines);
+    zlib_data.extend_from_slice(&adler.to_be_bytes());
+
+    // 5. IDAT Chunk
+    write_png_chunk(&mut png, b"IDAT", &zlib_data);
+
+    // 6. IEND Chunk
+    write_png_chunk(&mut png, b"IEND", &[]);
+
+    png
+}
+
+fn save_color_image_as_png(
     image: &egui::ColorImage,
     path: &std::path::Path,
 ) -> std::io::Result<()> {
-    use std::io::Write;
-    let [w, h] = image.size;
-    let pixel_bytes_len = (w * h * 4) as u32;
-    let file_size = 54 + pixel_bytes_len;
-    let mut file = std::fs::File::create(path)?;
-
-    // BITMAPFILEHEADER (14 bytes)
-    file.write_all(b"BM")?;
-    file.write_all(&file_size.to_le_bytes())?;
-    file.write_all(&0u32.to_le_bytes())?;
-    file.write_all(&54u32.to_le_bytes())?;
-
-    // BITMAPINFOHEADER (40 bytes)
-    file.write_all(&40u32.to_le_bytes())?;
-    file.write_all(&(w as i32).to_le_bytes())?;
-    file.write_all(&(-(h as i32)).to_le_bytes())?; // negative for top-down bitmap
-    file.write_all(&1u16.to_le_bytes())?;
-    file.write_all(&32u16.to_le_bytes())?;
-    file.write_all(&0u32.to_le_bytes())?;
-    file.write_all(&pixel_bytes_len.to_le_bytes())?;
-    file.write_all(&0i32.to_le_bytes())?;
-    file.write_all(&0i32.to_le_bytes())?;
-    file.write_all(&0u32.to_le_bytes())?;
-    file.write_all(&0u32.to_le_bytes())?;
-
-    // Pixels (BGRA)
-    let mut raw_pixels = Vec::with_capacity(w * h * 4);
-    for p in &image.pixels {
-        raw_pixels.push(p.b());
-        raw_pixels.push(p.g());
-        raw_pixels.push(p.r());
-        raw_pixels.push(p.a());
-    }
-    file.write_all(&raw_pixels)?;
-    file.flush()?;
-    Ok(())
+    let bytes = encode_color_image_as_png_bytes(image);
+    std::fs::write(path, bytes)
 }
 
 impl eframe::App for AppLoadApp {
@@ -1625,11 +1696,11 @@ impl eframe::App for AppLoadApp {
             }
             for event in &ctx.input(|i| i.raw.events.clone()) {
                 if let egui::Event::Screenshot { image, .. } = event {
-                    let bmp_path = std::path::PathBuf::from(&path);
-                    if let Err(err) = save_color_image_as_bmp(image, &bmp_path) {
-                        eprintln!("[Screenshot Error] Failed to save BMP: {err}");
+                    let png_path = std::path::PathBuf::from(&path);
+                    if let Err(err) = save_color_image_as_png(image, &png_path) {
+                        eprintln!("[Screenshot Error] Failed to save PNG: {err}");
                     } else {
-                        eprintln!("[Screenshot Success] Saved frame to {}", bmp_path.display());
+                        eprintln!("[Screenshot Success] Saved frame to {}", png_path.display());
                     }
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 }
@@ -1858,5 +1929,36 @@ impl eframe::App for AppLoadApp {
                 self.dirty_save_pending = false;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_encode_color_image_as_png_bytes_signature_and_chunks() {
+        let image = egui::ColorImage::new([4, 4], egui::Color32::from_rgb(255, 0, 128));
+        let bytes = encode_color_image_as_png_bytes(&image);
+
+        // PNG 8-byte signature: 89 50 4E 47 0D 0A 1A 0A
+        assert!(bytes.len() >= 8);
+        assert_eq!(
+            &bytes[0..8],
+            &[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
+        );
+
+        // Contains IHDR, IDAT, and IEND
+        let s = String::from_utf8_lossy(&bytes);
+        assert!(s.contains("IHDR"));
+        assert!(s.contains("IDAT"));
+        assert!(s.contains("IEND"));
+
+        // Ends with IEND chunk (0 length, b"IEND", CRC 0xae426082)
+        assert!(bytes.ends_with(&[
+            0x00, 0x00, 0x00, 0x00, // length = 0
+            b'I', b'E', b'N', b'D', // chunk type
+            0xae, 0x42, 0x60, 0x82 // CRC-32
+        ]));
     }
 }
