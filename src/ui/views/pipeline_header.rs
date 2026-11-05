@@ -49,7 +49,7 @@ impl ShiplyApp {
             ui.add_space(8.0);
             if header_avail_w >= 640.0 {
                 ui.label(
-                    RichText::new(format!("for {env_name} — Sequential deployment stages"))
+                    RichText::new(format!("Runs top to bottom when you deploy to {env_name}."))
                         .typo(Typo::Small)
                         .color(TEXT_MUTED),
                 );
