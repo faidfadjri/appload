@@ -654,12 +654,13 @@ pub(crate) fn format_relative_time(dt: chrono::DateTime<chrono::Utc>) -> String 
 
 /// Renders a left-aligned table header cell with an exact column width.
 pub(crate) fn table_header_cell(ui: &mut egui::Ui, width: f32, label: &str) {
-    ui.allocate_ui_with_layout(
-        Vec2::new(width, 20.0),
-        Layout::left_to_right(Align::Center),
-        |ui| {
-            ui.label(RichText::new(label).typo(Typo::Caption).color(TEXT_MUTED));
-        },
+    let (rect, _) = ui.allocate_exact_size(Vec2::new(width, 20.0), Sense::hover());
+    ui.painter().text(
+        Pos2::new(rect.left(), rect.center().y),
+        Align2::LEFT_CENTER,
+        label,
+        Typo::Caption.font(),
+        TEXT_MUTED,
     );
 }
 
@@ -671,11 +672,12 @@ pub(crate) fn table_header_cell_styled(
     font: Typo,
     color: Color32,
 ) {
-    ui.allocate_ui_with_layout(
-        Vec2::new(width, 20.0),
-        Layout::left_to_right(Align::Center),
-        |ui| {
-            ui.label(RichText::new(label).typo(font).color(color));
-        },
+    let (rect, _) = ui.allocate_exact_size(Vec2::new(width, 20.0), Sense::hover());
+    ui.painter().text(
+        Pos2::new(rect.left(), rect.center().y),
+        Align2::LEFT_CENTER,
+        label,
+        font.font(),
+        color,
     );
 }
