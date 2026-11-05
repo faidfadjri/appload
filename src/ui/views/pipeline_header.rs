@@ -2,6 +2,24 @@
 
 use super::*;
 
+/// Canonical list of pipeline variables supported by interpolation.
+///
+/// See `EnvironmentConfig::interpolate` in `domain.rs` for `{...}` variables,
+/// and `credentials::interpolate_secrets` for `${{ secrets.* }}` variables.
+pub(crate) const PIPELINE_VARIABLES: &[(&str, &str)] = &[
+    ("{remote_dir}", "Remote directory path from Settings"),
+    ("{remote_user}", "Remote SSH username from Settings"),
+    ("{app_name}", "Project application name"),
+    ("{http_proxy}", "HTTP proxy URL from Settings"),
+    ("{env_source}", "Local .env source path from Settings"),
+    ("{version}", "Target deployment version"),
+    ("${{ secrets.KEY }}", "Secret password/token from OS Vault"),
+    (
+        "${{ secrets.KEY.username }}",
+        "Secret username from OS Vault",
+    ),
+];
+
 impl ShiplyApp {
     pub(crate) fn render_pipeline_header(
         &mut self,
@@ -182,16 +200,7 @@ impl ShiplyApp {
                     .color(TEXT_MUTED),
             );
             ui.add_space(6.0);
-            for var_name in [
-                "${{ version }}",
-                "${{ branch }}",
-                "${{ commit }}",
-                "${{ timestamp }}",
-                "${{ env }}",
-                "${{ project }}",
-                "${{ remote_dir }}",
-                "${{ secrets.KEY }}",
-            ] {
+            for &(var_name, tooltip) in PIPELINE_VARIABLES {
                 let galley = ui.painter().layout_no_wrap(
                     var_name.to_string(),
                     Typo::MonoSm.font(),
@@ -204,7 +213,7 @@ impl ShiplyApp {
                     ui.allocate_exact_size(Vec2::new(tag_w, tag_h), Sense::click());
                 let tag_resp = tag_resp
                     .on_hover_cursor(egui::CursorIcon::PointingHand)
-                    .on_hover_text("Click to copy");
+                    .on_hover_text(format!("{tooltip}\nClick to copy"));
                 let bg = if tag_resp.hovered() {
                     BLUE_PILL_HOVER_BG
                 } else {

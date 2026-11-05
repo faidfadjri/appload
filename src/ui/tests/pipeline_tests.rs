@@ -197,3 +197,63 @@ fn test_draggable_pipeline_step_reorder_ui() {
     );
     assert!(app.dirty_save_pending);
 }
+
+#[test]
+fn test_pipeline_variables_chips_match_interpolation_support() {
+    use crate::domain::EnvironmentConfig;
+    use crate::ui::views::pipeline_header::PIPELINE_VARIABLES;
+
+    let env = EnvironmentConfig {
+        key: "dev".to_string(),
+        name: "Development".to_string(),
+        servers: vec!["10.0.0.1".to_string()],
+        remote_dir: "/opt/app".to_string(),
+        remote_user: "deploy".to_string(),
+        app_name: "my-service".to_string(),
+        http_proxy: Some("http://proxy:8080".to_string()),
+        env_source: Some("./.env.dev".to_string()),
+        vault_target: String::new(),
+        steps: Vec::new(),
+    };
+
+    // Assert there are exactly 8 canonical variables
+    assert_eq!(PIPELINE_VARIABLES.len(), 8);
+
+    // Verify all non-secret variables are substituted by interpolate
+    let non_secret_vars: Vec<&str> = PIPELINE_VARIABLES
+        .iter()
+        .map(|(k, _)| *k)
+        .filter(|k| !k.starts_with("${{"))
+        .collect();
+    assert_eq!(non_secret_vars.len(), 6);
+
+    let template = non_secret_vars.join(" ");
+    let interpolated = env.interpolate(&template, "1.2.3");
+
+    // Assert no `{...}` remains
+    assert!(
+        !interpolated.contains('{'),
+        "Unsubstituted variable found: {interpolated}"
+    );
+    assert!(
+        !interpolated.contains('}'),
+        "Unsubstituted variable found: {interpolated}"
+    );
+    assert!(interpolated.contains("/opt/app"));
+    assert!(interpolated.contains("deploy"));
+    assert!(interpolated.contains("my-service"));
+    assert!(interpolated.contains("http://proxy:8080"));
+    assert!(interpolated.contains("./.env.dev"));
+    assert!(interpolated.contains("1.2.3"));
+
+    // Verify secret variables follow ${{ secrets.KEY }} and ${{ secrets.KEY.username }} pattern
+    let secret_vars: Vec<&str> = PIPELINE_VARIABLES
+        .iter()
+        .map(|(k, _)| *k)
+        .filter(|k| k.starts_with("${{"))
+        .collect();
+    assert_eq!(
+        secret_vars,
+        vec!["${{ secrets.KEY }}", "${{ secrets.KEY.username }}"]
+    );
+}
