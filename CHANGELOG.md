@@ -1,23 +1,33 @@
 # Changelog
 
-## [0.12.0] - 2026-11-05
+## [0.12.0] - 2026-11-06
 
 ### Changed
-- **Rebrand from Shiply to AppLoad:**
+- **Shiply is now AppLoad:**
   - Full product rename to **AppLoad** across application window, UI topbar, sidebar, installer wizards, documentation, CLI scripts, and release workflows.
-  - Seamless first-run migration: automatically discovers existing `Shiply` data directories (`%LOCALAPPDATA%\shiply` or portable folders), non-destructively copies SQLite database and configuration files to `%LOCALAPPDATA%\appload\appload_state.db`, preserves legacy backup, and leaves existing data intact.
-  - Automatic install migration and handoff: when run from a legacy `Programs\Shiply` installation (e.g. following an auto-update from v0.11.0), AppLoad transparently copies itself to `%LOCALAPPDATA%\Programs\AppLoad\appload.exe`, creates `AppLoad.lnk` shortcuts on Desktop and Start Menu, deletes legacy `Shiply.lnk` shortcuts, and restarts from the new path.
-  - Full backward compatibility: fallback support for `SHIPLY_*` environment variables (`SHIPLY_ASKPASS_*`, `SHIPLY_WINDOW_*`, `SHIPLY_CONSOLE_*`), legacy `shiply_state.*` file paths, and legacy release asset names (`shiply.exe`, `shiply-windows-x86_64.exe`).
+  - Display name styled as **AppLoad**, identifier and directory names as `appload`, environment variables prefixed with `APPLOAD_` (with full legacy fallback to `SHIPLY_*`).
+  - Automatic install migration and handoff: when launched from a legacy `Programs\Shiply` installation (such as following an auto-update from v0.11.0), AppLoad installs itself cleanly to `%LOCALAPPDATA%\Programs\AppLoad\appload.exe`, swaps Desktop and Start Menu shortcuts, and relaunches from the new directory.
+  - Full updater backward compatibility: publishes compat `shiply.exe` and `shiply-windows-x86_64.exe` assets and maintains dual-format `latest.json` allowing legacy v0.11.0 clients to update directly and seamlessly to v0.12.0.
+
+### Added
+- **Non-Destructive Safe Migration Engine (Brief 006):**
+  - Read-only legacy data discovery: legacy files are strictly copied, never moved, deleted, or overwritten (`fs::remove_dir_all` completely removed).
+  - Legacy source priority resolution: checks `Programs\Shiply\shiply_state.db` first, then `shiply_state.json`, then `%LOCALAPPDATA%\shiply`, selecting the newest valid source.
+  - Pre-release marker self-healing: detects stale or corrupted migration markers, archives existing targets as `pre-migration-*`, and re-runs migration safely.
+  - Storage safety guards: `save_to` strictly rejects writing to legacy Shiply directories, and `default_storage_path` enforces `paths::data_dir()`.
+  - Headless `--migrate-only [--json]` command for automated validation and scriptable verification.
+  - Strict sandbox isolation: single path resolver in `src/paths.rs` honoring `APPLOAD_SANDBOX_ROOT`, with hard test-mode panic guards preventing test runs from touching real user profiles.
 
 ### Fixed
-- **Input Fields Usability & High-DPI Rendering:**
-  - Restored full click-to-position caret placement and click-and-drag text selection across all styled single-line text inputs (`styled_text_edit` and `input_core`).
-  - Perfect vertical text centering with subpixel rounding across all standard 36px text inputs.
-  - High-DPI font sizing and proportional layout adjustments ensuring crisp typography and correct touch targets at 125% and 150% Windows display scaling.
-- **Terminal Console & UI Polish:**
-  - Expanded terminal console output viewer default height to responsive 60% viewport height (clamped 320px–720px) with one-click full height toggle.
-  - Adjusted sidebar item spacing, padding, and ghost action button styling for increased breathing room.
+- **UI Refinements & Brief 004 Review Items:**
+  - Fixed sidebar search input box overflowing past sidebar border and resolved search icon overlap with placeholder text.
+  - Restored full click-to-position caret placement, double-click word selection, and click-and-drag range selection across `input_core` and `styled_text_edit`.
+  - Fixed compact input field layout in Filter Deployments search box and release bar version input.
+  - Perfect vertical text centering with subpixel rounding across all standard 36px inputs.
+  - Proportional UI scaling and crisp font rendering at 125% and 150% Windows display scaling.
+  - Expanded terminal console output viewer default height to responsive 60% viewport height with one-click full height toggle.
   - Matched Settings card widths to full workspace grid dimensions for visual balance.
+  - Replaced BMP screenshot capture with genuine RFC 2083 PNG encoder with valid PNG signature and chunk CRC-32 checksums.
 
 ## [0.11.0] - 2026-11-05
 
