@@ -19,7 +19,7 @@ impl ShiplyApp {
             }
             ui.add_space(4.0);
             let is_selected = self.selected_deployment_id.as_deref() == Some(&dep.id);
-            let row_h = 42.0;
+            let row_h = 46.0;
 
             horizontal_row(ui, row_h, |ui| {
                 // 1. Status (90px)
@@ -42,7 +42,7 @@ impl ShiplyApp {
                     paint_pill_left_aligned(ui.painter(), s_pos, dep.status.label(), s_bg, s_fg);
                 }
 
-                // 2. Version (80px, MONO)
+                // 2. Version (75px, MONO)
                 let (v_rect, _) =
                     ui.allocate_exact_size(Vec2::new(widths.col_version, row_h), Sense::hover());
                 ui.painter().text(
@@ -53,65 +53,87 @@ impl ShiplyApp {
                     TEXT_PRIMARY,
                 );
 
-                // 3. Branch (120px, MONO, truncated with ellipsis)
-                let (b_rect, b_resp) =
-                    ui.allocate_exact_size(Vec2::new(widths.col_branch, row_h), Sense::hover());
-                draw_icon_git_branch(
-                    ui.painter(),
-                    Pos2::new(b_rect.left() + 2.0, b_rect.center().y),
-                    TEXT_MUTED,
-                );
+                // 3. Changes column: Commit message in BODY (truncated) + branch @ commit in MonoSm muted
+                let (ch_rect, ch_resp) =
+                    ui.allocate_exact_size(Vec2::new(widths.col_changes, row_h), Sense::hover());
                 let raw_branch = dep.git_branch.as_deref().unwrap_or("main");
-                let max_b_chars = 11;
-                let b_text = if raw_branch.chars().count() > max_b_chars {
-                    let truncated: String = raw_branch
-                        .chars()
-                        .take(max_b_chars.saturating_sub(1))
-                        .collect();
-                    format!("{truncated}…")
-                } else {
-                    raw_branch.to_string()
-                };
-                ui.painter().with_clip_rect(b_rect).text(
-                    Pos2::new(b_rect.left() + 16.0, b_rect.center().y),
-                    Align2::LEFT_CENTER,
-                    b_text,
-                    Typo::MonoSm.font(),
-                    TEXT_SECONDARY,
-                );
-                b_resp.on_hover_text(format!("Branch: {raw_branch}"));
-
-                // 4. Commit (70px, MONO)
-                let (c_rect, c_resp) =
-                    ui.allocate_exact_size(Vec2::new(widths.col_commit, row_h), Sense::hover());
                 let full_sha = dep.git_commit.as_deref().unwrap_or("-");
                 let short_sha = if full_sha.len() > 7 {
                     &full_sha[..7]
                 } else {
                     full_sha
                 };
-                ui.painter().text(
-                    Pos2::new(c_rect.left(), c_rect.center().y),
+
+                let commit_msg = if let Some(first_change) = dep.git_changes.iter().find(|l| {
+                    !l.starts_with("M ")
+                        && !l.starts_with("A ")
+                        && !l.starts_with("D ")
+                        && !l.starts_with("?? ")
+                        && !l.starts_with("? ")
+                }) {
+                    if let Some(space_pos) = first_change.find(' ') {
+                        let rest = &first_change[space_pos + 1..];
+                        if let Some(paren_pos) = rest.rfind('(') {
+                            rest[..paren_pos].trim()
+                        } else {
+                            rest.trim()
+                        }
+                    } else {
+                        first_change.as_str()
+                    }
+                } else if dep.is_rollback {
+                    "Rollback deployment"
+                } else {
+                    "Deploy release"
+                };
+
+                let meta_line = format!("{raw_branch} @ {short_sha}");
+                ch_resp.on_hover_text(format!("{commit_msg}\n{meta_line}"));
+
+                let ch_painter = ui.painter().with_clip_rect(ch_rect);
+                ch_painter.text(
+                    Pos2::new(ch_rect.left(), ch_rect.top() + 15.0),
                     Align2::LEFT_CENTER,
-                    short_sha,
+                    commit_msg,
+                    Typo::Body.font(),
+                    TEXT_PRIMARY,
+                );
+                ch_painter.text(
+                    Pos2::new(ch_rect.left(), ch_rect.top() + 33.0),
+                    Align2::LEFT_CENTER,
+                    meta_line,
                     Typo::MonoSm.font(),
                     TEXT_MUTED,
                 );
-                if full_sha != "-" {
-                    c_resp.on_hover_text(format!("Commit: {full_sha}"));
-                }
 
-                // 5. Deployed (140px, relative time + tooltip with full timestamp)
+                // 4. Deployed (130px, relative time + duration below + full timestamp tooltip)
                 let (t_rect, t_resp) =
                     ui.allocate_exact_size(Vec2::new(widths.col_deployed, row_h), Sense::hover());
                 let rel_time = helpers::format_relative_time(dep.started_at);
-                ui.painter().text(
-                    Pos2::new(t_rect.left(), t_rect.center().y),
+                let dur_str = if dep.status == DeploymentStatus::Running {
+                    "running...".to_string()
+                } else if let Some(ms) = dep.duration_ms {
+                    format!("took {:.1}s", ms as f64 / 1000.0)
+                } else {
+                    "—".to_string()
+                };
+
+                let t_painter = ui.painter().with_clip_rect(t_rect);
+                t_painter.text(
+                    Pos2::new(t_rect.left(), t_rect.top() + 15.0),
                     Align2::LEFT_CENTER,
                     rel_time,
                     Typo::Small.font(),
                     TEXT_SECONDARY,
                 );
+                t_painter.text(
+                    Pos2::new(t_rect.left(), t_rect.top() + 33.0),
+                    Align2::LEFT_CENTER,
+                    dur_str,
+                    Typo::Small.font(),
+                    TEXT_MUTED,
+                );
+
                 let mut hover_msg = format!(
                     "Started: {}",
                     dep.format_started_at_local("%Y-%m-%d %H:%M:%S %:z")
@@ -124,21 +146,23 @@ impl ShiplyApp {
                 }
                 t_resp.on_hover_text(hover_msg);
 
-                // 6. Trigger / User (110px)
-                let (u_rect, _) =
-                    ui.allocate_exact_size(Vec2::new(widths.col_trigger, row_h), Sense::hover());
-                let trigger_lbl = if dep.is_rollback {
-                    "Rollback"
-                } else {
-                    "Manual"
-                };
-                ui.painter().text(
-                    Pos2::new(u_rect.left(), u_rect.center().y),
-                    Align2::LEFT_CENTER,
-                    trigger_lbl,
-                    Typo::Small.font(),
-                    TEXT_MUTED,
-                );
+                // 5. Trigger / User (only when show_trigger is true)
+                if widths.show_trigger {
+                    let (u_rect, _) = ui
+                        .allocate_exact_size(Vec2::new(widths.col_trigger, row_h), Sense::hover());
+                    let trigger_lbl = if dep.is_rollback {
+                        "Rollback"
+                    } else {
+                        "Manual"
+                    };
+                    ui.painter().text(
+                        Pos2::new(u_rect.left(), u_rect.center().y),
+                        Align2::LEFT_CENTER,
+                        trigger_lbl,
+                        Typo::Small.font(),
+                        TEXT_MUTED,
+                    );
+                }
 
                 // 7. Actions (remaining width, right-aligned)
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {

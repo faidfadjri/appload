@@ -12,10 +12,10 @@ pub(crate) struct HistoryActions {
 pub(crate) struct DesktopColWidths {
     pub col_status: f32,
     pub col_version: f32,
-    pub col_branch: f32,
-    pub col_commit: f32,
+    pub col_changes: f32,
     pub col_deployed: f32,
     pub col_trigger: f32,
+    pub show_trigger: bool,
 }
 
 impl ShiplyApp {
@@ -261,22 +261,30 @@ impl ShiplyApp {
             .corner_radius(CornerRadius::same(8))
             .inner_margin(Margin::symmetric(18, 14))
             .show(ui, |ui| {
-                // Fixed column widths: Status: 90, Version: 80, Branch: 120, Commit: 70, Deployed: 140, Trigger: 110, Actions: remaining
                 let col_status = 90.0;
-                let col_version = 80.0;
-                let col_branch = 120.0;
-                let col_commit = 70.0;
-                let col_deployed = 140.0;
-                let col_trigger = 110.0;
+                let col_version = 75.0;
+                let col_deployed = 130.0;
+                let table_avail_w = ui.available_width();
+                let show_trigger = table_avail_w >= 850.0;
+                let col_trigger = if show_trigger { 90.0 } else { 0.0 };
+                let col_actions_reserve = 180.0;
+                let col_changes = (table_avail_w
+                    - (col_status
+                        + col_version
+                        + col_deployed
+                        + col_trigger
+                        + col_actions_reserve))
+                    .max(180.0);
 
                 if !is_stacked_view {
                     horizontal_row(ui, 24.0, |ui| {
                         table_header_cell(ui, col_status, "Status");
                         table_header_cell(ui, col_version, "Version");
-                        table_header_cell(ui, col_branch, "Branch");
-                        table_header_cell(ui, col_commit, "Commit");
+                        table_header_cell(ui, col_changes, "Changes");
                         table_header_cell(ui, col_deployed, "Deployed");
-                        table_header_cell(ui, col_trigger, "Trigger / User");
+                        if show_trigger {
+                            table_header_cell(ui, col_trigger, "Trigger");
+                        }
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             ui.label(
                                 RichText::new("Actions")
@@ -318,10 +326,10 @@ impl ShiplyApp {
                     let widths = DesktopColWidths {
                         col_status,
                         col_version,
-                        col_branch,
-                        col_commit,
+                        col_changes,
                         col_deployed,
                         col_trigger,
+                        show_trigger,
                     };
                     self.render_history_desktop_rows(
                         ui,
