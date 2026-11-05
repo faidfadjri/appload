@@ -8,6 +8,8 @@
 //!    authoritative storage from `paths::data_dir()` and successfully loads all 4 projects and 167 deployments.
 //! 5. Attempting to save storage to any legacy path is blocked by the safety guard.
 //! 6. Legacy directories remain 100% byte-identical, with no new files created.
+//!
+//! Built self-contained for CI runners, with an `#[ignore]` variant for real recovery validation.
 
 use appload::migration::run_first_run_data_migration;
 use appload::storage::AppStorage;
@@ -60,25 +62,98 @@ fn get_dir_manifest(dir: &Path) -> BTreeMap<String, (u64, u64)> {
     manifest
 }
 
+/// Creates a synthetic legacy SQLite database containing 4 projects, 167 deployments, and 1 secret metadata row.
+fn create_synthetic_legacy_db(path: &Path) {
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let mut conn = rusqlite::Connection::open(path).expect("create synthetic db");
+    appload::storage::init_db(&conn).expect("init db");
+
+    let project_names = [
+        ("ndm-dq-subscription", "Backend Customer Data Ops"),
+        ("frontend-customer-data-ops", "Frontend Customer Data Ops"),
+        ("kafka-provisioner", "Kafka Provisioner"),
+        ("ndm-dq-subscription-copy", "Tester CDO"),
+    ];
+    let mut projects = Vec::new();
+    for (id, name) in project_names {
+        projects.push(appload::domain::Project {
+            id: id.to_string(),
+            name: name.to_string(),
+            description: "Synthetic project".to_string(),
+            local_path: "/opt/app".to_string(),
+            environments: Vec::new(),
+            group: None,
+            sort_order: None,
+        });
+    }
+
+    let mut deployments = Vec::new();
+    for i in 1..=167 {
+        deployments.push(appload::domain::DeploymentRecord {
+            id: format!("dep-synthetic-{i}"),
+            project_id: "ndm-dq-subscription".to_string(),
+            project_name: "Backend Customer Data Ops".to_string(),
+            environment: "prod".to_string(),
+            app_name: "ndm-dq-prod".to_string(),
+            version: "1.0.0".to_string(),
+            git_branch: Some("main".to_string()),
+            git_commit: Some("c0ffee1".to_string()),
+            git_changes: Vec::new(),
+            is_rollback: false,
+            servers: vec!["10.62.70.80".to_string()],
+            status: appload::domain::DeploymentStatus::Succeeded,
+            started_at: chrono::Utc::now(),
+            finished_at: Some(chrono::Utc::now()),
+            duration_ms: Some(1200),
+            step_logs: Vec::new(),
+            executed_steps: Vec::new(),
+        });
+    }
+
+    let secrets = vec![appload::domain::SecretEntry {
+        key: "PROD_VAULT_KEY".to_string(),
+        username: Some("appload_admin".to_string()),
+        description: "Production Secret".to_string(),
+        updated_at: chrono::Utc::now(),
+    }];
+
+    appload::storage::save_all_to_db(&mut conn, &projects, &deployments).expect("save all");
+    appload::storage::save_secrets_to_db(&mut conn, &secrets).expect("save secrets");
+}
+
+fn create_synthetic_stale_json(path: &Path) {
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let stale_data = serde_json::json!({
+        "projects": [
+            {
+                "id": "stale-proj-1",
+                "name": "Stale Proj 1",
+                "local_path": "/stale/1",
+                "environments": []
+            },
+            {
+                "id": "stale-proj-2",
+                "name": "Stale Proj 2",
+                "local_path": "/stale/2",
+                "environments": []
+            }
+        ],
+        "deployments": []
+    });
+    fs::write(
+        path,
+        serde_json::to_string_pretty(&stale_data).expect("serialize"),
+    )
+    .expect("write stale json");
+}
+
 #[test]
 fn test_storage_after_migration_loads_from_both_locations_without_legacy_writes() {
     let _lock = TEST_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
-
-    let recovery_dir =
-        PathBuf::from(r"C:\Users\ThinkPad\orca\briefs\shiply\recovery\20261105-215022");
-    let recovery_db = recovery_dir.join("shiply_state.debug.db");
-    let recovery_json = recovery_dir.join("localappdata-shiply_state.oct26.json");
-
-    assert!(
-        recovery_db.exists(),
-        "Read-only recovery DB must exist at {}",
-        recovery_db.display()
-    );
-    assert!(
-        recovery_json.exists(),
-        "Read-only recovery JSON must exist at {}",
-        recovery_json.display()
-    );
 
     let sandbox = TempDir::new().expect("tempdir for sandbox");
     let sandbox_root = sandbox.path().to_path_buf();
@@ -108,20 +183,12 @@ fn test_storage_after_migration_loads_from_both_locations_without_legacy_writes(
     fs::copy(bin_path, &shiply_exe).expect("copy shiply_exe");
     fs::copy(bin_path, &appload_exe).expect("copy appload_exe");
 
-    // Populate legacy state (read-only copy from recovery)
+    // Populate synthetic legacy state
     let legacy_db = prog_shiply.join("shiply_state.db");
-    fs::copy(&recovery_db, &legacy_db).expect("copy legacy_db");
-    let shm_src = recovery_dir.join("shiply_state.debug.db-shm");
-    if shm_src.exists() {
-        let _ = fs::copy(&shm_src, prog_shiply.join("shiply_state.db-shm"));
-    }
-    let wal_src = recovery_dir.join("shiply_state.debug.db-wal");
-    if wal_src.exists() {
-        let _ = fs::copy(&wal_src, prog_shiply.join("shiply_state.db-wal"));
-    }
+    create_synthetic_legacy_db(&legacy_db);
 
     let legacy_json = local_shiply.join("shiply_state.json");
-    fs::copy(&recovery_json, &legacy_json).expect("copy legacy_json");
+    create_synthetic_stale_json(&legacy_json);
 
     // Populate stale pre-release incident state in AppLoad to verify safe replacement
     let stale_marker = serde_json::json!({
@@ -134,8 +201,7 @@ fn test_storage_after_migration_loads_from_both_locations_without_legacy_writes(
         stale_marker.to_string(),
     )
     .expect("write stale marker");
-    fs::copy(&recovery_json, local_appload.join("appload_state.json"))
-        .expect("copy stale incident json");
+    create_synthetic_stale_json(&local_appload.join("appload_state.json"));
 
     // Snapshot legacy directories BEFORE migration and loading
     let manifest_prog_before = get_dir_manifest(&prog_shiply);
@@ -230,6 +296,52 @@ fn test_storage_after_migration_loads_from_both_locations_without_legacy_writes(
         manifest_local_before, manifest_local_after,
         "LocalAppData\\shiply files must be 100% byte-identical with zero new or altered files"
     );
+
+    env::remove_var("APPLOAD_SANDBOX_ROOT");
+}
+
+#[test]
+#[ignore]
+fn test_storage_migration_with_real_recovery_data() {
+    let recovery_path_str = match env::var("APPLOAD_RECOVERY_DB") {
+        Ok(v) if !v.trim().is_empty() => v,
+        _ => {
+            println!("Skipping real recovery test: APPLOAD_RECOVERY_DB is not set");
+            return;
+        }
+    };
+    let recovery_db = PathBuf::from(recovery_path_str);
+    assert!(
+        recovery_db.exists(),
+        "APPLOAD_RECOVERY_DB file does not exist at {}",
+        recovery_db.display()
+    );
+
+    let _lock = TEST_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
+
+    let sandbox = TempDir::new().expect("tempdir for sandbox");
+    let sandbox_root = sandbox.path().to_path_buf();
+    env::set_var("APPLOAD_SANDBOX_ROOT", &sandbox_root);
+
+    let prog_shiply = sandbox_root
+        .join("LocalAppData")
+        .join("Programs")
+        .join("Shiply");
+    let local_appload = sandbox_root.join("LocalAppData").join("appload");
+    fs::create_dir_all(&prog_shiply).expect("create prog_shiply");
+    fs::create_dir_all(&local_appload).expect("create local_appload");
+
+    let legacy_db = prog_shiply.join("shiply_state.db");
+    fs::copy(&recovery_db, &legacy_db).expect("copy recovery db");
+
+    let outcome = run_first_run_data_migration();
+    assert!(outcome.data_migrated);
+    assert_eq!(outcome.project_count, Some(4));
+
+    let storage_path = AppStorage::default_storage_path();
+    let storage = AppStorage::load_or_default(storage_path);
+    assert_eq!(storage.projects.len(), 4);
+    assert_eq!(storage.deployments.len(), 167);
 
     env::remove_var("APPLOAD_SANDBOX_ROOT");
 }
