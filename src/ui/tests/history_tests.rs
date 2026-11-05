@@ -358,3 +358,21 @@ fn test_responsive_window_resizing_and_local_timezone_history() {
         }
     }
 }
+
+#[test]
+fn test_truncate_commit_message_with_ellipsis() {
+    let ctx = egui::Context::default();
+    ShiplyApp::configure_light_workspace_style(&ctx);
+    let _ = ctx.run(Default::default(), |ctx| {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            let msg = "fix(calendar): adjust calendar-unit range calculation for leap years";
+            let font = Typo::Body.font();
+            let no_trunc = helpers::truncate_text_to_width(ui, msg, &font, 1000.0);
+            assert_eq!(no_trunc, msg);
+
+            let trunc = helpers::truncate_text_to_width(ui, msg, &font, 100.0);
+            assert!(trunc.ends_with("..."));
+            assert!(trunc.len() < msg.len());
+        });
+    });
+}

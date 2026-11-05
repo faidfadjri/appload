@@ -90,11 +90,19 @@ impl ShiplyApp {
                 let meta_line = format!("{raw_branch} @ {short_sha}");
                 ch_resp.on_hover_text(format!("{commit_msg}\n{meta_line}"));
 
+                let body_font = Typo::Body.font();
+                let display_msg = helpers::truncate_text_to_width(
+                    ui,
+                    commit_msg,
+                    &body_font,
+                    (ch_rect.width() - 8.0).max(20.0),
+                );
+
                 let ch_painter = ui.painter().with_clip_rect(ch_rect);
                 ch_painter.text(
                     Pos2::new(ch_rect.left(), ch_rect.top() + 15.0),
                     Align2::LEFT_CENTER,
-                    commit_msg,
+                    display_msg,
                     Typo::Body.font(),
                     TEXT_PRIMARY,
                 );

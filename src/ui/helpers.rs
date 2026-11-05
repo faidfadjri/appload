@@ -681,3 +681,59 @@ pub(crate) fn table_header_cell_styled(
         color,
     );
 }
+
+/// Truncates a string with an ellipsis "..." so that its rendered width does not exceed `max_width`.
+pub(crate) fn truncate_text_to_width(
+    ui: &egui::Ui,
+    text: &str,
+    font: &egui::FontId,
+    max_width: f32,
+) -> String {
+    let full_galley = ui
+        .painter()
+        .layout_no_wrap(text.to_string(), font.clone(), Color32::WHITE);
+    if full_galley.size().x <= max_width {
+        return text.to_string();
+    }
+
+    let ellipsis = "...";
+    let ellipsis_w = ui
+        .painter()
+        .layout_no_wrap(ellipsis.to_string(), font.clone(), Color32::WHITE)
+        .size()
+        .x;
+    if ellipsis_w >= max_width {
+        return ellipsis.to_string();
+    }
+
+    let target_w = max_width - ellipsis_w;
+    let char_indices: Vec<usize> = text.char_indices().map(|(idx, _)| idx).collect();
+    let mut best = 0;
+    let mut l = 0;
+    let mut r = char_indices.len();
+    while l <= r && r > 0 {
+        let mid = (l + r) / 2;
+        let byte_pos = if mid < char_indices.len() {
+            char_indices[mid]
+        } else {
+            text.len()
+        };
+        let sub = &text[..byte_pos];
+        let sub_w = ui
+            .painter()
+            .layout_no_wrap(sub.to_string(), font.clone(), Color32::WHITE)
+            .size()
+            .x;
+        if sub_w <= target_w {
+            best = byte_pos;
+            l = mid + 1;
+        } else {
+            if mid == 0 {
+                break;
+            }
+            r = mid - 1;
+        }
+    }
+
+    format!("{}{ellipsis}", text[..best].trim_end())
+}
