@@ -744,7 +744,7 @@ fn extract_test_path_target(content: &str) -> Option<String> {
             {
                 unquoted
             } else if after.starts_with('\'') || after.starts_with('"') {
-                let quote = after.chars().next().unwrap();
+                let quote = after.chars().next().expect("after is non-empty as guaranteed by starts_with check");
                 let inner = after[1..].split(quote).next().unwrap_or("");
                 inner.to_string()
             } else {

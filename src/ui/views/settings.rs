@@ -177,9 +177,8 @@ impl ShiplyApp {
                         let servers_text = match &mut self.servers_edit_buffer {
                             Some((k, buf)) if k == &env_key => buf,
                             _ => {
-                                self.servers_edit_buffer =
-                                    Some((env_key.clone(), env_cfg.servers.join(", ")));
-                                &mut self.servers_edit_buffer.as_mut().unwrap().1
+                                let slot = self.servers_edit_buffer.insert((env_key.clone(), env_cfg.servers.join(", ")));
+                                &mut slot.1
                             }
                         };
 
@@ -358,9 +357,8 @@ impl ShiplyApp {
                         let env_src_text = match &mut self.server_env_source_buffer {
                             Some((k, buf)) if k == &env_key => buf,
                             _ => {
-                                self.server_env_source_buffer =
-                                    Some((env_key.clone(), env_cfg.env_source.clone().unwrap_or_default()));
-                                &mut self.server_env_source_buffer.as_mut().unwrap().1
+                                let slot = self.server_env_source_buffer.insert((env_key.clone(), env_cfg.env_source.clone().unwrap_or_default()));
+                                &mut slot.1
                             }
                         };
 
@@ -386,9 +384,8 @@ impl ShiplyApp {
                                 let proxy_text = match &mut self.server_http_proxy_buffer {
                                     Some((k, buf)) if k == &env_key => buf,
                                     _ => {
-                                        self.server_http_proxy_buffer =
-                                            Some((env_key.clone(), env_cfg.http_proxy.clone().unwrap_or_default()));
-                                        &mut self.server_http_proxy_buffer.as_mut().unwrap().1
+                                        let slot = self.server_http_proxy_buffer.insert((env_key.clone(), env_cfg.http_proxy.clone().unwrap_or_default()));
+                                        &mut slot.1
                                     }
                                 };
                                 kit::form_field(ui, "HTTP proxy", None, false, |ui| {
@@ -429,9 +426,8 @@ impl ShiplyApp {
                             let proxy_text = match &mut self.server_http_proxy_buffer {
                                 Some((k, buf)) if k == &env_key => buf,
                                 _ => {
-                                    self.server_http_proxy_buffer =
-                                        Some((env_key.clone(), env_cfg.http_proxy.clone().unwrap_or_default()));
-                                    &mut self.server_http_proxy_buffer.as_mut().unwrap().1
+                                    let slot = self.server_http_proxy_buffer.insert((env_key.clone(), env_cfg.http_proxy.clone().unwrap_or_default()));
+                                    &mut slot.1
                                 }
                             };
                             kit::form_field(ui, "HTTP proxy", None, false, |ui| {
