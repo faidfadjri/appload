@@ -5,7 +5,7 @@ use super::*;
 #[test]
 fn test_concurrent_deployments_across_different_projects_prevent_same_project_only() {
     let ctx = egui::Context::default();
-    ShiplyApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
 
     let mut storage = crate::storage::AppStorage::default();
     let proj_backend = Project {
@@ -50,7 +50,7 @@ fn test_concurrent_deployments_across_different_projects_prevent_same_project_on
     };
     storage.projects = vec![proj_backend.clone(), proj_frontend.clone()];
 
-    let mut app = ShiplyApp::new(storage);
+    let mut app = AppLoadApp::new(storage);
 
     // 1. Initially neither project is deploying
     assert!(!app.is_project_deploying("proj-backend"));
@@ -182,7 +182,7 @@ fn test_concurrent_deployments_across_different_projects_prevent_same_project_on
 #[test]
 fn test_concurrent_deployments_for_multiple_environments_on_same_project() {
     let ctx = egui::Context::default();
-    ShiplyApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
 
     let mut storage = crate::storage::AppStorage::default();
     let proj_multi = Project {
@@ -221,7 +221,7 @@ fn test_concurrent_deployments_for_multiple_environments_on_same_project() {
     };
     storage.projects = vec![proj_multi.clone()];
 
-    let mut app = ShiplyApp::new(storage);
+    let mut app = AppLoadApp::new(storage);
 
     // 1. Initially neither environment is deploying
     assert!(!app.is_env_deploying("proj-api", "dev"));

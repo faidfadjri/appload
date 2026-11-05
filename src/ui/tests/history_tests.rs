@@ -5,7 +5,7 @@ use super::*;
 #[test]
 fn test_deployment_history_pagination_last_5_and_show_more_10() {
     let ctx = egui::Context::default();
-    ShiplyApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
 
     let mut storage = crate::storage::AppStorage::default();
     // Create 18 mock deployments
@@ -31,7 +31,7 @@ fn test_deployment_history_pagination_last_5_and_show_more_10() {
         });
     }
 
-    let mut app = ShiplyApp::new(storage);
+    let mut app = AppLoadApp::new(storage);
     assert_eq!(app.history_visible_limit, 5);
 
     // Render UI with initially 5 items
@@ -69,7 +69,7 @@ fn test_deployment_history_pagination_last_5_and_show_more_10() {
 #[test]
 fn test_deployment_history_filters_by_active_environment_for_selected_project() {
     let ctx = egui::Context::default();
-    ShiplyApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
 
     let mut storage = crate::storage::AppStorage::default();
     let proj = Project {
@@ -167,7 +167,7 @@ fn test_deployment_history_filters_by_active_environment_for_selected_project() 
     };
     storage.deployments = vec![dep_dev1, dep_dev2, dep_prod1];
 
-    let mut app = ShiplyApp::new(storage);
+    let mut app = AppLoadApp::new(storage);
     app.selection = SidebarSelection::Project("proj-backend".to_string());
     app.selected_env_key = "dev".to_string();
 
@@ -236,7 +236,7 @@ fn test_responsive_environment_cards_and_history_stacked_breakpoints() {
 #[test]
 fn test_responsive_window_resizing_and_local_timezone_history() {
     let ctx = egui::Context::default();
-    ShiplyApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
 
     let mut storage = crate::storage::AppStorage::default();
     let proj = Project {
@@ -314,7 +314,7 @@ fn test_responsive_window_resizing_and_local_timezone_history() {
     );
 
     storage.deployments.push(dep);
-    let mut app = ShiplyApp::new(storage);
+    let mut app = AppLoadApp::new(storage);
 
     // Render across multiple window sizes (from compact 540x440 up to 1920x1080)
     let window_sizes = [
@@ -362,7 +362,7 @@ fn test_responsive_window_resizing_and_local_timezone_history() {
 #[test]
 fn test_truncate_commit_message_with_ellipsis() {
     let ctx = egui::Context::default();
-    ShiplyApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
     let _ = ctx.run(Default::default(), |ctx| {
         egui::CentralPanel::default().show(ctx, |ui| {
             let msg = "fix(calendar): adjust calendar-unit range calculation for leap years";

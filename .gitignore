@@ -12,6 +12,12 @@
 setup.exe
 Windows/*.exe
 .shiply_state.json
-shiply_state.json
+shiply_state.*
+.appload_state.json
+appload_state.*
+*.db
+*.db-shm
+*.db-wal
+migrated_from_shiply.json
 *.tmp
 *.old

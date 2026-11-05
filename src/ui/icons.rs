@@ -245,8 +245,8 @@ pub(crate) fn draw_icon_check(painter: &egui::Painter, c: Pos2, color: Color32) 
     );
 }
 
-/// Draws the official Shiply `logo.ico` texture inside a rounded container (falling back to 'S' if unavailable).
-pub(crate) fn draw_shiply_logo(
+/// Draws the official AppLoad `logo.ico` texture inside a rounded container (falling back to 'A' if unavailable).
+pub(crate) fn draw_appload_logo(
     painter: &egui::Painter,
     rect: Rect,
     corner_radius: u8,
@@ -268,12 +268,15 @@ pub(crate) fn draw_shiply_logo(
         painter.text(
             rect.center(),
             Align2::CENTER_CENTER,
-            "S",
+            "A",
             FontId::proportional(font_size),
             Color32::WHITE,
         );
     }
 }
+
+#[allow(unused_imports)]
+pub(crate) use draw_appload_logo as draw_shiply_logo;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(dead_code)]

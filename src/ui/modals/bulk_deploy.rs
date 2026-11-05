@@ -2,7 +2,7 @@
 
 use super::*;
 
-impl ShiplyApp {
+impl AppLoadApp {
     pub(crate) fn render_bulk_deploy_modal(&mut self, ctx: &egui::Context) {
         let Some(anim_t) =
             prepare_animated_modal(ctx, "bulk_deploy", &mut self.show_bulk_deploy_modal)

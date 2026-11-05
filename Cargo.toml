@@ -1,8 +1,8 @@
 [package]
-name = "shiply"
-version = "0.11.0"
+name = "appload"
+version = "0.12.0"
 edition = "2021"
-description = "Cross-platform Mini Deployment Platform in Rust"
+description = "Universal Desktop Deployment Tool for multi-server pipelines"
 
 [dependencies]
 chrono = { version = "0.4", features = ["serde"] }

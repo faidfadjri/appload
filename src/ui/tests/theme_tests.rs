@@ -18,7 +18,7 @@ fn test_running_badge_pill_colors_and_layout() {
 
     // Test painter execution with egui Context
     let ctx = egui::Context::default();
-    ShiplyApp::install_fonts(&ctx);
+    AppLoadApp::install_fonts(&ctx);
     let _ = ctx.run(Default::default(), |ctx| {
         egui::CentralPanel::default().show(ctx, |ui| {
             let left_center = Pos2::new(100.0, 50.0);
@@ -70,10 +70,10 @@ fn test_webflow_palette_and_theme_tokens() {
 #[test]
 fn test_input_core_vertical_centring() {
     let ctx = egui::Context::default();
-    ShiplyApp::install_fonts(&ctx);
-    ShiplyApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::install_fonts(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
 
-    let mut val = "Shiply Production Deployment".to_string();
+    let mut val = "AppLoad Production Deployment".to_string();
 
     let _ = ctx.run(Default::default(), |ctx| {
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -96,8 +96,8 @@ fn test_input_core_vertical_centring() {
 #[test]
 fn test_input_core_single_click_mid_text() {
     let ctx = egui::Context::default();
-    ShiplyApp::install_fonts(&ctx);
-    ShiplyApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::install_fonts(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
 
     let mut val = "hello world foo bar".to_string();
     let id_salt = "test_click_mid";
@@ -170,8 +170,8 @@ fn test_input_core_single_click_mid_text() {
 #[test]
 fn test_input_core_drag_selection() {
     let ctx = egui::Context::default();
-    ShiplyApp::install_fonts(&ctx);
-    ShiplyApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::install_fonts(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
 
     let mut val = "abcdefghijklmnopqrstuvwxyz".to_string();
     let id_salt = "test_drag_select";
@@ -257,8 +257,8 @@ fn test_input_core_drag_selection() {
 #[test]
 fn test_input_core_double_click_word() {
     let ctx = egui::Context::default();
-    ShiplyApp::install_fonts(&ctx);
-    ShiplyApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::install_fonts(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
 
     let mut val = "deploy staging server".to_string();
     let id_salt = "test_double_click";
@@ -365,10 +365,10 @@ fn test_input_core_double_click_word() {
 #[test]
 fn test_settings_cards_equal_widths_and_grid_alignment() {
     let ctx = egui::Context::default();
-    ShiplyApp::install_fonts(&ctx);
-    ShiplyApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::install_fonts(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
 
-    let mut app = ShiplyApp::new(crate::storage::AppStorage::default());
+    let mut app = AppLoadApp::new(crate::storage::AppStorage::default());
     let proj = crate::domain::Project {
         id: "proj_settings_test".to_string(),
         name: "Settings Test Project".to_string(),
@@ -413,8 +413,8 @@ fn test_topbar_frameless_no_horizontal_border() {
 #[test]
 fn test_topbar_black_background_and_no_theme_toggle() {
     let ctx = egui::Context::default();
-    ShiplyApp::install_fonts(&ctx);
-    let mut app = ShiplyApp::new(crate::storage::AppStorage::default());
+    AppLoadApp::install_fonts(&ctx);
+    let mut app = AppLoadApp::new(crate::storage::AppStorage::default());
 
     let _ = ctx.run(Default::default(), |ctx| {
         app.render_termius_topbar(ctx);

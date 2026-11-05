@@ -2,7 +2,7 @@
 
 use super::*;
 
-impl ShiplyApp {
+impl AppLoadApp {
     pub(crate) fn render_history_code_changes(
         &mut self,
         ui: &mut egui::Ui,

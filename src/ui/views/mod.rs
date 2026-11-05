@@ -1,4 +1,4 @@
-//! Views for Shiply panels, tabs, and pages.
+//! Views for AppLoad panels, tabs, and pages.
 
 use super::*;
 

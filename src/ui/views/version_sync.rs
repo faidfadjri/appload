@@ -2,7 +2,7 @@
 
 use super::*;
 
-impl ShiplyApp {
+impl AppLoadApp {
     pub fn sync_version_candidates(&self, project_id: &str) -> Vec<SyncVersionCandidate> {
         let mut candidates = Vec::new();
         let Some(proj) = self.storage.projects.iter().find(|p| p.id == project_id) else {

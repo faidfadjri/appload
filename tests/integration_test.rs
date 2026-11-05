@@ -1,9 +1,9 @@
-use shiply::credentials::{ENV_ASKPASS_FILE, ENV_ASKPASS_MODE};
-use shiply::domain::{DeploymentStatus, EnvironmentConfig, PipelineStep, StepKind};
-use shiply::executor::{run_deployment, DeploymentRequest};
-use shiply::presets::default_projects;
-use shiply::ps1_importer::import_project_from_path;
-use shiply::storage::AppStorage;
+use appload::credentials::{ENV_ASKPASS_FILE, ENV_ASKPASS_MODE};
+use appload::domain::{DeploymentStatus, EnvironmentConfig, PipelineStep, StepKind};
+use appload::executor::{run_deployment, DeploymentRequest};
+use appload::presets::default_projects;
+use appload::ps1_importer::import_project_from_path;
+use appload::storage::AppStorage;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
@@ -12,7 +12,7 @@ use tempfile::TempDir;
 #[test]
 fn test_presets_custom_environment_and_full_deployment_lifecycle() {
     let tmp = TempDir::new().expect("tempdir");
-    let state_path = tmp.path().join("shiply_state.json");
+    let state_path = tmp.path().join("appload_state.json");
     let mut storage = AppStorage::load_or_default(&state_path);
 
     // First-time install starts empty without projects or environments
@@ -116,17 +116,17 @@ fn test_auto_import_real_ndm_dq_subscription_ps1_if_present() {
 }
 
 #[test]
-fn test_shiply_binary_askpass_mode() {
+fn test_appload_binary_askpass_mode() {
     let tmp = TempDir::new().expect("tempdir");
     let pw_file = tmp.path().join("secret_pw");
     fs::write(&pw_file, "IndyServerSecret!99").expect("write pw");
 
-    let bin_path = env!("CARGO_BIN_EXE_shiply");
+    let bin_path = env!("CARGO_BIN_EXE_appload");
     let output = Command::new(bin_path)
         .env(ENV_ASKPASS_MODE, "1")
         .env(ENV_ASKPASS_FILE, &pw_file)
         .output()
-        .expect("run shiply in askpass mode");
+        .expect("run appload in askpass mode");
 
     assert!(output.status.success());
     assert_eq!(

@@ -1,15 +1,16 @@
-//! Shiply application entry point and CLI mode dispatcher.
+//! AppLoad application entry point and CLI mode dispatcher.
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use eframe::egui;
-use shiply::credentials::try_handle_askpass_invocation;
-use shiply::installer::{
-    build_shiply_icon_data, check_install_state, default_install_dir, install_or_update_self,
+use appload::credentials::try_handle_askpass_invocation;
+use appload::installer::{
+    build_appload_icon_data, check_install_state, default_install_dir, install_or_update_self,
     is_setup_mode, InstallState, SetupWizardApp, APP_VERSION,
 };
-use shiply::storage::AppStorage;
-use shiply::ui::ShiplyApp;
+use appload::migration::{handle_install_migration_and_handoff, run_first_run_data_migration};
+use appload::storage::AppStorage;
+use appload::ui::AppLoadApp;
+use eframe::egui;
 use std::env;
 use std::sync::Arc;
 
@@ -37,14 +38,14 @@ fn main() -> eframe::Result<()> {
         }
     }
 
-    let app_icon = Arc::new(build_shiply_icon_data());
+    let app_icon = Arc::new(build_appload_icon_data());
 
     // 3. If launched as `setup.exe` (or `--setup`), open the graphical Desktop Setup Wizard!
     if is_setup_mode(&args) {
         let setup_options = eframe::NativeOptions {
             centered: true,
             viewport: egui::ViewportBuilder::default()
-                .with_title(format!("Shiply v{APP_VERSION} Setup"))
+                .with_title(format!("AppLoad v{APP_VERSION} Setup"))
                 .with_icon(app_icon)
                 .with_inner_size([520.0, 390.0])
                 .with_min_inner_size([500.0, 370.0])
@@ -52,16 +53,26 @@ fn main() -> eframe::Result<()> {
             ..Default::default()
         };
         return eframe::run_native(
-            "Shiply Setup",
+            "AppLoad Setup",
             setup_options,
             Box::new(|cc| {
-                ShiplyApp::configure_workspace_theme(&cc.egui_ctx, false);
+                AppLoadApp::configure_workspace_theme(&cc.egui_ctx, false);
                 Ok(Box::new(SetupWizardApp::default()))
             }),
         );
     }
 
-    // 4. Auto-update installed copy when launching a newer .exe version directly
+    // 4. Install migration and handoff:
+    // If running as legacy shiply.exe in Programs\Shiply, install to Programs\AppLoad,
+    // swap shortcuts, relaunch the new binary, and exit.
+    if handle_install_migration_and_handoff() {
+        return Ok(());
+    }
+
+    // 5. First-run data migration (copy with rename, leaving legacy intact, marker recorded)
+    let migration_outcome = run_first_run_data_migration();
+
+    // 6. Auto-update installed copy when launching a newer .exe version directly
     let mut startup_notice = None;
     if let InstallState::UpdateReady {
         installed_version,
@@ -81,12 +92,12 @@ fn main() -> eframe::Result<()> {
 
     let mut width = 1280.0;
     let mut height = 800.0;
-    if let Ok(w) = env::var("SHIPLY_WINDOW_WIDTH") {
+    if let Ok(w) = env::var("APPLOAD_WINDOW_WIDTH").or_else(|_| env::var("SHIPLY_WINDOW_WIDTH")) {
         if let Ok(val) = w.parse::<f32>() {
             width = val;
         }
     }
-    if let Ok(h) = env::var("SHIPLY_WINDOW_HEIGHT") {
+    if let Ok(h) = env::var("APPLOAD_WINDOW_HEIGHT").or_else(|_| env::var("SHIPLY_WINDOW_HEIGHT")) {
         if let Ok(val) = h.parse::<f32>() {
             height = val;
         }
@@ -95,7 +106,7 @@ fn main() -> eframe::Result<()> {
     let native_options = eframe::NativeOptions {
         centered: true,
         viewport: egui::ViewportBuilder::default()
-            .with_title(format!("Shiply v{APP_VERSION} — Mini Deployment Platform"))
+            .with_title(format!("AppLoad v{APP_VERSION}"))
             .with_icon(app_icon)
             .with_decorations(false)
             .with_inner_size([width, height])
@@ -104,12 +115,14 @@ fn main() -> eframe::Result<()> {
     };
 
     eframe::run_native(
-        "Shiply",
+        "AppLoad",
         native_options,
         Box::new(move |cc| {
-            ShiplyApp::configure_workspace_theme(&cc.egui_ctx, false);
-            let mut app = ShiplyApp::new(storage);
-            if let Some(notice) = startup_notice {
+            AppLoadApp::configure_workspace_theme(&cc.egui_ctx, false);
+            let mut app = AppLoadApp::new(storage);
+            if let Some(notice) = migration_outcome.notice {
+                app.set_status_banner(notice, !migration_outcome.is_error);
+            } else if let Some(notice) = startup_notice {
                 app.set_status_banner(notice, true);
             }
             Ok(Box::new(app))

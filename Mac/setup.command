@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Double-clickable macOS Finder Setup Launcher for Shiply
+# Double-clickable macOS Finder Setup Launcher for AppLoad
 set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"

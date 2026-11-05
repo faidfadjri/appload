@@ -51,7 +51,7 @@ struct AskpassGuard {
 
 impl AskpassGuard {
     fn new(password: &str) -> Result<Self, String> {
-        let dir = env::temp_dir().join(format!("shiply-askpass-{}", Uuid::new_v4().simple()));
+        let dir = env::temp_dir().join(format!("appload-askpass-{}", Uuid::new_v4().simple()));
         fs::create_dir_all(&dir)
             .map_err(|e| format!("Failed to create temp askpass directory: {e}"))?;
 
@@ -78,9 +78,14 @@ impl AskpassGuard {
         if let Ok(exe) = env::current_exe() {
             cmd.env("SSH_ASKPASS", exe);
             cmd.env("SSH_ASKPASS_REQUIRE", "force");
-            cmd.env("DISPLAY", "shiply:0");
+            cmd.env("DISPLAY", "appload:0");
             cmd.env(ENV_ASKPASS_MODE, "1");
             cmd.env(ENV_ASKPASS_FILE, &self.password_file);
+            cmd.env(crate::credentials::LEGACY_ENV_ASKPASS_MODE, "1");
+            cmd.env(
+                crate::credentials::LEGACY_ENV_ASKPASS_FILE,
+                &self.password_file,
+            );
         }
     }
 }
@@ -104,7 +109,7 @@ struct StagingGuard {
 
 impl StagingGuard {
     fn stage_env_file(source_file: &Path) -> Result<(Self, PathBuf), String> {
-        let dir = env::temp_dir().join(format!("shiply-stage-{}", Uuid::new_v4().simple()));
+        let dir = env::temp_dir().join(format!("appload-stage-{}", Uuid::new_v4().simple()));
         fs::create_dir_all(&dir)
             .map_err(|e| format!("Failed to create temporary staging directory: {e}"))?;
 
@@ -336,7 +341,7 @@ fn execute_multiline_script_file(
         LocalShell::Bash => "sh",
     };
 
-    let temp_name = format!("shiply_step_{id_slug}_{}.{ext}", Uuid::new_v4());
+    let temp_name = format!("appload_step_{id_slug}_{}.{ext}", Uuid::new_v4());
     let script_path = env::temp_dir().join(temp_name);
     let _guard = TempScriptGuard(script_path.clone());
 
@@ -919,7 +924,7 @@ pub fn run_deployment(
                         env_cfg.remote_user,
                         server,
                         if out.is_empty() {
-                            "Authentication or connection failed. Check OS Credential Manager ('indyserver') or enter SSH password in Shiply."
+                            "Authentication or connection failed. Check OS Credential Manager ('indyserver') or enter SSH password in AppLoad."
                         } else {
                             &out
                         }
@@ -1670,22 +1675,22 @@ mod tests {
         // 1. Single-line command (PowerShell on Windows, Bash on Unix)
         let (ok, out) = execute_local_shell_command(
             tmp.path(),
-            "echo \"Shiply Single Line\"",
+            "echo \"AppLoad Single Line\"",
             None,
             Some("step-single"),
         )
         .expect("single-line execution");
         assert!(ok, "single line command failed: {out}");
         assert!(
-            out.contains("Shiply Single Line"),
+            out.contains("AppLoad Single Line"),
             "output did not contain expected text: {out}"
         );
 
         // 2. Multiline command (written to temp script file)
         let multiline_script = if cfg!(windows) {
-            "$varA = 'Shiply Line 1'\r\n$varB = 'Shiply Line 2'\r\nWrite-Output \"$varA - $varB\""
+            "$varA = 'AppLoad Line 1'\r\n$varB = 'AppLoad Line 2'\r\nWrite-Output \"$varA - $varB\""
         } else {
-            "varA='Shiply Line 1'\nvarB='Shiply Line 2'\necho \"$varA - $varB\""
+            "varA='AppLoad Line 1'\nvarB='AppLoad Line 2'\necho \"$varA - $varB\""
         };
 
         let (ok_multi, out_multi) =
@@ -1693,7 +1698,7 @@ mod tests {
                 .expect("multiline execution");
         assert!(ok_multi, "multiline command failed: {out_multi}");
         assert!(
-            out_multi.contains("Shiply Line 1 - Shiply Line 2"),
+            out_multi.contains("AppLoad Line 1 - AppLoad Line 2"),
             "multiline output did not contain expected text: {out_multi}"
         );
 
@@ -1719,13 +1724,13 @@ mod tests {
         // Single line CMD
         let (ok, out) = execute_local_shell_command(
             tmp.path(),
-            "echo Shiply CMD Single",
+            "echo AppLoad CMD Single",
             Some(LocalShell::Cmd),
             Some("step-cmd-1"),
         )
         .expect("cmd single execution");
         assert!(ok);
-        assert!(out.contains("Shiply CMD Single"));
+        assert!(out.contains("AppLoad CMD Single"));
 
         // Multiline CMD (.bat file)
         let multiline_bat = "echo Line One\r\necho Line Two";

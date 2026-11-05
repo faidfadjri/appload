@@ -2,7 +2,7 @@
 
 use super::*;
 
-impl ShiplyApp {
+impl AppLoadApp {
     /// Renders a confirmation dialog before deleting a project or an environment.
     pub(crate) fn render_delete_confirmation_modal(&mut self, ctx: &egui::Context) {
         let mut is_open = self.pending_delete_confirm.is_some();
@@ -37,7 +37,7 @@ impl ShiplyApp {
                 ) = match &action {
                     ConfirmDeleteAction::Project { project_name, .. } => (
                         "Delete Project",
-                        "This will permanently delete the project from Shiply.",
+                        "This will permanently delete the project from AppLoad.",
                         project_name.clone(),
                         "Are you sure you want to delete this project? All associated environments, pipeline configurations, and settings for this project will be removed.".to_string(),
                     ),
@@ -81,7 +81,7 @@ impl ShiplyApp {
                     }
                     ConfirmDeleteAction::Secret { key } => (
                         "Delete Secret from OS Vault",
-                        "This will permanently remove this secret from your OS Credential Manager and Shiply.",
+                        "This will permanently remove this secret from your OS Credential Manager and AppLoad.",
                         key.clone(),
                         format!(
                             "Are you sure you want to delete secret '{key}'? Its stored password/token will be removed from your OS Credential Manager."

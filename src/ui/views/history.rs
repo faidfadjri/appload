@@ -18,7 +18,7 @@ pub(crate) struct DesktopColWidths {
     pub show_trigger: bool,
 }
 
-impl ShiplyApp {
+impl AppLoadApp {
     pub(crate) fn render_history_and_logs_view(
         &mut self,
         ui: &mut egui::Ui,

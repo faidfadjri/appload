@@ -1,4 +1,4 @@
-name: Release Shiply Desktop Binaries
+name: Release AppLoad Desktop Binaries
 
 on:
   push:
@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release version tag (e.g. v0.4.0)"
+        description: "Release version tag (e.g. v0.12.0)"
         required: true
-        default: "v0.4.0"
+        default: "v0.12.0"
 
 permissions:
   contents: write
@@ -39,18 +39,20 @@ jobs:
       - name: Build Release Binaries & Sign Executables
         run: |
           cargo build --release
-          Copy-Item target/release/shiply.exe shiply.exe -Force
-          Copy-Item target/release/shiply.exe Shiply-Setup.exe -Force
-          Copy-Item target/release/shiply.exe setup.exe -Force
-          Copy-Item target/release/shiply.exe shiply-windows-x86_64.exe -Force
-          Copy-Item Windows/install-windows.bat Shiply-Install.bat -Force
+          Copy-Item target/release/appload.exe appload.exe -Force
+          Copy-Item target/release/appload.exe AppLoad-Setup.exe -Force
+          Copy-Item target/release/appload.exe setup.exe -Force
+          Copy-Item target/release/appload.exe appload-windows-x86_64.exe -Force
+          Copy-Item target/release/appload.exe shiply.exe -Force
+          Copy-Item target/release/appload.exe shiply-windows-x86_64.exe -Force
+          Copy-Item Windows/install-windows.bat AppLoad-Install.bat -Force
           Copy-Item Windows/install-windows.ps1 install-windows.ps1 -Force
 
           # Authenticode Code Signing to eliminate "Unknown publisher" in Windows SmartScreen
           try {
-            $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=Shiply, O=Shiply Deployment Platform, C=US" -CertStoreLocation Cert:\CurrentUser\My -HashAlgorithm SHA256
-            Export-Certificate -Cert $cert -FilePath Shiply-Certificate.cer
-            Set-AuthenticodeSignature -Certificate $cert -FilePath @("shiply.exe", "Shiply-Setup.exe", "setup.exe", "shiply-windows-x86_64.exe") -TimestampServer "http://timestamp.digicert.com" -HashAlgorithm SHA256 -ErrorAction SilentlyContinue
+            $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=AppLoad, O=AppLoad Deployment Platform, C=US" -CertStoreLocation Cert:\CurrentUser\My -HashAlgorithm SHA256
+            Export-Certificate -Cert $cert -FilePath AppLoad-Certificate.cer
+            Set-AuthenticodeSignature -Certificate $cert -FilePath @("appload.exe", "AppLoad-Setup.exe", "setup.exe", "appload-windows-x86_64.exe", "shiply.exe", "shiply-windows-x86_64.exe") -TimestampServer "http://timestamp.digicert.com" -HashAlgorithm SHA256 -ErrorAction SilentlyContinue
           } catch {
             Write-Warning "Code signing warning: $_"
           }
@@ -60,13 +62,15 @@ jobs:
         with:
           name: windows-binaries
           path: |
-            shiply.exe
-            Shiply-Setup.exe
+            appload.exe
+            AppLoad-Setup.exe
             setup.exe
+            appload-windows-x86_64.exe
+            shiply.exe
             shiply-windows-x86_64.exe
-            Shiply-Install.bat
+            AppLoad-Install.bat
             install-windows.ps1
-            Shiply-Certificate.cer
+            AppLoad-Certificate.cer
 
   build-linux:
     name: Build Linux (x86_64)
@@ -89,14 +93,17 @@ jobs:
       - name: Build Release Binary
         run: |
           cargo build --release
-          cp target/release/shiply shiply-linux-x86_64
-          chmod +x shiply-linux-x86_64
+          cp target/release/appload appload-linux-x86_64
+          cp target/release/appload shiply-linux-x86_64
+          chmod +x appload-linux-x86_64 shiply-linux-x86_64
 
       - name: Upload Linux Release Asset
         uses: actions/upload-artifact@v4
         with:
           name: linux-binaries
-          path: shiply-linux-x86_64
+          path: |
+            appload-linux-x86_64
+            shiply-linux-x86_64
 
   build-macos:
     name: Build macOS (Universal / Apple Silicon)
@@ -114,19 +121,19 @@ jobs:
       - name: Build Release Binary & Package macOS Installer
         run: |
           cargo build --release
-          cp target/release/shiply shiply-macos-aarch64
-          chmod +x shiply-macos-aarch64
-          cp target/release/shiply Mac/shiply
-          chmod +x Mac/shiply Mac/setup Mac/*.command Mac/*.sh "Mac/Shiply Installer.app/Contents/MacOS/installer"
-          zip -r shiply-macos-installer.zip Mac
+          cp target/release/appload appload-macos-aarch64
+          chmod +x appload-macos-aarch64
+          cp target/release/appload Mac/appload
+          chmod +x Mac/appload Mac/setup Mac/*.command Mac/*.sh "Mac/AppLoad Installer.app/Contents/MacOS/installer"
+          zip -r appload-macos-installer.zip Mac
 
       - name: Upload macOS Release Asset
         uses: actions/upload-artifact@v4
         with:
           name: macos-binaries
           path: |
-            shiply-macos-aarch64
-            shiply-macos-installer.zip
+            appload-macos-aarch64
+            appload-macos-installer.zip
 
   publish-release:
     name: Publish GitHub Release
@@ -158,16 +165,16 @@ jobs:
             "version": "${VERSION}",
             "tag_name": "${TAG}",
             "pub_date": "${PUB_DATE}",
-            "notes": "Shiply ${TAG} automated multi-platform release.",
+            "notes": "AppLoad ${TAG} automated multi-platform release.",
             "platforms": {
               "windows-x86_64": {
-                "url": "https://github.com/${REPO}/releases/download/${TAG}/shiply.exe"
+                "url": "https://github.com/${REPO}/releases/download/${TAG}/appload.exe"
               },
               "linux-x86_64": {
-                "url": "https://github.com/${REPO}/releases/download/${TAG}/shiply-linux-x86_64"
+                "url": "https://github.com/${REPO}/releases/download/${TAG}/appload-linux-x86_64"
               },
               "darwin-aarch64": {
-                "url": "https://github.com/${REPO}/releases/download/${TAG}/shiply-macos-aarch64"
+                "url": "https://github.com/${REPO}/releases/download/${TAG}/appload-macos-aarch64"
               }
             }
           }
@@ -182,20 +189,23 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          name: "Shiply ${{ github.event.inputs.tag || github.ref_name }}"
+          name: "AppLoad ${{ github.event.inputs.tag || github.ref_name }}"
           generate_release_notes: true
           draft: false
           prerelease: false
           files: |
-            release_assets/shiply.exe
-            release_assets/Shiply-Setup.exe
+            release_assets/appload.exe
+            release_assets/AppLoad-Setup.exe
             release_assets/setup.exe
+            release_assets/appload-windows-x86_64.exe
+            release_assets/shiply.exe
             release_assets/shiply-windows-x86_64.exe
-            release_assets/Shiply-Install.bat
+            release_assets/AppLoad-Install.bat
             release_assets/install-windows.ps1
-            release_assets/Shiply-Certificate.cer
+            release_assets/AppLoad-Certificate.cer
+            release_assets/appload-linux-x86_64
             release_assets/shiply-linux-x86_64
-            release_assets/shiply-macos-aarch64
-            release_assets/shiply-macos-installer.zip
+            release_assets/appload-macos-aarch64
+            release_assets/appload-macos-installer.zip
             release_assets/latest.json
             release_assets/SHA256SUMS.txt

@@ -398,27 +398,43 @@ pub fn upsert_deployment_to_db(
 }
 
 impl AppStorage {
-    /// Resolves `shiply_state.db` directly inside the application executable's directory
-    /// so users can easily manage `shiply_state.db` (or drop `.json` / `.ps1` files)
-    /// into the app folder and have Shiply automatically recognize all projects and history.
+    /// Resolves `appload_state.db` directly inside the application executable's directory
+    /// so users can easily manage `appload_state.db` (or drop `.json` / `.ps1` files)
+    /// into the app folder and have AppLoad automatically recognize all projects and history.
     pub fn default_storage_path() -> PathBuf {
         if let Ok(exe_path) = env::current_exe() {
             if let Some(exe_dir) = exe_path.parent() {
-                let candidate_db = exe_dir.join("shiply_state.db");
-                let candidate_json = exe_dir.join("shiply_state.json");
-                if candidate_db.exists() || candidate_json.exists() || is_dir_writable(exe_dir) {
+                let candidate_db = exe_dir.join("appload_state.db");
+                let candidate_json = exe_dir.join("appload_state.json");
+                let legacy_db = exe_dir.join("shiply_state.db");
+                let legacy_json = exe_dir.join("shiply_state.json");
+                if candidate_db.exists()
+                    || candidate_json.exists()
+                    || legacy_db.exists()
+                    || legacy_json.exists()
+                    || is_dir_writable(exe_dir)
+                {
                     return candidate_db;
                 }
             }
         }
-        if let Some(proj_dirs) = dirs::data_local_dir() {
-            proj_dirs.join("shiply").join("shiply_state.db")
+        #[cfg(windows)]
+        let local_data = std::env::var("LOCALAPPDATA")
+            .ok()
+            .map(|s| PathBuf::from(s.trim()))
+            .filter(|p| !p.as_os_str().is_empty())
+            .or_else(dirs::data_local_dir);
+        #[cfg(not(windows))]
+        let local_data = dirs::data_local_dir();
+
+        if let Some(proj_dirs) = local_data {
+            proj_dirs.join("appload").join("appload_state.db")
         } else {
-            PathBuf::from("shiply_state.db")
+            PathBuf::from("appload_state.db")
         }
     }
 
-    /// Returns the directory where `shiply_state.db` (and any drop-in source files) live.
+    /// Returns the directory where `appload_state.db` (and any drop-in source files) live.
     pub fn app_data_dir(&self) -> PathBuf {
         self.storage_path
             .as_ref()
@@ -441,7 +457,7 @@ impl AppStorage {
     }
 
     /// Loads state from SQLite at `path` if it exists. If the database does not exist or is empty,
-    /// seamlessly detects and migrates legacy `shiply_state.json` without any data loss.
+    /// seamlessly detects and migrates legacy JSON state files without any data loss.
     /// Also scans the app directory for any pasted `.json` or `.ps1` files.
     pub fn load_or_default(path: impl Into<PathBuf>) -> Self {
         let input_path = path.into();
@@ -487,9 +503,13 @@ impl AppStorage {
                     legacy_candidates.push(input_path.with_extension("json"));
                 }
                 if let Some(p) = db_path.parent() {
-                    let parent_json = p.join("shiply_state.json");
-                    if !legacy_candidates.contains(&parent_json) {
-                        legacy_candidates.push(parent_json);
+                    let parent_appload_json = p.join("appload_state.json");
+                    let parent_shiply_json = p.join("shiply_state.json");
+                    if !legacy_candidates.contains(&parent_appload_json) {
+                        legacy_candidates.push(parent_appload_json);
+                    }
+                    if !legacy_candidates.contains(&parent_shiply_json) {
+                        legacy_candidates.push(parent_shiply_json);
                     }
                 }
                 // If using the default storage path, also check default global locations
@@ -497,16 +517,34 @@ impl AppStorage {
                 if is_default {
                     if let Ok(exe) = env::current_exe() {
                         if let Some(exe_dir) = exe.parent() {
-                            let exe_json = exe_dir.join("shiply_state.json");
-                            if !legacy_candidates.contains(&exe_json) {
-                                legacy_candidates.push(exe_json);
+                            let exe_appload_json = exe_dir.join("appload_state.json");
+                            let exe_shiply_json = exe_dir.join("shiply_state.json");
+                            if !legacy_candidates.contains(&exe_appload_json) {
+                                legacy_candidates.push(exe_appload_json);
+                            }
+                            if !legacy_candidates.contains(&exe_shiply_json) {
+                                legacy_candidates.push(exe_shiply_json);
                             }
                         }
                     }
-                    if let Some(proj_dirs) = dirs::data_local_dir() {
-                        let data_json = proj_dirs.join("shiply").join("shiply_state.json");
-                        if !legacy_candidates.contains(&data_json) {
-                            legacy_candidates.push(data_json);
+                    #[cfg(windows)]
+                    let local_data = std::env::var("LOCALAPPDATA")
+                        .ok()
+                        .map(|s| PathBuf::from(s.trim()))
+                        .filter(|p| !p.as_os_str().is_empty())
+                        .or_else(dirs::data_local_dir);
+                    #[cfg(not(windows))]
+                    let local_data = dirs::data_local_dir();
+
+                    if let Some(proj_dirs) = local_data {
+                        let data_appload_json =
+                            proj_dirs.join("appload").join("appload_state.json");
+                        let data_shiply_json = proj_dirs.join("shiply").join("shiply_state.json");
+                        if !legacy_candidates.contains(&data_appload_json) {
+                            legacy_candidates.push(data_appload_json);
+                        }
+                        if !legacy_candidates.contains(&data_shiply_json) {
+                            legacy_candidates.push(data_shiply_json);
                         }
                     }
                 }
@@ -534,7 +572,7 @@ impl AppStorage {
                                         candidate
                                             .file_name()
                                             .and_then(|s| s.to_str())
-                                            .unwrap_or("shiply_state.json")
+                                            .unwrap_or("state.json")
                                     ));
                                     break;
                                 }
@@ -614,7 +652,7 @@ impl AppStorage {
     }
 
     /// Synchronizes state with the app directory:
-    /// 1. If `shiply_state.db` was updated externally, reloads projects & history.
+    /// 1. If `appload_state.db` was updated externally, reloads projects & history.
     /// 2. If a `.json` file (containing `AppStorage`, `Project`, or `Vec<Project>`) or a `deploy*.ps1`
     ///    script was pasted into the app directory, merges it into `self` automatically and persists to SQLite.
     pub fn sync_from_app_directory(&mut self) -> Option<String> {
@@ -625,7 +663,7 @@ impl AppStorage {
             notifications.push(notice);
         }
 
-        // 1. Check if primary `shiply_state.db` was updated externally on disk
+        // 1. Check if primary `appload_state.db` was updated externally on disk
         if let Some(disk_mtime) = file_mtime(&state_path) {
             let is_changed = self.last_state_mtime.is_none_or(|prev| disk_mtime > prev);
             if is_changed {
@@ -654,7 +692,7 @@ impl AppStorage {
                             state_path
                                 .file_name()
                                 .and_then(|s| s.to_str())
-                                .unwrap_or("shiply_state.db")
+                                .unwrap_or("appload_state.db")
                         ));
                     }
                 }
@@ -1286,7 +1324,7 @@ fn is_dir_writable(dir: &Path) -> bool {
     if !dir.is_dir() {
         return false;
     }
-    let probe = dir.join(".shiply_write_probe.tmp");
+    let probe = dir.join(".appload_write_probe.tmp");
     if fs::write(&probe, b"ok").is_ok() {
         let _ = fs::remove_file(&probe);
         true
@@ -1332,7 +1370,7 @@ mod tests {
     #[test]
     fn test_first_time_install_is_empty_without_project_or_environment() {
         let tmp = TempDir::new().expect("tempdir");
-        let file_path = tmp.path().join("shiply_state.db");
+        let file_path = tmp.path().join("appload_state.db");
 
         let storage = AppStorage::load_or_default(&file_path);
         assert!(storage.projects.is_empty());
@@ -1398,7 +1436,7 @@ mod tests {
     #[test]
     fn test_storage_persistence_and_auto_recognize_pasted_files() {
         let tmp = TempDir::new().expect("tempdir");
-        let file_path = tmp.path().join("shiply_state.db");
+        let file_path = tmp.path().join("appload_state.db");
 
         let mut storage = AppStorage::load_or_default(&file_path);
         storage.upsert_deployment(dummy_record(
@@ -1516,7 +1554,7 @@ mod tests {
     #[test]
     fn test_storage_duplicate_project() {
         let tmp = TempDir::new().expect("tempdir");
-        let db_path = tmp.path().join("shiply_state.db");
+        let db_path = tmp.path().join("appload_state.db");
         let mut storage = AppStorage::load_or_default(&db_path);
 
         let proj = Project {
@@ -1562,7 +1600,7 @@ mod tests {
     #[test]
     fn test_storage_project_sort_and_reorder() {
         let tmp = TempDir::new().expect("tempdir");
-        let db_path = tmp.path().join("shiply_state.db");
+        let db_path = tmp.path().join("appload_state.db");
         let mut storage = AppStorage::load_or_default(&db_path);
 
         let p1 = Project {
@@ -1630,7 +1668,7 @@ mod tests {
     #[test]
     fn test_storage_project_grouping_and_persistence() {
         let tmp = TempDir::new().expect("tempdir");
-        let db_path = tmp.path().join("shiply_state.db");
+        let db_path = tmp.path().join("appload_state.db");
         let mut storage = AppStorage::load_or_default(&db_path);
 
         let p1 = Project {
@@ -1700,7 +1738,7 @@ mod tests {
     #[test]
     fn test_reconcile_orphaned_running_deployments_on_load() {
         let dir = tempfile::tempdir().unwrap();
-        let db_path = dir.path().join("shiply_state.db");
+        let db_path = dir.path().join("appload_state.db");
 
         // 1. Create a deployment that is left in Running state (simulating crash or desktop restart)
         let mut storage = AppStorage::load_or_default(&db_path);
@@ -1751,7 +1789,7 @@ mod tests {
     #[test]
     fn test_remove_deployment_and_clear_deployment_history() {
         let dir = tempfile::tempdir().unwrap();
-        let db_path = dir.path().join("shiply_state.db");
+        let db_path = dir.path().join("appload_state.db");
 
         let mut storage = AppStorage::load_or_default(&db_path);
         let now = chrono::Utc::now();
@@ -1823,7 +1861,7 @@ mod tests {
     #[test]
     fn test_secrets_metadata_persistence_and_project_vault_sync() {
         let dir = tempfile::tempdir().unwrap();
-        let db_path = dir.path().join("shiply_state.db");
+        let db_path = dir.path().join("appload_state.db");
 
         let mut storage = AppStorage::load_or_default(&db_path);
         storage.upsert_secret_metadata(SecretEntry::new(

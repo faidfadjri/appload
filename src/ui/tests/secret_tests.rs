@@ -5,14 +5,14 @@ use super::*;
 #[test]
 fn test_secret_management_page_and_os_vault_roundtrip() {
     let ctx = egui::Context::default();
-    ShiplyApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
 
     let dir = tempfile::tempdir().unwrap();
-    let db_path = dir.path().join("shiply_state.db");
+    let db_path = dir.path().join("appload_state.db");
     let storage = crate::storage::AppStorage::load_or_default(&db_path);
-    let mut app = ShiplyApp::new(storage);
+    let mut app = AppLoadApp::new(storage);
 
-    let test_key = format!("shiply_ui_test_secret_{}", uuid::Uuid::new_v4().simple());
+    let test_key = format!("appload_ui_test_secret_{}", uuid::Uuid::new_v4().simple());
     app.open_secret_management_for_target(
         &test_key,
         "deploy_user",

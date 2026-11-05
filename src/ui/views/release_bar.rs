@@ -2,7 +2,7 @@
 
 use super::*;
 
-impl ShiplyApp {
+impl AppLoadApp {
     pub(crate) fn render_deploy_action_bar(
         &mut self,
         ui: &mut egui::Ui,

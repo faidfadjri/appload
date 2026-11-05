@@ -88,7 +88,7 @@ impl<'a> Default for InputCoreOpts<'a> {
     }
 }
 
-/// Shared single-line text input core for all Shiply text fields.
+/// Shared single-line text input core for all AppLoad text fields.
 ///
 /// Allocates the entire input height (e.g. 36px) as the native `TextEdit`'s interactive area,
 /// vertically centers the text galley (`Align::Center`), and draws the background and border

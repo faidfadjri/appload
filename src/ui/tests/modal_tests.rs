@@ -41,7 +41,7 @@ fn test_modal_primary_button_grey_when_disabled() {
 
 #[test]
 fn test_open_new_project_modal_resets_form_fields() {
-    let mut app = ShiplyApp::new(crate::storage::AppStorage::default());
+    let mut app = AppLoadApp::new(crate::storage::AppStorage::default());
     app.new_project_name = "dirty_name".to_string();
     app.new_project_path = "dirty_path".to_string();
     app.new_project_ps1_path = "dirty.ps1".to_string();
@@ -77,7 +77,7 @@ fn test_prepare_animated_modal_and_window_lifecycle() {
 #[test]
 fn test_add_and_edit_project_modal_full_height_and_centered_position() {
     let ctx = egui::Context::default();
-    ShiplyApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
 
     let mut storage = crate::storage::AppStorage::default();
     storage.projects.push(Project {
@@ -90,7 +90,7 @@ fn test_add_and_edit_project_modal_full_height_and_centered_position() {
         sort_order: Some(0),
     });
 
-    let mut app = ShiplyApp::new(storage);
+    let mut app = AppLoadApp::new(storage);
     app.open_new_project_modal();
 
     let screen_size = egui::vec2(1280.0, 800.0);
@@ -150,7 +150,7 @@ fn test_add_and_edit_project_modal_full_height_and_centered_position() {
 #[test]
 fn test_delete_single_deployment_and_clear_history_modal() {
     let ctx = egui::Context::default();
-    ShiplyApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
 
     let mut storage = crate::storage::AppStorage::default();
     let now = chrono::Utc::now();
@@ -180,7 +180,7 @@ fn test_delete_single_deployment_and_clear_history_modal() {
         });
     }
 
-    let mut app = ShiplyApp::new(storage);
+    let mut app = AppLoadApp::new(storage);
     app.selected_deployment_id = Some("dep-a".to_string());
     app.pending_delete_confirm = Some(ConfirmDeleteAction::DeploymentRecord {
         deployment_id: "dep-a".to_string(),

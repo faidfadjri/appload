@@ -40,7 +40,7 @@ fn test_pipeline_syntax_highlight_layout_job() {
 #[test]
 fn test_server_settings_input_buffering_and_debounced_save() {
     let ctx = egui::Context::default();
-    ShiplyApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
 
     let mut storage = crate::storage::AppStorage::default();
     let env = EnvironmentConfig {
@@ -66,7 +66,7 @@ fn test_server_settings_input_buffering_and_debounced_save() {
     };
     storage.projects.push(project);
 
-    let mut app = ShiplyApp::new(storage);
+    let mut app = AppLoadApp::new(storage);
     app.selected_env_key = "dev".to_string();
 
     assert!(!app.dirty_save_pending);
@@ -99,7 +99,7 @@ fn test_server_settings_input_buffering_and_debounced_save() {
 #[test]
 fn test_draggable_pipeline_step_reorder_ui() {
     let ctx = egui::Context::default();
-    ShiplyApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
 
     let mut storage = crate::storage::AppStorage::default();
     let env = EnvironmentConfig {
@@ -147,7 +147,7 @@ fn test_draggable_pipeline_step_reorder_ui() {
     };
     storage.projects.push(project);
 
-    let mut app = ShiplyApp::new(storage);
+    let mut app = AppLoadApp::new(storage);
     app.selected_env_key = "dev".to_string();
 
     // Render pipeline steps tab initially

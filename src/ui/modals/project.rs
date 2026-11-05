@@ -2,7 +2,7 @@
 
 use super::*;
 
-impl ShiplyApp {
+impl AppLoadApp {
     pub(crate) fn render_new_project_modal(&mut self, ctx: &egui::Context) {
         let Some(anim_t) =
             prepare_animated_modal(ctx, "new_project", &mut self.show_new_project_modal)

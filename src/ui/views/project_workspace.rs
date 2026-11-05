@@ -2,7 +2,7 @@
 
 use super::*;
 
-impl ShiplyApp {
+impl AppLoadApp {
     pub(crate) fn render_project_workspace(&mut self, ui: &mut egui::Ui, project_id: &str) {
         if self.cached_project_id.as_deref() != Some(project_id) {
             self.refresh_selected_project_metadata(true);

@@ -5,7 +5,7 @@ use super::*;
 #[test]
 fn test_project_context_menu_and_duplication_ui() {
     let ctx = egui::Context::default();
-    ShiplyApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
 
     let mut storage = crate::storage::AppStorage::default();
     let proj = Project {
@@ -37,7 +37,7 @@ fn test_project_context_menu_and_duplication_ui() {
     };
     storage.projects.push(proj);
 
-    let mut app = ShiplyApp::new(storage);
+    let mut app = AppLoadApp::new(storage);
     app.selection = SidebarSelection::Project("proj-orig".to_string());
 
     // Render sidebar and project workspace to verify options and context menus execute without panic
@@ -61,7 +61,7 @@ fn test_project_context_menu_and_duplication_ui() {
 #[test]
 fn test_sidebar_custom_context_menu_viewport_flip_and_actions() {
     let ctx = egui::Context::default();
-    ShiplyApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
 
     let mut storage = crate::storage::AppStorage::default();
     storage.projects = vec![
@@ -85,7 +85,7 @@ fn test_sidebar_custom_context_menu_viewport_flip_and_actions() {
         },
     ];
 
-    let mut app = ShiplyApp::new(storage);
+    let mut app = AppLoadApp::new(storage);
 
     // 1. Trigger context menu for first project near top-left
     app.sidebar_context_menu = Some(SidebarContextMenuState {

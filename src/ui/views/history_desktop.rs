@@ -2,7 +2,7 @@
 
 use super::*;
 
-impl ShiplyApp {
+impl AppLoadApp {
     pub(crate) fn render_history_desktop_rows(
         &mut self,
         ui: &mut egui::Ui,

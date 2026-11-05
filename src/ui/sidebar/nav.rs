@@ -2,7 +2,7 @@
 
 use super::*;
 
-impl ShiplyApp {
+impl AppLoadApp {
     pub(crate) fn render_sidebar_nav(
         &mut self,
         ui: &mut egui::Ui,

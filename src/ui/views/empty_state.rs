@@ -2,7 +2,7 @@
 
 use super::*;
 
-impl ShiplyApp {
+impl AppLoadApp {
     pub(crate) fn render_first_time_empty_state(&mut self, ui: &mut egui::Ui) {
         ui.add_space(SP_32);
         let avail_w = ui.available_width();
@@ -19,7 +19,7 @@ impl ShiplyApp {
                     if kit::empty_state(
                         ui,
                         OutlineIcon::Plus,
-                        "Welcome to Shiply",
+                        "Welcome to AppLoad",
                         "No projects or environments configured yet. Auto-import a PowerShell deployment script (.ps1) or create a project to get started.",
                         Some("Add your first project"),
                     ) {

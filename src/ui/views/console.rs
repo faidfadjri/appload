@@ -2,7 +2,7 @@
 
 use super::*;
 
-impl ShiplyApp {
+impl AppLoadApp {
     pub(crate) fn render_terminal_window(
         &mut self,
         ui: &mut egui::Ui,
@@ -19,7 +19,7 @@ impl ShiplyApp {
         };
 
         #[cfg(debug_assertions)]
-        let is_before_mode = std::env::var("SHIPLY_CONSOLE_BEFORE").is_ok();
+        let is_before_mode = app_env_is_ok("APPLOAD_CONSOLE_BEFORE");
         #[cfg(not(debug_assertions))]
         let is_before_mode = false;
 

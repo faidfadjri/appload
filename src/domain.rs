@@ -437,7 +437,7 @@ impl DeploymentRecord {
     }
 }
 
-/// Metadata for a secret managed by Shiply and stored in the OS Credential Manager.
+/// Metadata for a secret managed by AppLoad and stored in the OS Credential Manager.
 /// The sensitive secret value / password itself is never stored in SQLite or JSON —
 /// it lives exclusively in the OS native credential store under `key`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

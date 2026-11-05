@@ -45,7 +45,7 @@ pub fn unblock_file(path: &Path) -> bool {
     }
 }
 
-/// Returns `true` if the current binary is named `setup.exe` (or `shiply-setup.exe`) or `--setup` was passed.
+/// Returns `true` if the current binary is named `setup.exe` (or `appload-setup.exe`) or `--setup` was passed.
 pub fn is_setup_mode(args: &[String]) -> bool {
     if let Ok(exe) = env::current_exe() {
         unblock_file(&exe);
@@ -57,6 +57,9 @@ pub fn is_setup_mode(args: &[String]) -> bool {
         if let Some(stem) = exe.file_stem().and_then(|s| s.to_str()) {
             let lower = stem.to_lowercase();
             if lower == "setup"
+                || lower.starts_with("appload-setup")
+                || lower.starts_with("appload_setup")
+                // Legacy setup executable names for backward compatibility:
                 || lower.starts_with("shiply-setup")
                 || lower.starts_with("shiply_setup")
             {
@@ -70,14 +73,20 @@ pub fn is_setup_mode(args: &[String]) -> bool {
 pub fn default_install_dir() -> PathBuf {
     #[cfg(windows)]
     {
+        if let Ok(local_app_data) = env::var("LOCALAPPDATA") {
+            let p = PathBuf::from(local_app_data.trim());
+            if !p.as_os_str().is_empty() {
+                return p.join("Programs").join("AppLoad");
+            }
+        }
         if let Some(local_app_data) = dirs::data_local_dir() {
-            return local_app_data.join("Programs").join("Shiply");
+            return local_app_data.join("Programs").join("AppLoad");
         }
     }
     #[cfg(target_os = "macos")]
     {
         if let Some(home) = dirs::home_dir() {
-            return home.join("Applications").join("Shiply");
+            return home.join("Applications").join("AppLoad");
         }
     }
     #[cfg(all(not(windows), not(target_os = "macos")))]
@@ -86,17 +95,38 @@ pub fn default_install_dir() -> PathBuf {
             return home.join(".local").join("bin");
         }
     }
-    PathBuf::from("shiply-install")
+    PathBuf::from("appload-install")
+}
+
+pub fn legacy_install_dir() -> Option<PathBuf> {
+    #[cfg(windows)]
+    {
+        if let Ok(local_app_data) = env::var("LOCALAPPDATA") {
+            let p = PathBuf::from(local_app_data.trim());
+            if !p.as_os_str().is_empty() {
+                return Some(p.join("Programs").join("Shiply"));
+            }
+        }
+        dirs::data_local_dir().map(|d| d.join("Programs").join("Shiply"))
+    }
+    #[cfg(target_os = "macos")]
+    {
+        dirs::home_dir().map(|h| h.join("Applications").join("Shiply"))
+    }
+    #[cfg(all(not(windows), not(target_os = "macos")))]
+    {
+        None
+    }
 }
 
 pub fn installed_exe_name() -> &'static str {
     #[cfg(windows)]
     {
-        "shiply.exe"
+        "appload.exe"
     }
     #[cfg(not(windows))]
     {
-        "shiply"
+        "appload"
     }
 }
 
@@ -127,7 +157,7 @@ pub fn check_install_state(install_dir: &Path, running_version: &str) -> Install
     }
 }
 
-/// Copies `source_exe` into `install_dir/shiply(.exe)`, safely replacing any existing version
+/// Copies `source_exe` into `install_dir/appload(.exe)`, safely replacing any existing version
 /// (even if locked on Windows by renaming the old binary to `.old` first) and records `version.txt`.
 pub fn install_binary_to_dir(
     source_exe: &Path,
@@ -177,8 +207,9 @@ pub fn install_binary_to_dir(
     fs::write(&version_file, version.trim())
         .map_err(|e| format!("Failed to write version metadata: {e}"))?;
 
-    let ico_bytes = build_shiply_ico_bytes();
+    let ico_bytes = build_appload_ico_bytes();
     let _ = fs::write(install_dir.join("logo.ico"), &ico_bytes);
+    let _ = fs::write(install_dir.join("appload.ico"), &ico_bytes);
     let _ = fs::write(install_dir.join("shiply.ico"), &ico_bytes);
 
     unblock_file(&target_exe);
@@ -190,7 +221,7 @@ pub fn install_binary_to_dir(
 pub const EMBEDDED_LOGO_ICO: &[u8] = include_bytes!("../logo.ico");
 
 /// Decodes the embedded `logo.ico` into `egui::IconData` for the window/taskbar icon and UI logo.
-pub fn build_shiply_icon_data() -> egui::IconData {
+pub fn build_appload_icon_data() -> egui::IconData {
     let ico = EMBEDDED_LOGO_ICO;
     let width = if ico[6] == 0 { 256u32 } else { ico[6] as u32 };
     let height = if ico[7] == 0 { 256u32 } else { ico[7] as u32 };
@@ -229,22 +260,28 @@ pub fn build_shiply_icon_data() -> egui::IconData {
     }
 }
 
-/// Loads `logo.ico` as an `egui::TextureHandle` for rendering the official Shiply logo inside the UI.
-pub fn load_shiply_logo_texture(ctx: &egui::Context) -> egui::TextureHandle {
-    let icon = build_shiply_icon_data();
+pub use build_appload_icon_data as build_shiply_icon_data;
+
+/// Loads `logo.ico` as an `egui::TextureHandle` for rendering the official AppLoad logo inside the UI.
+pub fn load_appload_logo_texture(ctx: &egui::Context) -> egui::TextureHandle {
+    let icon = build_appload_icon_data();
     let image = egui::ColorImage::from_rgba_unmultiplied(
         [icon.width as usize, icon.height as usize],
         &icon.rgba,
     );
-    ctx.load_texture("shiply_logo_ico", image, egui::TextureOptions::LINEAR)
+    ctx.load_texture("appload_logo_ico", image, egui::TextureOptions::LINEAR)
 }
 
+pub use load_appload_logo_texture as load_shiply_logo_texture;
+
 /// Returns the embedded `logo.ico` bytes for writing to the installation folder and shortcuts.
-pub fn build_shiply_ico_bytes() -> Vec<u8> {
+pub fn build_appload_ico_bytes() -> Vec<u8> {
     EMBEDDED_LOGO_ICO.to_vec()
 }
 
-/// Installs or updates the current running `shiply.exe` into the user's system install directory
+pub use build_appload_ico_bytes as build_shiply_ico_bytes;
+
+/// Installs or updates the current running binary into the user's system install directory
 /// and creates Start Menu & Desktop shortcuts on Windows.
 pub fn install_or_update_self() -> Result<String, String> {
     install_with_options(&default_install_dir(), true, true)
@@ -268,6 +305,7 @@ pub fn install_with_options(
                 desktop_shortcut,
                 start_menu_shortcut,
             );
+            remove_legacy_windows_shortcuts();
         }
     }
     #[cfg(not(windows))]
@@ -276,10 +314,33 @@ pub fn install_with_options(
     }
 
     Ok(format!(
-        "Shiply v{APP_VERSION} installed at {}",
+        "AppLoad v{APP_VERSION} installed at {}",
         target_exe.display()
     ))
 }
+
+#[cfg(windows)]
+pub fn remove_legacy_windows_shortcuts() {
+    let script = r#"
+        $ws = [IO.Path]::Combine($env:APPDATA, 'Microsoft\Windows\Start Menu\Programs\Shiply.lnk');
+        if (Test-Path -LiteralPath $ws) { Remove-Item -LiteralPath $ws -Force -ErrorAction SilentlyContinue };
+        $desktop_candidates = @(
+            [IO.Path]::Combine($env:USERPROFILE, 'Desktop'),
+            [Environment]::GetFolderPath('Desktop')
+        ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) };
+        foreach ($d in $desktop_candidates) {
+            $wd = [IO.Path]::Combine($d, 'Shiply.lnk');
+            if (Test-Path -LiteralPath $wd) { Remove-Item -LiteralPath $wd -Force -ErrorAction SilentlyContinue };
+        }
+    "#;
+    let mut cmd = Command::new("powershell");
+    cmd.args(["-NoProfile", "-NonInteractive", "-Command", script]);
+    crate::version::configure_background_command(&mut cmd);
+    let _ = cmd.output();
+}
+
+#[cfg(not(windows))]
+pub fn remove_legacy_windows_shortcuts() {}
 
 #[cfg(windows)]
 fn create_windows_shortcuts(
@@ -295,31 +356,37 @@ fn create_windows_shortcuts(
         .to_string_lossy()
         .replace('\'', "''");
 
-    let mut path_exprs = Vec::new();
+    let mut script_parts = Vec::new();
+    script_parts.push("$ws = New-Object -ComObject WScript.Shell;".to_string());
+    script_parts.push("$paths = New-Object System.Collections.Generic.List[string];".to_string());
     if start_menu {
-        path_exprs.push("[IO.Path]::Combine($env:APPDATA, 'Microsoft\\Windows\\Start Menu\\Programs\\Shiply.lnk')");
+        script_parts.push(
+            "if ($env:APPDATA) { $paths.Add([IO.Path]::Combine($env:APPDATA, 'Microsoft\\Windows\\Start Menu\\Programs\\AppLoad.lnk')) };".to_string(),
+        );
     }
     if desktop {
-        path_exprs
-            .push("[IO.Path]::Combine([Environment]::GetFolderPath('Desktop'), 'Shiply.lnk')");
+        script_parts.push(
+            "if ($env:USERPROFILE -and (Test-Path -LiteralPath ([IO.Path]::Combine($env:USERPROFILE, 'Desktop')))) { \
+                $paths.Add([IO.Path]::Combine($env:USERPROFILE, 'Desktop\\AppLoad.lnk')) \
+             } else { \
+                $paths.Add([IO.Path]::Combine([Environment]::GetFolderPath('Desktop'), 'AppLoad.lnk')) \
+             };".to_string(),
+        );
     }
-    if path_exprs.is_empty() {
-        return Ok(());
-    }
+    script_parts.push(format!(
+        "foreach ($p in $paths) {{ \
+            $parent = [System.IO.Path]::GetDirectoryName($p); \
+            if ($parent -and !(Test-Path -LiteralPath $parent)) {{ New-Item -ItemType Directory -Path $parent -Force | Out-Null }}; \
+            $s = $ws.CreateShortcut($p); \
+            $s.TargetPath = '{target_str}'; \
+            $s.WorkingDirectory = '{work_str}'; \
+            $s.IconLocation = '{ico_str}'; \
+            $s.Description = 'AppLoad - Universal Deployment Tool'; \
+            $s.Save(); \
+        }}"
+    ));
 
-    let script = format!(
-        "$ws = New-Object -ComObject WScript.Shell; \
-         $paths = @({}); \
-         foreach ($p in $paths) {{ \
-             $s = $ws.CreateShortcut($p); \
-             $s.TargetPath = '{target_str}'; \
-             $s.WorkingDirectory = '{work_str}'; \
-             $s.IconLocation = '{ico_str}'; \
-             $s.Description = 'Shiply - Mini Deployment Platform'; \
-             $s.Save(); \
-         }}",
-        path_exprs.join(", ")
-    );
+    let script = script_parts.join(" ");
 
     let mut cmd = Command::new("powershell");
     cmd.args(["-NoProfile", "-NonInteractive", "-Command", &script]);
@@ -349,7 +416,7 @@ impl eframe::App for SetupWizardApp {
             self.create_desktop_shortcut = true;
             self.create_start_menu_shortcut = true;
             self.launch_after_install = true;
-            self.logo_texture = Some(load_shiply_logo_texture(ctx));
+            self.logo_texture = Some(load_appload_logo_texture(ctx));
             self.initialized = true;
         }
         if !self.window_centered {
@@ -419,14 +486,14 @@ impl eframe::App for SetupWizardApp {
                         ui.painter().text(
                             Pos2::new(logo_rect.right() + 12.0, hdr_rect.center().y - 7.0),
                             Align2::LEFT_CENTER,
-                            format!("Shiply v{APP_VERSION} Setup"),
+                            format!("AppLoad v{APP_VERSION} Setup"),
                             FontId::proportional(18.0),
                             Color32::from_rgb(15, 23, 42),
                         );
                         ui.painter().text(
                             Pos2::new(logo_rect.right() + 12.0, hdr_rect.center().y + 11.0),
                             Align2::LEFT_CENTER,
-                            "Universal Desktop Mini Deployment Platform",
+                            "Universal Desktop Deployment Platform",
                             FontId::proportional(12.0),
                             Color32::from_rgb(100, 116, 139),
                         );
@@ -472,7 +539,7 @@ impl eframe::App for SetupWizardApp {
                         ui.add_space(14.0);
                         ui.checkbox(
                             &mut self.create_desktop_shortcut,
-                            RichText::new("Create Desktop shortcut (Shiply.lnk)")
+                            RichText::new("Create Desktop shortcut (AppLoad.lnk)")
                                 .size(13.0)
                                 .color(Color32::from_rgb(15, 23, 42)),
                         );
@@ -484,7 +551,7 @@ impl eframe::App for SetupWizardApp {
                         );
                         ui.checkbox(
                             &mut self.launch_after_install,
-                            RichText::new("Launch Shiply immediately after installation")
+                            RichText::new("Launch AppLoad immediately after installation")
                                 .size(13.0)
                                 .color(Color32::from_rgb(15, 23, 42)),
                         );
@@ -535,7 +602,7 @@ impl eframe::App for SetupWizardApp {
                                     }
                                 } else {
                                     let install_btn = egui::Button::new(
-                                        RichText::new(format!("Install Shiply v{APP_VERSION}"))
+                                        RichText::new(format!("Install AppLoad v{APP_VERSION}"))
                                             .size(13.5)
                                             .strong()
                                             .color(Color32::WHITE),
@@ -655,17 +722,18 @@ mod tests {
             }
         );
         assert!(install_dir.join("logo.ico").exists());
+        assert!(install_dir.join("appload.ico").exists());
         assert!(install_dir.join("shiply.ico").exists());
     }
 
     #[test]
-    fn test_build_shiply_s_icon_data_and_ico() {
-        let icon = build_shiply_icon_data();
+    fn test_build_appload_icon_data_and_ico() {
+        let icon = build_appload_icon_data();
         assert_eq!(icon.width, 32);
         assert_eq!(icon.height, 32);
         assert_eq!(icon.rgba.len(), 32 * 32 * 4);
 
-        let ico = build_shiply_ico_bytes();
+        let ico = build_appload_ico_bytes();
         // Valid ICO header: 00 00 01 00 01 00
         assert_eq!(&ico[0..6], &[0, 0, 1, 0, 1, 0]);
         assert_eq!(ico.len(), EMBEDDED_LOGO_ICO.len());
@@ -682,7 +750,7 @@ mod tests {
         assert!(install_sh.exists(), "install-mac.sh must exist");
         let content_sh = fs::read_to_string(&install_sh).expect("read install-mac.sh");
         assert!(content_sh.contains("#!/usr/bin/env bash"));
-        assert!(content_sh.contains("/Applications/Shiply.app"));
+        assert!(content_sh.contains("/Applications/AppLoad.app"));
 
         let install_cmd = mac_dir.join("install-mac.command");
         assert!(install_cmd.exists(), "install-mac.command must exist");
@@ -693,18 +761,18 @@ mod tests {
         let setup = mac_dir.join("setup");
         assert!(setup.exists(), "setup must exist");
 
-        // Verify Shiply Installer.app bundle
-        let app_bundle = mac_dir.join("Shiply Installer.app");
+        // Verify AppLoad Installer.app bundle
+        let app_bundle = mac_dir.join("AppLoad Installer.app");
         assert!(
             app_bundle.exists(),
-            "Shiply Installer.app bundle must exist"
+            "AppLoad Installer.app bundle must exist"
         );
 
         let info_plist = app_bundle.join("Contents").join("Info.plist");
         assert!(info_plist.exists(), "Info.plist must exist in bundle");
         let plist_content = fs::read_to_string(&info_plist).expect("read Info.plist");
         assert!(plist_content.contains("<key>CFBundleName</key>"));
-        assert!(plist_content.contains("<string>Shiply Installer</string>"));
+        assert!(plist_content.contains("<string>AppLoad Installer</string>"));
 
         let installer_exec = app_bundle.join("Contents").join("MacOS").join("installer");
         assert!(

@@ -2,7 +2,7 @@
 
 use super::*;
 
-impl ShiplyApp {
+impl AppLoadApp {
     pub(crate) fn render_server_settings_tab(&mut self, ui: &mut egui::Ui, proj_idx: usize) {
         let env_key = self.selected_env_key.clone();
         let mut config_changed = false;

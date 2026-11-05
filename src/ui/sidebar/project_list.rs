@@ -2,7 +2,7 @@
 
 use super::*;
 
-impl ShiplyApp {
+impl AppLoadApp {
     pub(crate) fn render_sidebar_project_list(&mut self, ui: &mut egui::Ui, full_w: f32) {
         // Skeleton loading on initial load or refresh:
         let is_refreshing = self

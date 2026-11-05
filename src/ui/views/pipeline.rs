@@ -2,7 +2,7 @@
 
 use super::*;
 
-impl ShiplyApp {
+impl AppLoadApp {
     /// Feature #6: Redesigned Pipeline Steps Tab with non-overlapping 2-row step cards!
     pub(crate) fn render_pipeline_steps_tab(&mut self, ui: &mut egui::Ui, proj_idx: usize) {
         let env_key = self.selected_env_key.clone();

@@ -37,10 +37,10 @@ fn main() {
   <assemblyIdentity
     version="1.0.0.0"
     processorArchitecture="*"
-    name="Shiply.Deployment.Platform"
+    name="AppLoad.Deployment.Platform"
     type="win32"
   />
-  <description>Shiply Mini Deployment Platform</description>
+  <description>AppLoad Desktop Deployment Platform</description>
   <application xmlns="urn:schemas-microsoft-com:asm.v3">
     <windowsSettings>
       <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
@@ -74,7 +74,7 @@ fn main() {
 </assembly>
 "#;
 
-    let manifest_file = out_dir.join("shiply.manifest");
+    let manifest_file = out_dir.join("appload.manifest");
     let _ = fs::write(&manifest_file, manifest_content);
     let manifest_escaped = manifest_file.to_string_lossy().replace('\\', "/");
 
@@ -95,13 +95,13 @@ BEGIN
     BEGIN
         BLOCK "040904b0"
         BEGIN
-            VALUE "CompanyName", "Shiply"
-            VALUE "FileDescription", "Shiply Setup Wizard & Deployment Manager"
+            VALUE "CompanyName", "AppLoad"
+            VALUE "FileDescription", "AppLoad Setup Wizard & Deployment Manager"
             VALUE "FileVersion", "{file_version_str}"
-            VALUE "InternalName", "shiply"
+            VALUE "InternalName", "appload"
             VALUE "LegalCopyright", "Copyright (c) 2026 Faid Fadjri. All rights reserved."
-            VALUE "OriginalFilename", "Shiply-Setup.exe"
-            VALUE "ProductName", "Shiply"
+            VALUE "OriginalFilename", "AppLoad-Setup.exe"
+            VALUE "ProductName", "AppLoad"
             VALUE "ProductVersion", "{version}"
         END
     END
@@ -115,14 +115,14 @@ END
         manifest_escaped = manifest_escaped,
     );
 
-    let rc_file = out_dir.join("shiply.rc");
+    let rc_file = out_dir.join("appload.rc");
     let _ = fs::write(&rc_file, rc_content);
 
     let target_env = env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
     let mut compiled_ok = false;
 
     if target_env == "gnu" {
-        let obj_path = out_dir.join("shiply_res.o");
+        let obj_path = out_dir.join("appload_res.o");
         for tool in ["windres", "x86_64-w64-mingw32-windres"] {
             if let Ok(status) = Command::new(tool)
                 .args(["-i"])
@@ -140,7 +140,7 @@ END
         }
     } else {
         // MSVC environment
-        let res_path = out_dir.join("shiply_res.res");
+        let res_path = out_dir.join("appload_res.res");
         for tool in ["rc.exe", "rc"] {
             if let Ok(status) = Command::new(tool)
                 .arg("/nologo")
@@ -243,13 +243,13 @@ fn compile_raw_icon_res(ico_path: &Path, out_dir: &Path, target_env: &str, manif
         res.push(0);
     }
 
-    let res_path = out_dir.join("shiply_icon.res");
+    let res_path = out_dir.join("appload_icon.res");
     if fs::write(&res_path, &res).is_err() {
         return;
     }
 
     if target_env == "gnu" {
-        let obj_path = out_dir.join("shiply_icon.o");
+        let obj_path = out_dir.join("appload_icon.o");
         for tool in ["windres", "x86_64-w64-mingw32-windres"] {
             if let Ok(status) = Command::new(tool)
                 .args(["-J", "res", "-O", "coff", "-i"])

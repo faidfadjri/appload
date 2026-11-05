@@ -7,7 +7,7 @@ pub(crate) mod footer;
 pub(crate) mod nav;
 pub(crate) mod project_list;
 
-impl ShiplyApp {
+impl AppLoadApp {
     pub(crate) fn render_sidebar_drawer(&mut self, ctx: &egui::Context) {
         let screen_rect = ctx.screen_rect();
 
@@ -65,7 +65,7 @@ impl ShiplyApp {
         let pad_x = if is_rail { 8.0 } else { SB_PAD_X };
         let mut sort_trigger_rect_out = None;
 
-        egui::SidePanel::left("shiply_sidebar")
+        egui::SidePanel::left("appload_sidebar")
             .resizable(false)
             .show_separator_line(false)
             .exact_width(width)
@@ -112,7 +112,7 @@ impl ShiplyApp {
             let brand_rect = Rect::from_min_size(inner_rect.min, Vec2::new(full_w, 56.0));
             let brand_ui = ui.new_child(egui::UiBuilder::new().max_rect(brand_rect));
             let logo_rect = Rect::from_center_size(brand_rect.center(), Vec2::new(26.0, 26.0));
-            draw_shiply_logo(
+            draw_appload_logo(
                 brand_ui.painter(),
                 logo_rect,
                 6,
@@ -520,7 +520,7 @@ impl ShiplyApp {
                     Pos2::new(brand_rect.left(), brand_rect.center().y - 13.0),
                     Vec2::new(26.0, 26.0),
                 );
-                draw_shiply_logo(
+                draw_appload_logo(
                     brand_ui.painter(),
                     logo_rect,
                     6,
@@ -530,7 +530,7 @@ impl ShiplyApp {
                 brand_ui.painter().text(
                     Pos2::new(logo_rect.right() + SP_8, brand_rect.center().y),
                     Align2::LEFT_CENTER,
-                    "Shiply",
+                    "AppLoad",
                     Typo::H2.font(),
                     Color32::WHITE,
                 );

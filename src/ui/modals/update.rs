@@ -2,7 +2,7 @@
 
 use super::*;
 
-impl ShiplyApp {
+impl AppLoadApp {
     pub(crate) fn render_github_update_modal(&mut self, ctx: &egui::Context) {
         let Some(anim_t) =
             prepare_animated_modal(ctx, "github_update", &mut self.show_update_modal)
@@ -20,7 +20,7 @@ impl ShiplyApp {
                         "close_github_update_modal",
                         "Software Update Available",
                         &format!(
-                            "A newer release of Shiply is available on GitHub Releases ({GITHUB_REPO})."
+                            "A newer release of AppLoad is available on GitHub Releases ({GITHUB_REPO})."
                         ),
                     ) {
                         self.show_update_modal = false;
@@ -277,14 +277,14 @@ impl ShiplyApp {
                             horizontal_row(ui, 24.0, |ui| {
                                 kit::status_badge(ui, StatusKind::Success, "Up to date");
                                 ui.label(
-                                    RichText::new(format!("Shiply v{APP_VERSION}"))
+                                    RichText::new(format!("AppLoad v{APP_VERSION}"))
                                         .typo(Typo::Label).color(SUCCESS_PILL_TEXT),
                                 );
                             });
                             ui.add_space(SP_4);
                             ui.label(
                                 RichText::new(format!(
-                                    "You are running the latest version of Shiply. Update checks query {GITHUB_REPO} on startup."
+                                    "You are running the latest version of AppLoad. Update checks query {GITHUB_REPO} on startup."
                                 ))
                                 .typo(Typo::Small)
                                 .color(SUCCESS),

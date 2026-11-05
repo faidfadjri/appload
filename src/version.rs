@@ -280,7 +280,7 @@ pub fn create_git_tag(project_dir: &Path, version: &str, env_name: &str) -> Resu
         format!("v{trimmed}")
     };
 
-    let msg = format!("Shiply deployment {tag_name} ({env_name})");
+    let msg = format!("AppLoad deployment {tag_name} ({env_name})");
     let mut cmd = Command::new("git");
     cmd.current_dir(project_dir)
         .args(["tag", "-f", "-a", &tag_name, "-m", &msg]);
@@ -348,8 +348,8 @@ mod tests {
         };
 
         run_git(&["init", "-b", "main"]);
-        run_git(&["config", "user.email", "test@shiply.dev"]);
-        run_git(&["config", "user.name", "Shiply Tester"]);
+        run_git(&["config", "user.email", "test@appload.dev"]);
+        run_git(&["config", "user.name", "AppLoad Tester"]);
 
         fs::write(dir.join("app.js"), "console.log('v1');\n").expect("write v1");
         run_git(&["add", "."]);

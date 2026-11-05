@@ -2,7 +2,7 @@
 
 use super::*;
 
-impl ShiplyApp {
+impl AppLoadApp {
     pub(crate) fn render_secret_management_view(&mut self, ui: &mut egui::Ui) {
         // Vault-status caching: refresh only if dirty, empty, or 10s elapsed
         let now = Instant::now();
@@ -82,7 +82,7 @@ impl ShiplyApp {
         });
 
         ui.label(
-            RichText::new("Credentials and tokens for your pipelines, stored in your OS vault, never in Shiply's database.")
+            RichText::new("Credentials and tokens for your pipelines, stored in your OS vault, never in AppLoad's database.")
                 .typo(Typo::Small)
                 .color(TEXT_SECONDARY),
         );
@@ -300,7 +300,7 @@ impl ShiplyApp {
                     ui,
                     OutlineIcon::Key,
                     "No secrets yet",
-                    "Credentials and tokens are saved directly into your OS vault, never touching Shiply's database.",
+                    "Credentials and tokens are saved directly into your OS vault, never touching AppLoad's database.",
                     Some("+ Create your first secret"),
                 ) {
                     self.open_new_secret_modal();
@@ -638,7 +638,7 @@ impl ShiplyApp {
                 let (ic_r, _) = ui.allocate_exact_size(Vec2::splat(20.0), Sense::hover());
                 draw_outline_icon(ui.painter(), ic_r.center(), OutlineIcon::Key, PRIMARY_BLUE);
                 ui.add_space(4.0);
-                ui.label(Typo::H3.rich("How Shiply stores secrets"));
+                ui.label(Typo::H3.rich("How AppLoad stores secrets"));
                 ui.add_space(SP_8);
                 ui.label(
                     Typo::Small

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Shiply macOS Application Installer
+# AppLoad macOS Application Installer
 # ==============================================================================
-# Installs Shiply into /Applications/Shiply.app (or ~/Applications/Shiply.app),
+# Installs AppLoad into /Applications/AppLoad.app (or ~/Applications/AppLoad.app),
 # writes the macOS application bundle, icon, Info.plist, and creates a CLI symlink
-# in /usr/local/bin/shiply (or ~/.local/bin/shiply).
+# in /usr/local/bin/appload (or ~/.local/bin/appload).
 #
 # If a prebuilt binary isn't present locally, it automatically downloads the
 # latest matching macOS release (Apple Silicon or Intel) from GitHub Releases.
@@ -14,42 +14,48 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." 2>/dev/null && pwd || echo "$SCRIPT_DIR")"
-GITHUB_REPO="faidfadjri/shiply"
-APP_NAME="Shiply"
-VERSION="0.9.1"
+GITHUB_REPO="faidfadjri/appload"
+APP_NAME="AppLoad"
+VERSION="0.12.0"
 
 echo "========================================================"
-echo "           Shiply macOS Application Installer           "
+echo "           AppLoad macOS Application Installer          "
 echo "========================================================"
 
 # 1. Determine CPU Architecture
 ARCH="$(uname -m)"
 case "$ARCH" in
     arm64|aarch64)
-        ASSET_NAME="shiply-macos-aarch64"
+        ASSET_NAME="appload-macos-aarch64"
         ARCH_DESC="Apple Silicon (arm64)"
         ;;
     x86_64)
-        ASSET_NAME="shiply-macos-x86_64"
+        ASSET_NAME="appload-macos-x86_64"
         ARCH_DESC="Intel (x86_64)"
         ;;
     *)
-        ASSET_NAME="shiply-macos-aarch64"
+        ASSET_NAME="appload-macos-aarch64"
         ARCH_DESC="$ARCH"
         ;;
 esac
 echo "[1/4] Detected system architecture: $ARCH_DESC"
 
-# 2. Resolve or Download Shiply macOS Executable
-TMP_BIN="/tmp/shiply_macos_binary_$$"
+# 2. Resolve or Download AppLoad macOS Executable
+TMP_BIN="/tmp/appload_macos_binary_$$"
 FINAL_BIN=""
 
-if [[ -f "$SCRIPT_DIR/shiply" && -x "$SCRIPT_DIR/shiply" ]]; then
-    echo "      Found local prebuilt binary: $SCRIPT_DIR/shiply"
-    FINAL_BIN="$SCRIPT_DIR/shiply"
+if [[ -f "$SCRIPT_DIR/appload" && -x "$SCRIPT_DIR/appload" ]]; then
+    echo "      Found local prebuilt binary: $SCRIPT_DIR/appload"
+    FINAL_BIN="$SCRIPT_DIR/appload"
 elif [[ -f "$SCRIPT_DIR/$ASSET_NAME" && -x "$SCRIPT_DIR/$ASSET_NAME" ]]; then
     echo "      Found local architecture binary: $SCRIPT_DIR/$ASSET_NAME"
     FINAL_BIN="$SCRIPT_DIR/$ASSET_NAME"
+elif [[ -f "$REPO_ROOT/target/release/appload" && -x "$REPO_ROOT/target/release/appload" ]]; then
+    echo "      Found local cargo release build: $REPO_ROOT/target/release/appload"
+    FINAL_BIN="$REPO_ROOT/target/release/appload"
+elif [[ -f "$SCRIPT_DIR/shiply" && -x "$SCRIPT_DIR/shiply" ]]; then
+    echo "      Found local legacy binary: $SCRIPT_DIR/shiply"
+    FINAL_BIN="$SCRIPT_DIR/shiply"
 elif [[ -f "$REPO_ROOT/target/release/shiply" && -x "$REPO_ROOT/target/release/shiply" ]]; then
     echo "      Found local cargo release build: $REPO_ROOT/target/release/shiply"
     FINAL_BIN="$REPO_ROOT/target/release/shiply"
@@ -83,7 +89,7 @@ if [[ -z "$FINAL_BIN" ]]; then
         if command -v cargo >/dev/null 2>&1 && [[ -f "$REPO_ROOT/Cargo.toml" ]]; then
             echo "      Download unavailable; building from local source (cargo build --release)..."
             (cd "$REPO_ROOT" && cargo build --release)
-            FINAL_BIN="$REPO_ROOT/target/release/shiply"
+            FINAL_BIN="$REPO_ROOT/target/release/appload"
         else
             echo "ERROR: Could not find prebuilt binary and could not download from GitHub." >&2
             echo "       Please check your internet connection or run: cargo build --release" >&2
@@ -96,10 +102,10 @@ fi
 
 # 3. Determine Installation Destination
 if [[ -w "/Applications" ]]; then
-    APP_DIR="/Applications/Shiply.app"
+    APP_DIR="/Applications/AppLoad.app"
 else
     mkdir -p "$HOME/Applications"
-    APP_DIR="$HOME/Applications/Shiply.app"
+    APP_DIR="$HOME/Applications/AppLoad.app"
 fi
 
 echo "[3/4] Creating macOS application bundle at: $APP_DIR"
@@ -110,8 +116,8 @@ RESOURCES_DIR="$CONTENTS_DIR/Resources"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 
 # Copy executable
-cp -f "$FINAL_BIN" "$MACOS_DIR/shiply"
-chmod +x "$MACOS_DIR/shiply"
+cp -f "$FINAL_BIN" "$MACOS_DIR/appload"
+chmod +x "$MACOS_DIR/appload"
 
 # Clean up temp download if used
 if [[ -f "$TMP_BIN" ]]; then
@@ -138,15 +144,15 @@ cat > "$CONTENTS_DIR/Info.plist" <<EOF
 <plist version="1.0">
 <dict>
     <key>CFBundleDisplayName</key>
-    <string>Shiply</string>
+    <string>AppLoad</string>
     <key>CFBundleExecutable</key>
-    <string>shiply</string>
+    <string>appload</string>
     <key>CFBundleIconFile</key>
     <string>logo.png</string>
     <key>CFBundleIdentifier</key>
-    <string>io.shiply.desktop</string>
+    <string>io.appload.desktop</string>
     <key>CFBundleName</key>
-    <string>Shiply</string>
+    <string>AppLoad</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -164,39 +170,40 @@ echo "[4/4] Setting up CLI symlink..."
 CLI_INSTALLED=false
 
 if [[ -d "/usr/local/bin" && -w "/usr/local/bin" ]]; then
-    ln -sf "$MACOS_DIR/shiply" "/usr/local/bin/shiply"
-    echo "      Linked CLI to /usr/local/bin/shiply"
+    ln -sf "$MACOS_DIR/appload" "/usr/local/bin/appload"
+    echo "      Linked CLI to /usr/local/bin/appload"
     CLI_INSTALLED=true
 elif [[ -d "$HOME/.local/bin" || -d "$HOME/bin" ]]; then
     mkdir -p "$HOME/.local/bin"
-    ln -sf "$MACOS_DIR/shiply" "$HOME/.local/bin/shiply"
-    echo "      Linked CLI to $HOME/.local/bin/shiply"
+    ln -sf "$MACOS_DIR/appload" "$HOME/.local/bin/appload"
+    echo "      Linked CLI to $HOME/.local/bin/appload"
     CLI_INSTALLED=true
 fi
 
-# Create Desktop Shortcut
+# Create Desktop Shortcut & remove legacy shortcut
 DESKTOP_DIR="$HOME/Desktop"
 if [[ -d "$DESKTOP_DIR" && -w "$DESKTOP_DIR" ]]; then
-    ln -sf "$APP_DIR" "$DESKTOP_DIR/Shiply.app" 2>/dev/null || true
-    echo "      Created Desktop shortcut: $DESKTOP_DIR/Shiply.app"
+    ln -sf "$APP_DIR" "$DESKTOP_DIR/AppLoad.app" 2>/dev/null || true
+    rm -f "$DESKTOP_DIR/Shiply.app" 2>/dev/null || true
+    echo "      Created Desktop shortcut: $DESKTOP_DIR/AppLoad.app"
 fi
 
 # Send native notification if osascript is available
 if command -v osascript >/dev/null 2>&1; then
-    osascript -e 'display notification "Shiply has been installed successfully!" with title "Shiply Installer"' 2>/dev/null || true
+    osascript -e 'display notification "AppLoad has been installed successfully!" with title "AppLoad Installer"' 2>/dev/null || true
 fi
 
 echo "========================================================"
 echo " Installation Complete!"
 echo " App Bundle: $APP_DIR"
 if [[ "$CLI_INSTALLED" == "true" ]]; then
-    echo " Terminal Command: 'shiply'"
+    echo " Terminal Command: 'appload'"
 fi
 echo "========================================================"
 
 # Launch the app if requested or interactive
 if command -v open >/dev/null 2>&1; then
-    echo "Launching Shiply..."
+    echo "Launching AppLoad..."
     open "$APP_DIR" || true
 fi
 

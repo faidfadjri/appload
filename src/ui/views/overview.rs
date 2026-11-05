@@ -2,7 +2,7 @@
 
 use super::*;
 
-impl ShiplyApp {
+impl AppLoadApp {
     pub(crate) fn render_all_deployments_overview(&mut self, ui: &mut egui::Ui) {
         let mut open_bulk_modal = false;
         let mut clear_selection = false;

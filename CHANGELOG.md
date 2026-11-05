@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.12.0] - 2026-11-05
+
+### Changed
+- **Rebrand from Shiply to AppLoad:**
+  - Full product rename to **AppLoad** across application window, UI topbar, sidebar, installer wizards, documentation, CLI scripts, and release workflows.
+  - Seamless first-run migration: automatically discovers existing `Shiply` data directories (`%LOCALAPPDATA%\shiply` or portable folders), non-destructively copies SQLite database and configuration files to `%LOCALAPPDATA%\appload\appload_state.db`, preserves legacy backup, and leaves existing data intact.
+  - Automatic install migration and handoff: when run from a legacy `Programs\Shiply` installation (e.g. following an auto-update from v0.11.0), AppLoad transparently copies itself to `%LOCALAPPDATA%\Programs\AppLoad\appload.exe`, creates `AppLoad.lnk` shortcuts on Desktop and Start Menu, deletes legacy `Shiply.lnk` shortcuts, and restarts from the new path.
+  - Full backward compatibility: fallback support for `SHIPLY_*` environment variables (`SHIPLY_ASKPASS_*`, `SHIPLY_WINDOW_*`, `SHIPLY_CONSOLE_*`), legacy `shiply_state.*` file paths, and legacy release asset names (`shiply.exe`, `shiply-windows-x86_64.exe`).
+
+### Fixed
+- **Input Fields Usability & High-DPI Rendering:**
+  - Restored full click-to-position caret placement and click-and-drag text selection across all styled single-line text inputs (`styled_text_edit` and `input_core`).
+  - Perfect vertical text centering with subpixel rounding across all standard 36px text inputs.
+  - High-DPI font sizing and proportional layout adjustments ensuring crisp typography and correct touch targets at 125% and 150% Windows display scaling.
+- **Terminal Console & UI Polish:**
+  - Expanded terminal console output viewer default height to responsive 60% viewport height (clamped 320px–720px) with one-click full height toggle.
+  - Adjusted sidebar item spacing, padding, and ghost action button styling for increased breathing room.
+  - Matched Settings card widths to full workspace grid dimensions for visual balance.
+
 ## [0.11.0] - 2026-11-05
 
 ### Added

@@ -91,7 +91,7 @@ pub(crate) fn animated_modal_window_with_width(
     (window, inner_w)
 }
 
-impl ShiplyApp {
+impl AppLoadApp {
     pub fn open_new_project_modal(&mut self) {
         self.new_project_ps1_path.clear();
         self.new_project_name.clear();

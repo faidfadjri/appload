@@ -2,7 +2,7 @@
 
 use super::*;
 
-impl ShiplyApp {
+impl AppLoadApp {
     pub(crate) fn render_sidebar_footer(
         &mut self,
         footer_ui: &mut egui::Ui,
@@ -108,7 +108,7 @@ impl ShiplyApp {
         );
         if dir_resp
             .on_hover_text(
-                "Open the app folder where you can paste shiply_state.json or deploy-*.ps1 files",
+                "Open the app folder where you can paste appload_state.json or deploy-*.ps1 files",
             )
             .clicked()
         {
@@ -206,7 +206,7 @@ impl ShiplyApp {
         );
         footer_ui
             .interact(st_rect, egui::Id::new("sidebar_status_lbl"), Sense::hover())
-            .on_hover_text(format!("Installed Shiply v{APP_VERSION}"));
+            .on_hover_text(format!("Installed AppLoad v{APP_VERSION}"));
         footer_ui
             .painter()
             .galley(st_rect.min, st_galley, SB_TEXT_MUTED);
@@ -249,7 +249,7 @@ impl ShiplyApp {
                 )
                 .on_hover_cursor(egui::CursorIcon::PointingHand)
                 .on_hover_text(
-                    "Support Shiply development on Trakteer (https://trakteer.id/faidfadjri)",
+                    "Support AppLoad development on Trakteer (https://trakteer.id/faidfadjri)",
                 );
             let don_color = if don_resp.hovered() {
                 HEART_PINK

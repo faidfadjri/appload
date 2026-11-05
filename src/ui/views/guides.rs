@@ -2,7 +2,7 @@
 
 use super::*;
 
-impl ShiplyApp {
+impl AppLoadApp {
     pub(crate) fn render_onboarding_guideline_card(&mut self, ui: &mut egui::Ui) {
         let pad_y = if self.show_onboarding_guide { 16 } else { 12 };
         egui::Frame::new()
@@ -197,7 +197,7 @@ impl ShiplyApp {
     ) {
         ui.label(
             Typo::Small
-                .rich("Shiply reads your SSH password securely from your operating system's native credential vault so you never hardcode passwords in scripts or config files.")
+                .rich("AppLoad reads your SSH password securely from your operating system's native credential vault so you never hardcode passwords in scripts or config files.")
                 .color(TEXT_SECONDARY),
         );
         ui.add_space(SP_12);
@@ -340,7 +340,7 @@ impl ShiplyApp {
                 }
                 CredentialOsTab::Linux => {
                     let linux_cmd = format!(
-                        "secret-tool store --label=\"Shiply ({target_example})\" target \"{target_example}\" username \"{user_example}\""
+                        "secret-tool store --label=\"AppLoad ({target_example})\" target \"{target_example}\" username \"{user_example}\""
                     );
                     ui.label(Typo::SmallMedium.rich("Linux Secret Service (libsecret / GNOME Keyring / KWallet):"));
                     ui.add_space(4.0);

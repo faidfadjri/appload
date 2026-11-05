@@ -5,7 +5,7 @@ use super::*;
 #[test]
 fn test_project_switch_loading_indicator_and_hover_cursor() {
     let ctx = egui::Context::default();
-    ShiplyApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
 
     // Verify global visuals hover interact cursor is set to PointingHand (Pointer)
     assert_eq!(
@@ -45,7 +45,7 @@ fn test_async_git_inspect_channel_and_project_switch() {
         sort_order: None,
     };
     storage.projects.push(project);
-    let mut app = ShiplyApp::new(storage);
+    let mut app = AppLoadApp::new(storage);
 
     // Simulate fast project selection
     app.selection = SidebarSelection::Project("proj-async".to_string());
@@ -79,7 +79,7 @@ fn test_async_git_inspect_channel_and_project_switch() {
 #[test]
 fn test_project_menu_sidebar_running_deployment_circle_loading_indicator() {
     let ctx = egui::Context::default();
-    ShiplyApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
 
     let mut storage = crate::storage::AppStorage::default();
     let proj1 = Project {
@@ -135,7 +135,7 @@ fn test_project_menu_sidebar_running_deployment_circle_loading_indicator() {
     };
     storage.deployments = vec![running_dep];
 
-    let mut app = ShiplyApp::new(storage);
+    let mut app = AppLoadApp::new(storage);
     app.active_deployment_id = Some("dep-running-1".to_string());
 
     // Render sidebar with anim_t = 1.0 (fully open)
@@ -163,7 +163,7 @@ fn test_project_menu_sidebar_running_deployment_circle_loading_indicator() {
 #[test]
 fn test_sidebar_project_loading_indicator_positioned_without_overlap() {
     let ctx = egui::Context::default();
-    ShiplyApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
 
     let mut storage = crate::storage::AppStorage::default();
     let proj = Project {
@@ -244,7 +244,7 @@ fn test_sidebar_project_loading_indicator_positioned_without_overlap() {
     };
     storage.deployments = vec![dep, ok_dep];
 
-    let mut app = ShiplyApp::new(storage);
+    let mut app = AppLoadApp::new(storage);
     app.active_deployment_id = Some("dep-running-dev".to_string());
     assert!(app.is_project_deploying("proj-multi"));
     assert!(app.is_env_deploying("proj-multi", "dev"));
@@ -271,7 +271,7 @@ fn test_sidebar_project_loading_indicator_positioned_without_overlap() {
 #[test]
 fn test_project_sorting_and_drag_reordering_ui() {
     let ctx = egui::Context::default();
-    ShiplyApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
 
     let mut storage = crate::storage::AppStorage::default();
     let p_beta = Project {
@@ -303,7 +303,7 @@ fn test_project_sorting_and_drag_reordering_ui() {
     };
     storage.projects = vec![p_beta, p_alpha, p_gamma];
 
-    let mut app = ShiplyApp::new(storage);
+    let mut app = AppLoadApp::new(storage);
 
     // 1. Render sidebar initial custom order
     let _ = ctx.run(Default::default(), |ctx| {
@@ -357,7 +357,7 @@ fn test_project_sorting_and_drag_reordering_ui() {
 #[test]
 fn test_project_grouping_and_collapsible_sections_ui() {
     let ctx = egui::Context::default();
-    ShiplyApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
 
     let mut storage = crate::storage::AppStorage::default();
     let p_backend = Project {
@@ -389,7 +389,7 @@ fn test_project_grouping_and_collapsible_sections_ui() {
     };
     storage.projects = vec![p_backend, p_frontend, p_ungrouped];
 
-    let mut app = ShiplyApp::new(storage);
+    let mut app = AppLoadApp::new(storage);
 
     // Verify existing project groups
     let groups = app.storage.existing_project_groups();
@@ -442,7 +442,7 @@ fn test_project_grouping_and_collapsible_sections_ui() {
 #[test]
 fn test_sidebar_design_tokens_skeleton_loading_and_modals() {
     let ctx = egui::Context::default();
-    ShiplyApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
 
     // 1. Verify typography tokens (Brief 002 Section 2.2: 22, 16, 14, 13, 12, 11)
     assert_eq!(Typo::H1.size(), 22.0);
@@ -517,7 +517,7 @@ fn test_sidebar_design_tokens_skeleton_loading_and_modals() {
         sort_order: Some(0),
     }];
 
-    let mut app = ShiplyApp::new(storage);
+    let mut app = AppLoadApp::new(storage);
 
     // Test rendering with project switch loading (shimmer skeleton pills on card)
     app.project_switch_loading_id = Some("p-test-long".to_string());
@@ -528,7 +528,7 @@ fn test_sidebar_design_tokens_skeleton_loading_and_modals() {
     });
 
     // Test rendering empty state with refresh shimmer skeletons
-    let mut empty_app = ShiplyApp::new(crate::storage::AppStorage::default());
+    let mut empty_app = AppLoadApp::new(crate::storage::AppStorage::default());
     empty_app.sidebar_refreshing_until = Some(Instant::now() + Duration::from_secs(5));
     let _ = ctx.run(Default::default(), |ctx| {
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -580,7 +580,7 @@ fn test_sidebar_design_tokens_skeleton_loading_and_modals() {
 #[test]
 fn test_sidebar_sort_dropdown_menu_interaction() {
     let ctx = egui::Context::default();
-    ShiplyApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
 
     let mut storage = crate::storage::AppStorage::default();
     storage.projects = vec![
@@ -604,7 +604,7 @@ fn test_sidebar_sort_dropdown_menu_interaction() {
         },
     ];
 
-    let mut app = ShiplyApp::new(storage);
+    let mut app = AppLoadApp::new(storage);
     assert!(!app.sidebar_sort_dropdown_open);
 
     // 1. Open dropdown
@@ -637,7 +637,7 @@ fn test_sidebar_sort_dropdown_menu_interaction() {
 #[test]
 fn test_sidebar_search_single_outline_and_clear_button() {
     let ctx = egui::Context::default();
-    ShiplyApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
 
     let mut search_query = "cdo-tester".to_string();
 
@@ -698,15 +698,15 @@ fn test_sidebar_footer_bounds_prevent_overflow_under_taskbar() {
 #[test]
 fn test_sidebar_width_and_symmetric_padding() {
     let ctx = egui::Context::default();
-    ShiplyApp::configure_light_workspace_style(&ctx);
-    ShiplyApp::install_fonts(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::install_fonts(&ctx);
 
     assert_eq!(SIDEBAR_EXPANDED_WIDTH, 272.0);
     assert_eq!(SB_PAD_X, 16.0);
     assert_eq!(SP_2, 2.0);
 
     let storage = crate::storage::AppStorage::default();
-    let mut app = ShiplyApp::new(storage);
+    let mut app = AppLoadApp::new(storage);
 
     let mut rendered_inner_width = 0.0;
     let _ = ctx.run(
@@ -727,8 +727,8 @@ fn test_sidebar_width_and_symmetric_padding() {
 #[test]
 fn test_sidebar_project_row_borderless_and_env_badges_overflow() {
     let ctx = egui::Context::default();
-    ShiplyApp::configure_light_workspace_style(&ctx);
-    ShiplyApp::install_fonts(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::install_fonts(&ctx);
 
     let mut storage = crate::storage::AppStorage::default();
     let mut project = Project {
@@ -756,7 +756,7 @@ fn test_sidebar_project_row_borderless_and_env_badges_overflow() {
     }
     storage.projects = vec![project];
 
-    let mut app = ShiplyApp::new(storage);
+    let mut app = AppLoadApp::new(storage);
     app.selection = SidebarSelection::Project("proj-many-envs".to_string());
 
     // Run layout with anim_t = 1.0 (expanded mode)

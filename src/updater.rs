@@ -14,19 +14,19 @@ use std::sync::mpsc::Sender;
 use std::thread;
 use std::time::Duration;
 
-/// GitHub `<OWNER>/<REPO>` extracted from `.git/config` (`https://github.com/faidfadjri/shiply.git`).
-pub const GITHUB_REPO: &str = "faidfadjri/shiply";
+/// GitHub `<OWNER>/<REPO>` for AppLoad releases.
+pub const GITHUB_REPO: &str = "faidfadjri/appload";
 
 /// GitHub Releases API endpoint for fetching the latest published release.
 pub const GITHUB_RELEASES_LATEST_URL: &str =
-    "https://api.github.com/repos/faidfadjri/shiply/releases/latest";
+    "https://api.github.com/repos/faidfadjri/appload/releases/latest";
 
 /// Public GitHub Releases page URL for browser fallback.
-pub const GITHUB_RELEASES_PAGE_URL: &str = "https://github.com/faidfadjri/shiply/releases";
+pub const GITHUB_RELEASES_PAGE_URL: &str = "https://github.com/faidfadjri/appload/releases";
 
 /// Direct CDN URL to the latest.json release asset (bypasses GitHub REST API 60 req/hr rate limits).
 pub const GITHUB_RELEASES_LATEST_JSON_URL: &str =
-    "https://github.com/faidfadjri/shiply/releases/latest/download/latest.json";
+    "https://github.com/faidfadjri/appload/releases/latest/download/latest.json";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ReleaseInfo {
@@ -187,7 +187,16 @@ fn select_platform_asset<'a>(
 
     match target_os {
         "windows" => {
-            // 1. Prefer direct shiply.exe or shiply-windows*.exe binary for seamless in-place update
+            // 1. Prefer direct appload.exe or appload-windows*.exe binary for seamless in-place update
+            if let Some(a) = assets.iter().find(|a| {
+                let n = a.name.to_lowercase();
+                (n == "appload.exe"
+                    || (n.contains("appload") && n.contains("windows") && n.ends_with(".exe")))
+                    && !n.contains("setup")
+            }) {
+                return Some(a);
+            }
+            // 2. Compatibility fallback: also accept legacy shiply*.exe release assets
             if let Some(a) = assets.iter().find(|a| {
                 let n = a.name.to_lowercase();
                 (n == "shiply.exe"
@@ -196,7 +205,7 @@ fn select_platform_asset<'a>(
             }) {
                 return Some(a);
             }
-            // 2. Any .exe asset (including setup.exe since setup.exe and shiply.exe share the same binary!)
+            // 3. Any .exe asset (including setup.exe since setup.exe and appload.exe share the same binary!)
             if let Some(a) = assets
                 .iter()
                 .find(|a| a.name.to_lowercase().ends_with(".exe"))
@@ -216,7 +225,7 @@ fn select_platform_asset<'a>(
         "linux" => {
             if let Some(a) = assets.iter().find(|a| {
                 let n = a.name.to_lowercase();
-                !is_metadata(&n) && (n.contains("linux") || n == "shiply")
+                !is_metadata(&n) && (n.contains("linux") || n == "appload" || n == "shiply")
             }) {
                 return Some(a);
             }
@@ -261,9 +270,9 @@ pub fn parse_github_release_json_for_os(
                 return Ok(None);
             }
             let (target_key, fallback_name) = match target_os {
-                "windows" => ("windows-x86_64", "shiply.exe"),
-                "macos" => ("darwin-aarch64", "shiply-macos-aarch64"),
-                _ => ("linux-x86_64", "shiply-linux-x86_64"),
+                "windows" => ("windows-x86_64", "appload.exe"),
+                "macos" => ("darwin-aarch64", "appload-macos-aarch64"),
+                _ => ("linux-x86_64", "appload-linux-x86_64"),
             };
             let platforms = latest.platforms.unwrap_or_default();
             let download_url = platforms
@@ -272,10 +281,10 @@ pub fn parse_github_release_json_for_os(
                 .unwrap_or_else(|| {
                     format!("{GITHUB_RELEASES_PAGE_URL}/download/{tag}/{fallback_name}")
                 });
-            let name = format!("Shiply v{candidate_version}");
+            let name = format!("AppLoad v{candidate_version}");
             let body = latest
                 .notes
-                .unwrap_or_else(|| format!("Shiply v{candidate_version} release."));
+                .unwrap_or_else(|| format!("AppLoad v{candidate_version} release."));
             let published_at = latest
                 .pub_date
                 .unwrap_or_else(|| "Recently published".to_string());
@@ -329,7 +338,7 @@ pub fn parse_github_release_json_for_os(
     let name = payload
         .name
         .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| format!("Shiply v{candidate_version}"));
+        .unwrap_or_else(|| format!("AppLoad v{candidate_version}"));
 
     let body = payload
         .body
@@ -365,7 +374,7 @@ fn fetch_latest_release_json() -> Result<String, String> {
         "--max-time",
         "10",
         "-H",
-        "User-Agent: Shiply-Desktop-Updater",
+        "User-Agent: AppLoad-Desktop-Updater",
         GITHUB_RELEASES_LATEST_JSON_URL,
     ]);
     configure_background_command(&mut cmd_latest);
@@ -409,7 +418,7 @@ fn fetch_latest_release_json() -> Result<String, String> {
         "-H".to_string(),
         "Accept: application/vnd.github+json".to_string(),
         "-H".to_string(),
-        "User-Agent: Shiply-Desktop-Updater".to_string(),
+        "User-Agent: AppLoad-Desktop-Updater".to_string(),
     ];
     if let Ok(token) = env::var("GITHUB_TOKEN").or_else(|_| env::var("GH_TOKEN")) {
         let trimmed = token.trim();
@@ -436,7 +445,7 @@ fn fetch_latest_release_json() -> Result<String, String> {
         let ps_latest_script = format!(
             "$ProgressPreference = 'SilentlyContinue'; \
              [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
-             (Invoke-WebRequest -Uri '{GITHUB_RELEASES_LATEST_JSON_URL}' -Headers @{{'User-Agent'='Shiply-Desktop-Updater'}} -UseBasicParsing -TimeoutSec 10).Content"
+             (Invoke-WebRequest -Uri '{GITHUB_RELEASES_LATEST_JSON_URL}' -Headers @{{'User-Agent'='AppLoad-Desktop-Updater'}} -UseBasicParsing -TimeoutSec 10).Content"
         );
         let mut ps_latest = Command::new("powershell");
         ps_latest.args([
@@ -461,7 +470,7 @@ fn fetch_latest_release_json() -> Result<String, String> {
         let ps_script = format!(
             "$ProgressPreference = 'SilentlyContinue'; \
              [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
-             (Invoke-WebRequest -Uri '{GITHUB_RELEASES_LATEST_URL}' -Headers @{{'User-Agent'='Shiply-Desktop-Updater'; 'Accept'='application/vnd.github+json'}} -UseBasicParsing -TimeoutSec 12).Content"
+             (Invoke-WebRequest -Uri '{GITHUB_RELEASES_LATEST_URL}' -Headers @{{'User-Agent'='AppLoad-Desktop-Updater'; 'Accept'='application/vnd.github+json'}} -UseBasicParsing -TimeoutSec 12).Content"
         );
         let mut ps = Command::new("powershell");
         ps.args(["-NoProfile", "-NonInteractive", "-Command", &ps_script]);
@@ -576,7 +585,7 @@ pub fn spawn_download_and_apply_update(release: ReleaseInfo, tx: Sender<UpdaterE
             return;
         }
 
-        let staging_dir = env::temp_dir().join("shiply-updater");
+        let staging_dir = env::temp_dir().join("appload-updater");
         if let Err(e) = fs::create_dir_all(&staging_dir) {
             let _ = tx.send(UpdaterEvent::UpdateFailed {
                 error: format!("Could not create temp update folder: {e}"),
@@ -585,7 +594,7 @@ pub fn spawn_download_and_apply_update(release: ReleaseInfo, tx: Sender<UpdaterE
         }
 
         let temp_file = staging_dir.join(format!(
-            "shiply-update-{}-{}",
+            "appload-update-{}-{}",
             release.version,
             installed_exe_name()
         ));
@@ -604,7 +613,7 @@ pub fn spawn_download_and_apply_update(release: ReleaseInfo, tx: Sender<UpdaterE
             "-sSL",
             "--fail",
             "-H",
-            "User-Agent: Shiply-Desktop-Updater",
+            "User-Agent: AppLoad-Desktop-Updater",
             "-o",
         ]);
         cmd.arg(&temp_file);
@@ -684,7 +693,7 @@ pub fn spawn_download_and_apply_update(release: ReleaseInfo, tx: Sender<UpdaterE
             downloaded_bytes: final_size,
             total_bytes: expected_total.max(final_size),
             fraction: 0.95,
-            status_text: format!("Installing Shiply v{}...", release.version),
+            status_text: format!("Installing AppLoad v{}...", release.version),
         });
 
         let current_exe = match env::current_exe() {
@@ -712,7 +721,7 @@ pub fn spawn_download_and_apply_update(release: ReleaseInfo, tx: Sender<UpdaterE
             downloaded_bytes: final_size,
             total_bytes: expected_total.max(final_size),
             fraction: 1.0,
-            status_text: format!("Shiply v{} installed! Restarting...", release.version),
+            status_text: format!("AppLoad v{} installed! Restarting...", release.version),
         });
 
         let _ = tx.send(UpdaterEvent::ReadyToRestart {
@@ -752,65 +761,87 @@ mod tests {
     #[test]
     fn test_parse_github_release_json_detects_newer_version_and_platform_asset() {
         let sample_json = r####"{
-            "tag_name": "v0.4.0",
-            "name": "Shiply v0.4.0 — Auto-Update Release",
-            "body": "### What's New\n- Added GitHub Releases in-app auto-updater\n- Centered Setup dialog",
-            "published_at": "2026-10-26T08:00:00Z",
-            "html_url": "https://github.com/faidfadjri/shiply/releases/tag/v0.4.0",
+            "tag_name": "v0.12.0",
+            "name": "AppLoad v0.12.0",
+            "body": "### What's New\n- Rebrand to AppLoad",
+            "published_at": "2026-11-05T20:00:00Z",
+            "html_url": "https://github.com/faidfadjri/appload/releases/tag/v0.12.0",
             "draft": false,
             "prerelease": false,
             "assets": [
                 {
                     "name": "latest.json",
-                    "browser_download_url": "https://github.com/faidfadjri/shiply/releases/download/v0.4.0/latest.json",
+                    "browser_download_url": "https://github.com/faidfadjri/appload/releases/download/v0.12.0/latest.json",
                     "size": 512
                 },
                 {
-                    "name": "shiply-linux-x86_64",
-                    "browser_download_url": "https://github.com/faidfadjri/shiply/releases/download/v0.4.0/shiply-linux-x86_64",
+                    "name": "appload-linux-x86_64",
+                    "browser_download_url": "https://github.com/faidfadjri/appload/releases/download/v0.12.0/appload-linux-x86_64",
                     "size": 8400000
                 },
                 {
+                    "name": "appload.exe",
+                    "browser_download_url": "https://github.com/faidfadjri/appload/releases/download/v0.12.0/appload.exe",
+                    "size": 9200000
+                },
+                {
                     "name": "shiply.exe",
-                    "browser_download_url": "https://github.com/faidfadjri/shiply/releases/download/v0.4.0/shiply.exe",
+                    "browser_download_url": "https://github.com/faidfadjri/appload/releases/download/v0.12.0/shiply.exe",
                     "size": 9200000
                 }
             ]
         }"####;
 
-        let win_rel = parse_github_release_json_for_os(sample_json, "0.3.0", "windows")
+        let win_rel = parse_github_release_json_for_os(sample_json, "0.11.0", "windows")
             .expect("valid json")
             .expect("should detect update");
-        assert_eq!(win_rel.tag_name, "v0.4.0");
-        assert_eq!(win_rel.version, "0.4.0");
-        assert_eq!(win_rel.asset_name, "shiply.exe");
+        assert_eq!(win_rel.tag_name, "v0.12.0");
+        assert_eq!(win_rel.version, "0.12.0");
+        assert_eq!(win_rel.asset_name, "appload.exe");
         assert_eq!(win_rel.asset_size, 9_200_000);
-        assert!(win_rel.body.contains("Added GitHub Releases"));
 
-        let linux_rel = parse_github_release_json_for_os(sample_json, "0.3.0", "linux")
+        let linux_rel = parse_github_release_json_for_os(sample_json, "0.11.0", "linux")
             .expect("valid json")
             .expect("should detect update");
-        assert_eq!(linux_rel.asset_name, "shiply-linux-x86_64");
+        assert_eq!(linux_rel.asset_name, "appload-linux-x86_64");
+
+        // Legacy compatibility test: if release only has shiply.exe, AppLoad still finds it
+        let legacy_json = r####"{
+            "tag_name": "v0.11.0",
+            "name": "Shiply v0.11.0",
+            "body": "Legacy",
+            "assets": [
+                {
+                    "name": "shiply.exe",
+                    "browser_download_url": "https://github.com/faidfadjri/shiply/releases/download/v0.11.0/shiply.exe",
+                    "size": 9100000
+                }
+            ]
+        }"####;
+        let legacy_win_rel = parse_github_release_json_for_os(legacy_json, "0.10.0", "windows")
+            .expect("valid json")
+            .expect("should detect update");
+        assert_eq!(legacy_win_rel.asset_name, "shiply.exe");
 
         // Same or newer current version returns None
         let up_to_date =
-            parse_github_release_json_for_os(sample_json, "0.4.0", "windows").expect("valid json");
+            parse_github_release_json_for_os(sample_json, "0.12.0", "windows").expect("valid json");
         assert!(up_to_date.is_none());
     }
 
     #[test]
     fn test_replace_executable_atomic() {
         let tmp = TempDir::new().expect("tempdir");
-        let running_exe = tmp.path().join("shiply.exe");
-        let downloaded_exe = tmp.path().join("shiply-update-0.4.0.exe");
+        let running_exe = tmp.path().join("appload.exe");
+        let downloaded_exe = tmp.path().join("appload-update-0.12.0.exe");
 
-        fs::write(&running_exe, b"old-binary-v0.3.0").expect("write old");
-        fs::write(&downloaded_exe, b"new-binary-v0.4.0").expect("write new");
+        fs::write(&running_exe, b"old-binary-v0.11.0").expect("write old");
+        fs::write(&downloaded_exe, b"new-binary-v0.12.0").expect("write new");
 
         replace_executable_atomic(&downloaded_exe, &running_exe).expect("atomic replace");
         assert_eq!(
             fs::read(&running_exe).expect("read updated"),
-            b"new-binary-v0.4.0"
+            b"new-binary-v0.12.0"
         );
     }
 

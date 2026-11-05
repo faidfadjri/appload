@@ -1,8 +1,20 @@
-//! Main ShiplyApp state container and top-level eframe/egui render loop.
+//! Main AppLoadApp state container and top-level eframe/egui render loop.
 
 use super::*;
 
-pub struct ShiplyApp {
+pub(crate) fn app_env_var(name: &str) -> Result<String, std::env::VarError> {
+    if name.starts_with("APPLOAD_") {
+        std::env::var(name).or_else(|_| std::env::var(name.replacen("APPLOAD_", "SHIPLY_", 1)))
+    } else {
+        std::env::var(name)
+    }
+}
+
+pub(crate) fn app_env_is_ok(name: &str) -> bool {
+    app_env_var(name).is_ok()
+}
+
+pub struct AppLoadApp {
     pub(crate) storage: AppStorage,
     pub(crate) selection: SidebarSelection,
     pub(crate) selected_env_key: String,
@@ -154,7 +166,7 @@ pub struct ShiplyApp {
     pub(crate) dpi_diagnostics_logged: bool,
     pub(crate) screenshot_frames: usize,
 }
-impl ShiplyApp {
+impl AppLoadApp {
     pub fn new(storage: AppStorage) -> Self {
         let (event_tx, event_rx) = mpsc::channel();
         let (updater_tx, updater_rx) = mpsc::channel();
@@ -174,21 +186,21 @@ impl ShiplyApp {
             Some(id) => SidebarSelection::Project(id.clone()),
             None => SidebarSelection::AllDeployments,
         };
-        if let Ok(val) = std::env::var("SHIPLY_INITIAL_VIEW") {
+        if let Ok(val) = app_env_var("APPLOAD_INITIAL_VIEW") {
             if val.eq_ignore_ascii_case("all_deployments") {
                 selection = SidebarSelection::AllDeployments;
             } else if val.eq_ignore_ascii_case("secret_management") {
                 selection = SidebarSelection::SecretManagement;
             }
         }
-        let modal_env = std::env::var("SHIPLY_OPEN_MODAL").unwrap_or_default();
+        let modal_env = app_env_var("APPLOAD_OPEN_MODAL").unwrap_or_default();
         let show_modal = modal_env.eq_ignore_ascii_case("new_project");
         let show_secret_modal_init = modal_env.eq_ignore_ascii_case("secret")
             || modal_env.eq_ignore_ascii_case("new_secret");
         let initial_selected_dep = storage.deployments.first().map(|d| d.id.clone());
 
         let mut active_tab = WorkspaceTab::HistoryAndLogs;
-        if let Ok(val) = std::env::var("SHIPLY_INITIAL_TAB") {
+        if let Ok(val) = app_env_var("APPLOAD_INITIAL_TAB") {
             if val.eq_ignore_ascii_case("pipeline_steps") || val.eq_ignore_ascii_case("steps") {
                 active_tab = WorkspaceTab::PipelineSteps;
             } else if val.eq_ignore_ascii_case("deployments") || val.eq_ignore_ascii_case("history")
@@ -213,7 +225,7 @@ impl ShiplyApp {
             last_edit_time: None,
             servers_edit_buffer: None,
             console_collapsed: false,
-            console_expanded_height: std::env::var("SHIPLY_CONSOLE_EXPANDED").is_ok(),
+            console_expanded_height: app_env_is_ok("APPLOAD_CONSOLE_EXPANDED"),
             changes_collapsed: false,
             collapsed_step_indices: HashSet::new(),
             dragged_step_idx: None,
@@ -306,7 +318,7 @@ impl ShiplyApp {
             last_sync_check: Instant::now(),
             status_banner: None,
             status_banner_time: None,
-            sidebar_collapsed: std::env::var("SHIPLY_SIDEBAR_COLLAPSED").is_ok(),
+            sidebar_collapsed: app_env_is_ok("APPLOAD_SIDEBAR_COLLAPSED"),
             window_maximized: false,
             pending_delete_confirm: None,
             fonts_initialized: false,
@@ -594,12 +606,12 @@ impl ShiplyApp {
     }
 
     /// Configures typography fonts: bundles Inter (Regular, Medium, SemiBold) and JetBrains Mono
-    /// with system Segoe UI fallback on Windows. Supports runtime Font A/B testing via `SHIPLY_UI_FONT`.
+    /// with system Segoe UI fallback on Windows. Supports runtime Font A/B testing via `APPLOAD_UI_FONT`.
     pub(crate) fn install_fonts(ctx: &egui::Context) {
         #[allow(unused_mut)]
         let mut fonts = FontDefinitions::default();
 
-        let active_font = if let Ok(val) = std::env::var("SHIPLY_UI_FONT") {
+        let active_font = if let Ok(val) = app_env_var("APPLOAD_UI_FONT") {
             if val.eq_ignore_ascii_case("segoeui") || val.eq_ignore_ascii_case("segoe") {
                 UiFont::SegoeUi
             } else {
@@ -1043,7 +1055,7 @@ impl ShiplyApp {
                                 self.update_error = Some(err);
                             } else {
                                 self.status_banner = Some((
-                                    format!("All deployments completed! Updated to Shiply v{new_ver}. Restarting application..."),
+                                    format!("All deployments completed! Updated to AppLoad v{new_ver}. Restarting application..."),
                                     true,
                                 ));
                                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
@@ -1075,7 +1087,7 @@ impl ShiplyApp {
                     if manual {
                         self.status_banner = Some((
                             format!(
-                                "Shiply v{current_version} is up to date with GitHub Releases ({GITHUB_REPO})."
+                                "AppLoad v{current_version} is up to date with GitHub Releases ({GITHUB_REPO})."
                             ),
                             true,
                         ));
@@ -1106,14 +1118,14 @@ impl ShiplyApp {
                         self.pending_update_restart = Some((new_version.clone(), exe_path));
                         self.show_update_modal = false;
                         self.status_banner = Some((
-                            format!("Shiply v{new_version} update is downloaded! Active deployments will continue running uninterrupted before restart."),
+                            format!("AppLoad v{new_version} update is downloaded! Active deployments will continue running uninterrupted before restart."),
                             true,
                         ));
                     } else if let Err(err) = restart_application(&exe_path) {
                         self.update_error = Some(err);
                     } else {
                         self.status_banner = Some((
-                            format!("Updated to Shiply v{new_version}! Restarting application..."),
+                            format!("Updated to AppLoad v{new_version}! Restarting application..."),
                             true,
                         ));
                         ctx.send_viewport_cmd(egui::ViewportCommand::Close);
@@ -1589,23 +1601,23 @@ fn save_color_image_as_bmp(
     Ok(())
 }
 
-impl eframe::App for ShiplyApp {
+impl eframe::App for AppLoadApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         if !self.fonts_initialized {
             Self::install_system_fonts(ctx);
             self.fonts_initialized = true;
         }
         if self.logo_texture.is_none() {
-            self.logo_texture = Some(load_shiply_logo_texture(ctx));
+            self.logo_texture = Some(load_appload_logo_texture(ctx));
         }
 
-        if let Ok(scale_str) = std::env::var("SHIPLY_ZOOM_FACTOR") {
+        if let Ok(scale_str) = app_env_var("APPLOAD_ZOOM_FACTOR") {
             if let Ok(scale) = scale_str.parse::<f32>() {
                 ctx.set_zoom_factor(scale);
             }
         }
 
-        if let Ok(path) = std::env::var("SHIPLY_SCREENSHOT_PATH") {
+        if let Ok(path) = app_env_var("APPLOAD_SCREENSHOT_PATH") {
             ctx.input_mut(|i| i.focused = true);
             self.screenshot_frames += 1;
             if self.screenshot_frames == 5 {
@@ -1705,13 +1717,18 @@ impl eframe::App for ShiplyApp {
                     .inner_margin(Margin::ZERO),
             )
             .show(ctx, |ui| {
+                #[cfg(debug_assertions)]
                 let mut main_scroll = ScrollArea::vertical()
                     .id_salt("main_workspace_vertical_scroll")
                     .auto_shrink([false, false]);
                 #[cfg(debug_assertions)]
-                if std::env::var("SHIPLY_SCROLL_TO_BOTTOM").is_ok() {
+                if app_env_is_ok("APPLOAD_SCROLL_TO_BOTTOM") {
                     main_scroll = main_scroll.vertical_scroll_offset(99999.0);
                 }
+                #[cfg(not(debug_assertions))]
+                let main_scroll = ScrollArea::vertical()
+                    .id_salt("main_workspace_vertical_scroll")
+                    .auto_shrink([false, false]);
                 main_scroll.show(ui, |ui| {
                         let avail_w = ui.available_width();
                         let h_pad = 32.0_f32;

@@ -164,6 +164,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "appload"
+version = "0.12.0"
+dependencies = [
+ "chrono",
+ "dirs",
+ "eframe",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "uuid",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
 name = "arboard"
 version = "3.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2768,21 +2783,6 @@ dependencies = [
  "cfg-if",
  "cpufeatures",
  "digest",
-]
-
-[[package]]
-name = "shiply"
-version = "0.11.0"
-dependencies = [
- "chrono",
- "dirs",
- "eframe",
- "rusqlite",
- "serde",
- "serde_json",
- "tempfile",
- "uuid",
- "windows-sys 0.59.0",
 ]
 
 [[package]]

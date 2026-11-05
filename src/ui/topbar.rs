@@ -2,7 +2,7 @@
 
 use super::*;
 
-impl ShiplyApp {
+impl AppLoadApp {
     /// Renders the custom frameless Webflow-style topbar with left navigation pills,
     /// 3px brand primary accent strip, theme toggle, draggable window region, notification bell, and window controls.
     pub(crate) fn render_termius_topbar(&mut self, ctx: &egui::Context) {
@@ -17,7 +17,7 @@ impl ShiplyApp {
             self.window_maximized = maximized;
         }
 
-        egui::TopBottomPanel::top("shiply_termius_topbar")
+        egui::TopBottomPanel::top("appload_termius_topbar")
             .exact_height(42.0)
             .show_separator_line(false)
             .frame(
@@ -71,10 +71,10 @@ impl ShiplyApp {
                 }
                 x = menu_rect.right() + 10.0;
 
-                // Shiply Brand title in topbar
+                // AppLoad Brand title in topbar
                 let logo_rect =
                     Rect::from_center_size(Pos2::new(x + 10.0, cy), Vec2::new(20.0, 20.0));
-                draw_shiply_logo(
+                draw_appload_logo(
                     ui.painter(),
                     logo_rect,
                     5,
@@ -86,7 +86,7 @@ impl ShiplyApp {
                 ui.painter().text(
                     Pos2::new(x, cy),
                     Align2::LEFT_CENTER,
-                    format!("Shiply v{APP_VERSION}"),
+                    format!("AppLoad v{APP_VERSION}"),
                     Typo::Label.font(),
                     topbar_text,
                 );

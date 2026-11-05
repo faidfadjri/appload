@@ -20,7 +20,7 @@ pub(crate) const PIPELINE_VARIABLES: &[(&str, &str)] = &[
     ),
 ];
 
-impl ShiplyApp {
+impl AppLoadApp {
     pub(crate) fn render_pipeline_header(
         &mut self,
         ui: &mut egui::Ui,

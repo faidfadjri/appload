@@ -2,7 +2,7 @@
 
 use super::*;
 
-impl ShiplyApp {
+impl AppLoadApp {
     pub(crate) fn render_secret_modal(&mut self, ctx: &egui::Context) {
         let Some(anim_t) = prepare_animated_modal(ctx, "secret_modal", &mut self.show_secret_modal)
         else {
@@ -25,7 +25,7 @@ impl ShiplyApp {
             } else {
                 "Linux Secret Service"
             };
-            let subtitle = format!("Saved to {os_name}. The value never touches Shiply's database.");
+            let subtitle = format!("Saved to {os_name}. The value never touches AppLoad's database.");
 
             if render_modal_header(ui, "close_secret_modal", title, &subtitle) {
                 self.show_secret_modal = false;

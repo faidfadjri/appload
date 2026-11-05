@@ -2,7 +2,7 @@
 
 use super::*;
 
-impl ShiplyApp {
+impl AppLoadApp {
     pub(crate) fn render_new_environment_modal(&mut self, ctx: &egui::Context) {
         let SidebarSelection::Project(proj_id) = self.selection.clone() else {
             self.show_new_env_modal = false;

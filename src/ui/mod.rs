@@ -16,7 +16,10 @@ pub mod views;
 #[cfg(test)]
 mod tests;
 
-pub use app::ShiplyApp;
+#[cfg(debug_assertions)]
+pub(crate) use app::app_env_is_ok;
+pub use app::AppLoadApp;
+pub type ShiplyApp = AppLoadApp;
 pub(crate) use components::*;
 pub(crate) use helpers::*;
 pub(crate) use icons::{IconButtonVisuals, *};
@@ -37,7 +40,7 @@ use crate::domain::{
 };
 use crate::executor::{run_deployment, DeploymentRequest, ExecutorEvent};
 use crate::installer::{
-    check_install_state, default_install_dir, install_or_update_self, load_shiply_logo_texture,
+    check_install_state, default_install_dir, install_or_update_self, load_appload_logo_texture,
     InstallState, APP_VERSION,
 };
 use crate::ps1_importer::{import_project_from_path, parse_ps1_file};

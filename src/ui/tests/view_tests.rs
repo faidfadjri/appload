@@ -93,7 +93,7 @@ fn test_active_project_code_changes_isolation() {
 
     storage.deployments = vec![dep_backend, dep_frontend];
 
-    let mut app = ShiplyApp::new(storage);
+    let mut app = AppLoadApp::new(storage);
     // Switch to Backend project and set an invalid foreign selected deployment ID
     app.selection = SidebarSelection::Project("proj-backend".to_string());
     app.selected_deployment_id = Some("dep-fe-1".to_string());
@@ -117,9 +117,9 @@ fn test_active_project_code_changes_isolation() {
 #[test]
 fn test_deploy_and_rollback_button_dynamic_sizing_no_offset() {
     let ctx = egui::Context::default();
-    ShiplyApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
 
-    let mut app = ShiplyApp::new(crate::storage::AppStorage::default());
+    let mut app = AppLoadApp::new(crate::storage::AppStorage::default());
     app.deploy_version_input = "1.0.10-beta.2+build.2026".to_string();
 
     let rollback_dep = DeploymentRecord {
@@ -258,7 +258,7 @@ fn test_sync_version_candidates_and_application() {
     };
     storage.deployments = vec![dep_dev, dep_staging];
 
-    let mut app = ShiplyApp::new(storage);
+    let mut app = AppLoadApp::new(storage);
     app.selection = SidebarSelection::Project("proj-sync".to_string());
     app.selected_env_key = "prod".to_string();
     app.cached_pkg_version = Some("1.3.5".to_string());
@@ -294,7 +294,7 @@ fn test_sync_version_candidates_and_application() {
 #[test]
 fn test_console_loading_indicator_on_running_pipeline() {
     let ctx = egui::Context::default();
-    ShiplyApp::configure_light_workspace_style(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
 
     let mut storage = crate::storage::AppStorage::default();
     let proj = Project {
@@ -346,7 +346,7 @@ fn test_console_loading_indicator_on_running_pipeline() {
     };
     storage.deployments = vec![running_dep];
 
-    let mut app = ShiplyApp::new(storage);
+    let mut app = AppLoadApp::new(storage);
     app.selection = SidebarSelection::Project("proj-running-console".to_string());
     app.selected_env_key = "prod".to_string();
     app.active_deployment_id = Some("dep-console-run".to_string());
@@ -366,7 +366,7 @@ fn test_console_loading_indicator_on_running_pipeline() {
 #[test]
 fn test_deployment_keeps_running_on_update_and_restart_deferred_until_finished() {
     let storage = crate::storage::AppStorage::default();
-    let mut app = ShiplyApp::new(storage);
+    let mut app = AppLoadApp::new(storage);
     let ctx = egui::Context::default();
 
     // 1. Mark an active deployment in progress
@@ -383,7 +383,7 @@ fn test_deployment_keeps_running_on_update_and_restart_deferred_until_finished()
     updater_tx
         .send(UpdaterEvent::ReadyToRestart {
             new_version: "0.10.7".to_string(),
-            exe_path: PathBuf::from("mock/path/shiply.exe"),
+            exe_path: PathBuf::from("mock/path/appload.exe"),
         })
         .unwrap();
     app.updater_rx = updater_rx;
@@ -394,7 +394,7 @@ fn test_deployment_keeps_running_on_update_and_restart_deferred_until_finished()
     assert!(app.is_project_deploying("proj-app"));
     assert_eq!(
         app.pending_update_restart,
-        Some(("0.10.7".to_string(), PathBuf::from("mock/path/shiply.exe")))
+        Some(("0.10.7".to_string(), PathBuf::from("mock/path/appload.exe")))
     );
     let banner = app.status_banner.as_ref().unwrap();
     assert!(banner
@@ -471,7 +471,7 @@ fn test_donation_url_and_heart_icon() {
 
 #[test]
 fn test_refresh_animation_state() {
-    let mut app = ShiplyApp::new(crate::storage::AppStorage::default());
+    let mut app = AppLoadApp::new(crate::storage::AppStorage::default());
     assert!(app.refresh_anim_start.is_some());
     app.refresh_anim_start = None;
     assert!(app.refresh_anim_start.is_none());
@@ -522,7 +522,7 @@ fn test_cancel_running_deployment_clears_busy_state() {
         executed_steps: vec![],
     });
 
-    let mut app = ShiplyApp::new(storage);
+    let mut app = AppLoadApp::new(storage);
     app.active_deployments.insert(
         ("backend-cdo".to_string(), "production".to_string()),
         "dep-stuck-1".to_string(),
@@ -580,12 +580,12 @@ fn test_console_scroll_height_in_small_viewport() {
     };
     storage.deployments.push(dep.clone());
 
-    let mut app = ShiplyApp::new(storage);
+    let mut app = AppLoadApp::new(storage);
     app.console_collapsed = false;
     app.console_expanded_height = false; // compact mode: compact = 320.0
 
     let ctx = egui::Context::default();
-    ShiplyApp::install_fonts(&ctx);
+    AppLoadApp::install_fonts(&ctx);
     let mut inner_viewport_height = 0.0;
 
     let raw_input = egui::RawInput {

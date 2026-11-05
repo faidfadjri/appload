@@ -6,9 +6,13 @@ use std::env;
 use std::fs;
 use std::io::{self, Write};
 
-pub const ENV_ASKPASS_MODE: &str = "SHIPLY_ASKPASS_MODE";
-pub const ENV_ASKPASS_FILE: &str = "SHIPLY_ASKPASS_FILE";
-pub const ENV_SSH_PASSWORD: &str = "SHIPLY_SSH_PASSWORD";
+pub const ENV_ASKPASS_MODE: &str = "APPLOAD_ASKPASS_MODE";
+pub const ENV_ASKPASS_FILE: &str = "APPLOAD_ASKPASS_FILE";
+pub const ENV_SSH_PASSWORD: &str = "APPLOAD_SSH_PASSWORD";
+
+pub const LEGACY_ENV_ASKPASS_MODE: &str = "SHIPLY_ASKPASS_MODE";
+pub const LEGACY_ENV_ASKPASS_FILE: &str = "SHIPLY_ASKPASS_FILE";
+pub const LEGACY_ENV_SSH_PASSWORD: &str = "SHIPLY_SSH_PASSWORD";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedCredentials {
@@ -26,7 +30,9 @@ pub struct VaultCredential {
 /// If the current process was launched by `ssh`/`scp` as `SSH_ASKPASS`,
 /// prints the password to stdout and returns `true`.
 pub fn try_handle_askpass_invocation() -> bool {
-    if env::var_os(ENV_ASKPASS_MODE).is_none() {
+    let is_askpass =
+        env::var_os(ENV_ASKPASS_MODE).is_some() || env::var_os(LEGACY_ENV_ASKPASS_MODE).is_some();
+    if !is_askpass {
         return false;
     }
 
@@ -39,14 +45,14 @@ pub fn try_handle_askpass_invocation() -> bool {
 }
 
 pub fn read_askpass_secret_from_env() -> Option<String> {
-    if let Ok(path) = env::var(ENV_ASKPASS_FILE) {
+    if let Ok(path) = env::var(ENV_ASKPASS_FILE).or_else(|_| env::var(LEGACY_ENV_ASKPASS_FILE)) {
         if !path.is_empty() {
             if let Ok(contents) = fs::read_to_string(&path) {
                 return Some(contents);
             }
         }
     }
-    if let Ok(pw) = env::var(ENV_SSH_PASSWORD) {
+    if let Ok(pw) = env::var(ENV_SSH_PASSWORD).or_else(|_| env::var(LEGACY_ENV_SSH_PASSWORD)) {
         if !pw.is_empty() {
             return Some(pw);
         }
@@ -212,7 +218,7 @@ pub fn write_os_vault_credential(
         let account = username
             .map(str::trim)
             .filter(|u| !u.is_empty())
-            .unwrap_or("shiply");
+            .unwrap_or("appload");
         let output = std::process::Command::new("security")
             .args([
                 "add-generic-password",
@@ -242,11 +248,11 @@ pub fn write_os_vault_credential(
         let account = username
             .map(str::trim)
             .filter(|u| !u.is_empty())
-            .unwrap_or("shiply");
+            .unwrap_or("appload");
         let mut child = std::process::Command::new("secret-tool")
             .args([
                 "store",
-                &format!("--label=Shiply ({target})"),
+                &format!("--label=AppLoad ({target})"),
                 "service",
                 target,
                 "username",
@@ -562,7 +568,7 @@ mod tests {
 
     #[test]
     fn test_write_read_delete_os_vault_credential_and_secret_interpolation() {
-        let target = format!("shiply_test_secret_{}", uuid::Uuid::new_v4().simple());
+        let target = format!("appload_test_secret_{}", uuid::Uuid::new_v4().simple());
         write_os_vault_credential(&target, Some("deploy_admin"), "MyVaultS3cret!99")
             .expect("write credential to OS vault");
 
