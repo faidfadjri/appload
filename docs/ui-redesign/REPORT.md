@@ -9,7 +9,7 @@
 
 ## 1. Executive Summary
 
-Briefs 001, 002, and 003 are fully implemented across all 12 phases (Phases 0a through 11). The application has been transformed from its legacy dark-themed desktop layout into a modern Webflow/Linear-inspired light SaaS interface. All oversized files have been split into cohesive modules, strict zero-warning compiler lints (`[lints]` clippy) have been applied, and characterization tests guarantee complete safety of the frozen database schema and process command strings.
+Briefs 001, 002, and 003 are fully implemented across all 12 phases (Phases 0a through 11). The application has been transformed from its legacy dark-themed desktop layout into a modern Webflow/Linear-inspired light SaaS interface. All oversized UI files (`views.rs`, `sidebar.rs`, `modals.rs`, `tests.rs`) have been split into cohesive modules, strict zero-warning compiler lints (`[lints]` clippy) have been applied, and characterization tests guarantee complete safety of the frozen database schema and process command strings.
 
 ### Key Highlights
 - **100% Visual Redesign:** Clean Webflow canvas (`#F7F8FA`), solid elevated white cards (`#FFFFFF`), 1px hairline borders (`#E5E7EB`), crisp typography hierarchy (`Typo::H1` through `Typo::Caption`), standardized interactive states, and consistent 36px inputs.
@@ -17,7 +17,7 @@ Briefs 001, 002, and 003 are fully implemented across all 12 phases (Phases 0a t
 - **Font Decision:** Bundled `Inter` as default primary proportional font and `JetBrains Mono` as code font. The `UI_FONT` compile switch is preserved with the `SegoeUi` fallback option for instant toggling if needed.
 - **Zero Behaviour Change / Invariants Frozen:** The SQLite storage schema, serialization formats, process executor arguments (`ssh`, `scp`, `powershell.exe`), and OS credential vault keys remain 100% intact and verified by characterization tests.
 - **Strict Code Quality:** `cargo check`, `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, and `cargo test` pass with **zero warnings, zero errors**.
-- **Test Suite:** 93 unit tests + 3 integration tests (96 total) passing cleanly.
+- **Test Suite:** 94 unit tests + 3 integration tests (97 total) passing cleanly.
 
 ---
 
@@ -55,7 +55,7 @@ Adrian observed that the application "feels low resolution" when running on Wind
 | **7** | `6dc9e17` | Uniform Modals & Toast System | Centered responsive modals, 32x32 close button, top-right auto-dismiss toasts |
 | **8** | `f065652` | Secret Management Modern SaaS View | 3 stat summary cards, status filter tabs, OS vault cache, guide body |
 | **9** | `417a5d2` | Sidebar Navigation & Brand Polish | Dark navy sidebar (`#0B1220`), active states, project drag-sort, title bar |
-| **10** | `f39b46f`<br>`15323e8`<br>`6b3737c`<br>`40c2804`<br>`dcba4e0`<br>`4beb0ae`<br>`a4fed82`<br>`75e518c`<br>`3639cac`<br>`270bbce`<br>`b043369` | Rust Best Practices Codebase Refactor | Module splits (all files ≤752 lines), [lints] clippy clean, 0 unwraps in prod, doc comments on all modules |
+| **10** | `f39b46f`<br>`15323e8`<br>`6b3737c`<br>`40c2804`<br>`dcba4e0`<br>`4beb0ae`<br>`a4fed82`<br>`75e518c`<br>`3639cac`<br>`270bbce`<br>`b043369` | Rust Best Practices Codebase Refactor | Module splits of all large UI files, [lints] clippy clean, 0 unwraps in prod, doc comments on all modules |
 | **11.1** | `98a1d6d` | Pipeline Variable Chips Correctness | Fixed canonical variables (`{remote_dir}`, etc.), added substitution unit test |
 | **11.2** | `693718c` | Table Header Left-Alignment | Aligned table headers with cell content in Deployments & Secrets tables |
 | **11.3** | `aa5ac5d` | Deployments Table Columns & Responsiveness | Flexible Changes column (message + branch @ sha), duration, hide trigger <850px |
@@ -67,14 +67,16 @@ Adrian observed that the application "feels low resolution" when running on Wind
 | **11.9** | `c172124` | Release Bar Segmented Bump Group | Attached group with shared border and dividers, Sync tooltip |
 | **11.10** | `544a6c5` | Collapsible Guide Chevrons | Chevron toggle buttons, height ≤56px when collapsed |
 | **11.11** | `593bb00` | Header Path Spacing | 4px gap between folder icon and path text |
-| **Follow-up** | `e5d79a3` | Selected Card Background Tokenization | Zero raw RGB literals in UI views |
+| **11.12** | `ef1a929` | Exact Table Header Column Allocation | Allocated exact column widths matching row geometry for Deployments & Secrets |
+| **11.13** | `a6469a8` | Commit Message Truncation with Ellipsis | Truncate long commit messages with "..." and full tooltip, added unit test |
+| **11.14** | `2857754` | Shorten Status in Narrow Sidebar Footer | Prevent clipping of "Reinstall · Donate" by shortening to "v{version}" when narrow |
 
 ---
 
 ## 4. Phase 10 Architecture & Refactoring Breakdown
 
 ### Module Splitting
-All previously bloated files were modularized into focused, readable submodules:
+All oversized UI view, modal, sidebar, and test files were modularized into focused submodules:
 
 ```
 src/ui/
@@ -87,9 +89,9 @@ src/ui/
 │   ├── secret.rs            (273 lines - secret creation & edit modal)
 │   └── update.rs            (205 lines - in-app update notification modal)
 ├── sidebar/
-│   ├── mod.rs               (574 lines - sidebar container & layout coordinator)
+│   ├── mod.rs               (573 lines - sidebar container & layout coordinator)
 │   ├── context_menu.rs      (752 lines - project & environment right-click menus)
-│   ├── footer.rs            (260 lines - update check, open folder, donation)
+│   ├── footer.rs            (303 lines - update check, open folder, donation)
 │   ├── nav.rs               (446 lines - all deployments, secret mgmt, search)
 │   └── project_list.rs      (638 lines - project trees, environments, drag-sort)
 ├── views/
@@ -99,18 +101,20 @@ src/ui/
 │   ├── guides.rs            (421 lines - onboarding & OS credentials guides)
 │   ├── history.rs           (475 lines - deployment history table & filters)
 │   ├── history_changes.rs   (185 lines - git commit history & diff views)
+│   ├── history_desktop.rs   (337 lines - desktop table row layout & actions)
+│   ├── history_mobile.rs    (235 lines - responsive stacked row layout)
 │   ├── overview.rs          (331 lines - all deployments global overview)
 │   ├── pipeline.rs          (689 lines - pipeline step list & editor cards)
 │   ├── pipeline_header.rs   (242 lines - pipeline header, variable chips, add menu)
-│   ├── project_workspace.rs (658 lines - project header & environment cards)
+│   ├── project_workspace.rs (655 lines - project header & environment cards)
 │   ├── release_bar.rs       (384 lines - release bar, version bump & deploy trigger)
-│   ├── secrets.rs           (705 lines - secrets table, vault stats & guidelines)
+│   ├── secrets.rs           (701 lines - secrets table, vault stats & guidelines)
 │   └── settings.rs          (546 lines - environment config forms & danger zone)
 └── tests/
     ├── mod.rs               (12 lines - test module aggregator)
     ├── concurrent_deploy_tests.rs (125 lines)
     ├── context_menu_tests.rs (180 lines)
-    ├── history_tests.rs     (572 lines)
+    ├── history_tests.rs     (378 lines)
     ├── modal_tests.rs       (545 lines)
     ├── pipeline_tests.rs    (290 lines)
     ├── secret_tests.rs      (278 lines)
@@ -119,18 +123,49 @@ src/ui/
     └── view_tests.rs        (321 lines)
 ```
 
-### Refactoring Metrics
-- **Largest UI View File:** `secrets.rs` (705 lines) — down from 5,900 lines in `views.rs`.
-- **Largest UI Modal File:** `mod.rs` (462 lines) — down from 1,700 lines in `modals.rs`.
-- **Largest UI Sidebar File:** `context_menu.rs` (752 lines) — down from 2,000 lines in `sidebar.rs`.
-- **Largest Test File:** `sidebar_tests.rs` (696 lines) — down from 2,600 lines in `tests.rs`.
+### Full Codebase Line Counts (Largest Files)
+The table below reflects the actual line counts across `src/` following the refactor:
+
+| File | Line Count | Status | Notes |
+|---|---|---|---|
+| `src/storage.rs` | 1,899 lines | Kept unified | Frozen SQLite schema, migrations, and transactions |
+| `src/ui/app.rs` | 1,828 lines | Kept unified | Root eframe App lifecycle, window events & routing |
+| `src/executor.rs` | 1,793 lines | Kept unified | Frozen SSH/SCP/PowerShell command construction |
+| `src/ps1_importer.rs` | 949 lines | Unmodified | PowerShell parser & project auto-discovery |
+| `src/updater.rs` | 880 lines | Unmodified | GitHub releases & self-update logic |
+| `src/ui/icons.rs` | 840 lines | Submodule | Outline & solid vector icon drawing primitives |
+| `src/ui/components.rs` | 807 lines | Submodule | Standardized widgets, 36px inputs & search boxes |
+| `src/ui/sidebar/context_menu.rs` | 752 lines | Submodule | Context menu viewport flip & actions |
+| `src/installer.rs` | 743 lines | Unmodified | OS installer, shortcuts & askpass binary builder |
+| `src/domain.rs` | 713 lines | Unmodified | Pure domain models, config structures & interpolation |
+| `src/ui/kit.rs` | 704 lines | Submodule | Core design system kit (cards, tags, buttons) |
+| `src/ui/views/secrets.rs` | 701 lines | Submodule | Secret management SaaS view & credential guide |
+
+### Refactoring Quality Standards
 - **Clippy Invariants:** Zero `#[allow(clippy::too_many_arguments)]` remaining in production code; replaced with `IconButtonVisuals`.
 - **Error Handling:** All production `.unwrap()` instances replaced with `Option::insert`, safe matching, or explicit `.expect(...)` documenting the exact invariant.
 - **Documentation:** Every crate and submodule contains a top-level module documentation comment (`//!`).
 
 ---
 
-## 5. Relocated Actions Map
+## 5. Deviations / Not Done
+
+In accordance with Brief 003 guidance to avoid high-risk semantic churn on frozen subsystems, the following items from the initial Phase 10 wish-list were deliberately not split or restructured:
+
+1. **`src/storage.rs` (1,899 lines) was NOT split into submodules:**
+   - *Reason:* Contains the SQLite table migrations, legacy JSON-to-SQLite migration, and ACID transaction boundaries. Splitting across multiple files introduced borrow and module visibility hazards without architectural benefit.
+   - *Safety:* Pinned by characterization test `storage::tests::test_characterization_storage_json_schema_frozen`.
+2. **`src/executor.rs` (1,793 lines) was NOT split into submodules:**
+   - *Reason:* Contains the process execution engines for local PowerShell, SSH sessions, SCP upload, askpass integration, and secret log redaction. Command strings are frozen invariants that must not deviate.
+   - *Safety:* Pinned by characterization tests `executor::tests::test_characterization_build_ssh_command_frozen` and `test_characterization_build_scp_command_frozen`.
+3. **`src/ui/app.rs` (1,828 lines) was NOT split:**
+   - *Reason:* Houses the top-level `eframe::App` implementation (`update`, `setup`), frame event loops, viewport commands (including screenshot automation), and cross-thread channel pollers.
+4. **`ShiplyApp` State God-Struct was NOT broken into sub-structs:**
+   - *Reason:* Extracting modal and form fields into separate structs (e.g., `SecretFormState`, `BulkDeployState`) would have touched over 1,200 call sites across the codebase, conflicting with the mandate to keep behavior strictly identical and diffs focused on UI quality. Form state cleanup is instead handled cleanly via explicit field resets in the respective modal modules.
+
+---
+
+## 6. Relocated Actions Map
 
 All original capabilities and event handlers are preserved. The table below documents their new SaaS visual locations:
 
@@ -151,7 +186,7 @@ All original capabilities and event handlers are preserved. The table below docu
 
 ---
 
-## 6. Acceptance Verification Results
+## 7. Acceptance Verification Results
 
 All automated checks from Brief 002 Section 5 were run directly against the tree:
 
@@ -174,7 +209,7 @@ Result: Clean — 0 warnings, 0 errors (PASS)
 
 # 5. Full test suite:
 cargo test
-Result: 93 unit tests passed, 3 integration tests passed (96/96 PASS)
+Result: 94 unit tests passed, 3 integration tests passed (97/97 PASS)
 
 # 6. Formatting check:
 cargo fmt --check
@@ -183,7 +218,7 @@ Result: Clean (PASS)
 
 ---
 
-## 7. Screenshot Deliverables
+## 8. Screenshot Deliverables
 
 Fresh screenshots have been generated at standard wide (1920×1080) and narrow responsive (1000×800) resolutions for every view:
 
@@ -201,6 +236,6 @@ Fresh screenshots have been generated at standard wide (1920×1080) and narrow r
 
 ---
 
-## 8. Summary for Adrian & Orchestrator
+## 9. Summary for Adrian & Orchestrator
 
 The redesign and refactoring is complete on branch `ui/redesign-v2`. `main` remains untouched at `0467fff`, no git tags or releases were created, and no user sessions were interrupted. The branch is ready for your direct review and fast-forward/squash merge whenever convenient.
