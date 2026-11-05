@@ -15,6 +15,9 @@ use std::env;
 use std::sync::Arc;
 
 fn main() -> eframe::Result<()> {
+    // 0. Safety sandbox guard: if APPLOAD_TEST is set, APPLOAD_SANDBOX_ROOT MUST be set.
+    appload::paths::check_startup_guard();
+
     // 1. If invoked by OpenSSH (ssh/scp) as SSH_ASKPASS helper, output the secret and exit immediately.
     if try_handle_askpass_invocation() {
         return Ok(());
@@ -22,6 +25,37 @@ fn main() -> eframe::Result<()> {
 
     // 2. If invoked with `--install` / `--silent` / `install`, install/update binary + shortcuts headlessly and exit.
     let args: Vec<String> = env::args().skip(1).collect();
+
+    // 2b. Dedicated headless migration entry point (--migrate-only [--json])
+    if args.iter().any(|a| a == "--migrate-only") {
+        let is_json = args.iter().any(|a| a == "--json");
+        let outcome = appload::migration::run_first_run_data_migration();
+        if is_json {
+            let res = serde_json::json!({
+                "success": !outcome.is_error,
+                "data_migrated": outcome.data_migrated,
+                "notice": outcome.notice,
+                "is_error": outcome.is_error,
+                "project_count": outcome.project_count,
+                "source_path": outcome.source_path,
+            });
+            println!("{res}");
+        } else if outcome.is_error {
+            eprintln!(
+                "[AppLoad Migration] Failed: {}",
+                outcome.notice.unwrap_or_default()
+            );
+        } else {
+            println!(
+                "[AppLoad Migration] Success (migrated={}): {}",
+                outcome.data_migrated,
+                outcome
+                    .notice
+                    .unwrap_or_else(|| "No legacy state to migrate.".to_string())
+            );
+        }
+        std::process::exit(if outcome.is_error { 1 } else { 0 });
+    }
     if args
         .iter()
         .any(|a| a == "--install" || a == "install" || a == "--silent")

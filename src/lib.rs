@@ -5,6 +5,7 @@ pub mod domain;
 pub mod executor;
 pub mod installer;
 pub mod migration;
+pub mod paths;
 pub mod presets;
 pub mod ps1_importer;
 pub mod storage;

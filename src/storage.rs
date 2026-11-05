@@ -418,20 +418,7 @@ impl AppStorage {
                 }
             }
         }
-        #[cfg(windows)]
-        let local_data = std::env::var("LOCALAPPDATA")
-            .ok()
-            .map(|s| PathBuf::from(s.trim()))
-            .filter(|p| !p.as_os_str().is_empty())
-            .or_else(dirs::data_local_dir);
-        #[cfg(not(windows))]
-        let local_data = dirs::data_local_dir();
-
-        if let Some(proj_dirs) = local_data {
-            proj_dirs.join("appload").join("appload_state.db")
-        } else {
-            PathBuf::from("appload_state.db")
-        }
+        crate::paths::data_dir().join("appload_state.db")
     }
 
     /// Returns the directory where `appload_state.db` (and any drop-in source files) live.
@@ -527,24 +514,19 @@ impl AppStorage {
                             }
                         }
                     }
-                    #[cfg(windows)]
-                    let local_data = std::env::var("LOCALAPPDATA")
-                        .ok()
-                        .map(|s| PathBuf::from(s.trim()))
-                        .filter(|p| !p.as_os_str().is_empty())
-                        .or_else(dirs::data_local_dir);
-                    #[cfg(not(windows))]
-                    let local_data = dirs::data_local_dir();
-
-                    if let Some(proj_dirs) = local_data {
-                        let data_appload_json =
-                            proj_dirs.join("appload").join("appload_state.json");
-                        let data_shiply_json = proj_dirs.join("shiply").join("shiply_state.json");
-                        if !legacy_candidates.contains(&data_appload_json) {
-                            legacy_candidates.push(data_appload_json);
-                        }
-                        if !legacy_candidates.contains(&data_shiply_json) {
-                            legacy_candidates.push(data_shiply_json);
+                    let data_appload_json = crate::paths::data_dir().join("appload_state.json");
+                    if !legacy_candidates.contains(&data_appload_json) {
+                        legacy_candidates.push(data_appload_json);
+                    }
+                    for cand in crate::paths::legacy_data_candidates() {
+                        if cand
+                            .extension()
+                            .and_then(|e| e.to_str())
+                            .map(|e| e.eq_ignore_ascii_case("json"))
+                            .unwrap_or(false)
+                            && !legacy_candidates.contains(&cand)
+                        {
+                            legacy_candidates.push(cand);
                         }
                     }
                 }
@@ -1320,7 +1302,7 @@ fn file_mtime(path: &Path) -> Option<SystemTime> {
     fs::metadata(path).and_then(|m| m.modified()).ok()
 }
 
-fn is_dir_writable(dir: &Path) -> bool {
+pub(crate) fn is_dir_writable(dir: &Path) -> bool {
     if !dir.is_dir() {
         return false;
     }

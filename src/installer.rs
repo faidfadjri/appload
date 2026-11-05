@@ -71,52 +71,11 @@ pub fn is_setup_mode(args: &[String]) -> bool {
 }
 
 pub fn default_install_dir() -> PathBuf {
-    #[cfg(windows)]
-    {
-        if let Ok(local_app_data) = env::var("LOCALAPPDATA") {
-            let p = PathBuf::from(local_app_data.trim());
-            if !p.as_os_str().is_empty() {
-                return p.join("Programs").join("AppLoad");
-            }
-        }
-        if let Some(local_app_data) = dirs::data_local_dir() {
-            return local_app_data.join("Programs").join("AppLoad");
-        }
-    }
-    #[cfg(target_os = "macos")]
-    {
-        if let Some(home) = dirs::home_dir() {
-            return home.join("Applications").join("AppLoad");
-        }
-    }
-    #[cfg(all(not(windows), not(target_os = "macos")))]
-    {
-        if let Some(home) = dirs::home_dir() {
-            return home.join(".local").join("bin");
-        }
-    }
-    PathBuf::from("appload-install")
+    crate::paths::install_dir()
 }
 
 pub fn legacy_install_dir() -> Option<PathBuf> {
-    #[cfg(windows)]
-    {
-        if let Ok(local_app_data) = env::var("LOCALAPPDATA") {
-            let p = PathBuf::from(local_app_data.trim());
-            if !p.as_os_str().is_empty() {
-                return Some(p.join("Programs").join("Shiply"));
-            }
-        }
-        dirs::data_local_dir().map(|d| d.join("Programs").join("Shiply"))
-    }
-    #[cfg(target_os = "macos")]
-    {
-        dirs::home_dir().map(|h| h.join("Applications").join("Shiply"))
-    }
-    #[cfg(all(not(windows), not(target_os = "macos")))]
-    {
-        None
-    }
+    crate::paths::legacy_install_dir()
 }
 
 pub fn installed_exe_name() -> &'static str {
@@ -321,20 +280,54 @@ pub fn install_with_options(
 
 #[cfg(windows)]
 pub fn remove_legacy_windows_shortcuts() {
-    let script = r#"
-        $ws = [IO.Path]::Combine($env:APPDATA, 'Microsoft\Windows\Start Menu\Programs\Shiply.lnk');
-        if (Test-Path -LiteralPath $ws) { Remove-Item -LiteralPath $ws -Force -ErrorAction SilentlyContinue };
-        $desktop_candidates = @(
-            [IO.Path]::Combine($env:USERPROFILE, 'Desktop'),
-            [Environment]::GetFolderPath('Desktop')
-        ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) };
-        foreach ($d in $desktop_candidates) {
-            $wd = [IO.Path]::Combine($d, 'Shiply.lnk');
-            if (Test-Path -LiteralPath $wd) { Remove-Item -LiteralPath $wd -Force -ErrorAction SilentlyContinue };
-        }
-    "#;
+    let mut candidates = Vec::new();
+    if let Some(sm) = crate::paths::start_menu_dir() {
+        candidates.push(sm.join("Shiply.lnk"));
+    }
+    if let Some(dt) = crate::paths::desktop_dir() {
+        candidates.push(dt.join("Shiply.lnk"));
+    }
+
+    let existing: Vec<String> = candidates
+        .into_iter()
+        .filter(|p| p.exists())
+        .map(|p| p.to_string_lossy().replace('\'', "''"))
+        .collect();
+
+    if existing.is_empty() {
+        return;
+    }
+
+    let joined = existing
+        .iter()
+        .map(|s| format!("'{s}'"))
+        .collect::<Vec<_>>()
+        .join(",");
+
+    let script = format!(
+        r#"
+        $ws = New-Object -ComObject WScript.Shell;
+        $candidates = @({joined});
+        foreach ($lnk in $candidates) {{
+            if (Test-Path -LiteralPath $lnk) {{
+                try {{
+                    $s = $ws.CreateShortcut($lnk);
+                    $target = if ($s.TargetPath) {{ $s.TargetPath.ToLower() }} else {{ "" }};
+                    if ($target.EndsWith("shiply.exe") -or $target -like "*programs\shiply*") {{
+                        Remove-Item -LiteralPath $lnk -Force -ErrorAction SilentlyContinue;
+                    }}
+                }} catch {{
+                    // Fallback: remove only if inside sandbox
+                    if ($env:APPLOAD_SANDBOX_ROOT) {{
+                        Remove-Item -LiteralPath $lnk -Force -ErrorAction SilentlyContinue;
+                    }}
+                }}
+            }}
+        }}
+        "#
+    );
     let mut cmd = Command::new("powershell");
-    cmd.args(["-NoProfile", "-NonInteractive", "-Command", script]);
+    cmd.args(["-NoProfile", "-NonInteractive", "-Command", &script]);
     crate::version::configure_background_command(&mut cmd);
     let _ = cmd.output();
 }
@@ -356,37 +349,46 @@ fn create_windows_shortcuts(
         .to_string_lossy()
         .replace('\'', "''");
 
-    let mut script_parts = Vec::new();
-    script_parts.push("$ws = New-Object -ComObject WScript.Shell;".to_string());
-    script_parts.push("$paths = New-Object System.Collections.Generic.List[string];".to_string());
+    let mut shortcut_paths = Vec::new();
     if start_menu {
-        script_parts.push(
-            "if ($env:APPDATA) { $paths.Add([IO.Path]::Combine($env:APPDATA, 'Microsoft\\Windows\\Start Menu\\Programs\\AppLoad.lnk')) };".to_string(),
-        );
+        if let Some(sm) = crate::paths::start_menu_dir() {
+            shortcut_paths.push(sm.join("AppLoad.lnk"));
+        }
     }
     if desktop {
-        script_parts.push(
-            "if ($env:USERPROFILE -and (Test-Path -LiteralPath ([IO.Path]::Combine($env:USERPROFILE, 'Desktop')))) { \
-                $paths.Add([IO.Path]::Combine($env:USERPROFILE, 'Desktop\\AppLoad.lnk')) \
-             } else { \
-                $paths.Add([IO.Path]::Combine([Environment]::GetFolderPath('Desktop'), 'AppLoad.lnk')) \
-             };".to_string(),
-        );
+        if let Some(dt) = crate::paths::desktop_dir() {
+            shortcut_paths.push(dt.join("AppLoad.lnk"));
+        }
     }
-    script_parts.push(format!(
-        "foreach ($p in $paths) {{ \
-            $parent = [System.IO.Path]::GetDirectoryName($p); \
-            if ($parent -and !(Test-Path -LiteralPath $parent)) {{ New-Item -ItemType Directory -Path $parent -Force | Out-Null }}; \
-            $s = $ws.CreateShortcut($p); \
-            $s.TargetPath = '{target_str}'; \
-            $s.WorkingDirectory = '{work_str}'; \
-            $s.IconLocation = '{ico_str}'; \
-            $s.Description = 'AppLoad - Universal Deployment Tool'; \
-            $s.Save(); \
-        }}"
-    ));
 
-    let script = script_parts.join(" ");
+    if shortcut_paths.is_empty() {
+        return Ok(());
+    }
+
+    let joined_paths = shortcut_paths
+        .iter()
+        .map(|p| format!("'{}'", p.to_string_lossy().replace('\'', "''")))
+        .collect::<Vec<_>>()
+        .join(",");
+
+    let script = format!(
+        r#"
+        $ws = New-Object -ComObject WScript.Shell;
+        $paths = @({joined_paths});
+        foreach ($p in $paths) {{
+            $parent = [System.IO.Path]::GetDirectoryName($p);
+            if ($parent -and !(Test-Path -LiteralPath $parent)) {{
+                New-Item -ItemType Directory -Path $parent -Force | Out-Null
+            }};
+            $s = $ws.CreateShortcut($p);
+            $s.TargetPath = '{target_str}';
+            $s.WorkingDirectory = '{work_str}';
+            $s.IconLocation = '{ico_str}';
+            $s.Description = 'AppLoad - Universal Deployment Tool';
+            $s.Save();
+        }}
+        "#
+    );
 
     let mut cmd = Command::new("powershell");
     cmd.args(["-NoProfile", "-NonInteractive", "-Command", &script]);
