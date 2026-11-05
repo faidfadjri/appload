@@ -156,7 +156,7 @@ impl ShiplyApp {
                 );
 
                 // Search/filter input
-                styled_text_edit(
+                styled_search_input(
                     ui,
                     "history_search_input",
                     &mut self.history_search_query,

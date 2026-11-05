@@ -193,7 +193,7 @@ impl ShiplyApp {
             // Card Toolbar
             horizontal_row(ui, 36.0, |ui| {
                 let search_w = if is_compact_hdr { 140.0 } else { 200.0 };
-                styled_text_edit(
+                styled_search_input(
                     ui,
                     "secret_mgmt_search_input",
                     &mut self.secret_search_query,
@@ -391,12 +391,14 @@ impl ShiplyApp {
                         if !referencing_envs.is_empty() {
                             ui.add_space(SP_8);
                             for (badge, _) in referencing_envs.iter().take(2) {
-                                kit::tag(ui, badge, env_pastel_pill_colors(badge));
+                                kit::tag(ui, badge, env_pastel_pill_colors(badge))
+                                    .on_hover_text(&full_used_tip);
                                 ui.add_space(2.0);
                             }
                             if referencing_envs.len() > 2 {
                                 let rem = referencing_envs.len() - 2;
-                                kit::count_badge(ui, rem);
+                                kit::tag(ui, &format!("+{rem}"), (SUBTLE_BG, TEXT_MUTED))
+                                    .on_hover_text(&full_used_tip);
                             }
                         }
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -535,12 +537,18 @@ impl ShiplyApp {
                             ub_child.label(Typo::Small.rich("Not used").color(TEXT_MUTED));
                         } else {
                             for (badge, _) in referencing_envs.iter().take(2) {
-                                kit::tag(&mut ub_child, badge, env_pastel_pill_colors(badge));
+                                kit::tag(&mut ub_child, badge, env_pastel_pill_colors(badge))
+                                    .on_hover_text(&full_used_tip);
                                 ub_child.add_space(4.0);
                             }
                             if referencing_envs.len() > 2 {
                                 let rem = referencing_envs.len() - 2;
-                                kit::count_badge(&mut ub_child, rem);
+                                kit::tag(
+                                    &mut ub_child,
+                                    &format!("+{rem}"),
+                                    (SUBTLE_BG, TEXT_MUTED),
+                                )
+                                .on_hover_text(&full_used_tip);
                             }
                         }
                         ub_resp.on_hover_text(&full_used_tip);
@@ -687,7 +695,7 @@ fn render_secret_stat_tile(
             ui.vertical(|ui| {
                 ui.label(Typo::Small.rich(label).color(TEXT_MUTED));
                 ui.add_space(4.0);
-                ui.label(Typo::H2.rich(value.to_string()).color(val_color));
+                ui.label(Typo::H1.rich(value.to_string()).color(val_color));
             });
         });
 }

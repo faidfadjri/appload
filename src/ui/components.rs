@@ -44,6 +44,80 @@ pub(crate) fn styled_password_edit(
     styled_text_edit_ext(ui, id_salt, value, width, hint, true)
 }
 
+pub(crate) fn styled_search_input(
+    ui: &mut egui::Ui,
+    id_salt: impl std::hash::Hash,
+    value: &mut String,
+    width: f32,
+    hint: Option<&str>,
+) -> bool {
+    let placeholder_str = hint.unwrap_or("Search...");
+    let height = INPUT_HEIGHT; // 36.0
+    let (outer_rect, outer_resp) = ui.allocate_exact_size(Vec2::new(width, height), Sense::click());
+
+    // Single clean white background fill
+    ui.painter()
+        .rect_filled(outer_rect, CornerRadius::same(6), INPUT_BG);
+
+    // Left magnifying glass search icon
+    let icon_center = Pos2::new(outer_rect.left() + 16.0, outer_rect.center().y);
+    draw_outline_icon(
+        ui.painter(),
+        icon_center,
+        OutlineIcon::Search,
+        TEXT_PLACEHOLDER,
+    );
+
+    // Inner TextEdit child matching singleline text row height (22px) centered vertically
+    let text_h = 22.0_f32;
+    let text_y = outer_rect.center().y - text_h * 0.5;
+    let left_pad = 32.0_f32;
+    let right_pad = 10.0_f32;
+    let text_rect = Rect::from_min_size(
+        Pos2::new(outer_rect.left() + left_pad, text_y),
+        Vec2::new((width - left_pad - right_pad).max(10.0), text_h),
+    );
+
+    let mut child_ui = ui.new_child(egui::UiBuilder::new().max_rect(text_rect));
+    let edit = egui::TextEdit::singleline(value)
+        .id_salt(id_salt)
+        .font(Typo::Body.font())
+        .text_color(TEXT_PRIMARY)
+        .frame(false)
+        .margin(Margin::ZERO)
+        .cursor_at_end(true)
+        .desired_width(text_rect.width())
+        .min_size(Vec2::new(text_rect.width(), text_h))
+        .hint_text(Typo::Body.rich(placeholder_str).color(TEXT_PLACEHOLDER));
+    let mut output = edit.show(&mut child_ui);
+
+    if outer_resp.clicked() && !output.response.has_focus() {
+        ui.memory_mut(|mem| mem.request_focus(output.response.id));
+    }
+
+    let is_focused =
+        output.response.has_focus() || ui.memory(|mem| mem.has_focus(output.response.id));
+    let is_hovered = outer_resp.hovered() || output.response.hovered();
+
+    let stroke = if is_focused {
+        Stroke::new(1.5_f32, PRIMARY_BLUE)
+    } else if is_hovered {
+        Stroke::new(1.0_f32, INPUT_BORDER_HOVER)
+    } else {
+        Stroke::new(1.0_f32, INPUT_BORDER)
+    };
+    ui.painter().rect_stroke(
+        outer_rect,
+        CornerRadius::same(6),
+        stroke,
+        StrokeKind::Inside,
+    );
+
+    handle_text_edit_cursor_and_selection(ui.ctx(), &mut output, value);
+
+    output.response.changed()
+}
+
 pub(crate) fn styled_text_edit_ext(
     ui: &mut egui::Ui,
     id_salt: impl std::hash::Hash,

@@ -297,14 +297,14 @@ pub fn status_badge(ui: &mut egui::Ui, kind: StatusKind, text: &str) {
 }
 
 /// Generic tag: 20px high, 4px radius, CAPTION font, no dot.
-pub fn tag(ui: &mut egui::Ui, text: &str, colors: (Color32, Color32)) {
+pub fn tag(ui: &mut egui::Ui, text: &str, colors: (Color32, Color32)) -> egui::Response {
     let (bg, fg) = colors;
     let font_id = Typo::Caption.font();
     let text_galley = ui.painter().layout_no_wrap(text.to_string(), font_id, fg);
 
     let h = 20.0;
     let w = 8.0 + text_galley.size().x + 8.0;
-    let (rect, _) = ui.allocate_exact_size(Vec2::new(w, h), Sense::hover());
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(w, h), Sense::hover());
 
     ui.painter()
         .rect_filled(rect, CornerRadius::same(R_SM as u8), bg);
@@ -313,6 +313,7 @@ pub fn tag(ui: &mut egui::Ui, text: &str, colors: (Color32, Color32)) {
         rect.center().y - text_galley.size().y / 2.0,
     );
     ui.painter().galley(text_pos, text_galley, fg);
+    resp
 }
 
 /// Small rounded grey count badge for tabs and section titles.
