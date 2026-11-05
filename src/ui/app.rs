@@ -213,7 +213,7 @@ impl ShiplyApp {
             last_edit_time: None,
             servers_edit_buffer: None,
             console_collapsed: false,
-            console_expanded_height: false,
+            console_expanded_height: std::env::var("SHIPLY_CONSOLE_EXPANDED").is_ok(),
             changes_collapsed: false,
             collapsed_step_indices: HashSet::new(),
             dragged_step_idx: None,
@@ -306,7 +306,7 @@ impl ShiplyApp {
             last_sync_check: Instant::now(),
             status_banner: None,
             status_banner_time: None,
-            sidebar_collapsed: false,
+            sidebar_collapsed: std::env::var("SHIPLY_SIDEBAR_COLLAPSED").is_ok(),
             window_maximized: false,
             pending_delete_confirm: None,
             fonts_initialized: false,
@@ -1599,7 +1599,14 @@ impl eframe::App for ShiplyApp {
             self.logo_texture = Some(load_shiply_logo_texture(ctx));
         }
 
+        if let Ok(scale_str) = std::env::var("SHIPLY_ZOOM_FACTOR") {
+            if let Ok(scale) = scale_str.parse::<f32>() {
+                ctx.set_zoom_factor(scale);
+            }
+        }
+
         if let Ok(path) = std::env::var("SHIPLY_SCREENSHOT_PATH") {
+            ctx.input_mut(|i| i.focused = true);
             self.screenshot_frames += 1;
             if self.screenshot_frames == 5 {
                 ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(Default::default()));
@@ -1698,10 +1705,14 @@ impl eframe::App for ShiplyApp {
                     .inner_margin(Margin::ZERO),
             )
             .show(ctx, |ui| {
-                ScrollArea::vertical()
+                let mut main_scroll = ScrollArea::vertical()
                     .id_salt("main_workspace_vertical_scroll")
-                    .auto_shrink([false, false])
-                    .show(ui, |ui| {
+                    .auto_shrink([false, false]);
+                #[cfg(debug_assertions)]
+                if std::env::var("SHIPLY_SCROLL_TO_BOTTOM").is_ok() {
+                    main_scroll = main_scroll.vertical_scroll_offset(99999.0);
+                }
+                main_scroll.show(ui, |ui| {
                         let avail_w = ui.available_width();
                         let h_pad = 32.0_f32;
                         let col_w = (avail_w - h_pad * 2.0).clamp(280.0, MAX_CONTENT_WIDTH);

@@ -6,7 +6,8 @@ use eframe::egui::Color32;
 // DESIGN TOKENS (Webflow-Style Light First System with Optional Dark Theme)
 // =============================================================================
 
-// Spacing scale: ONLY 4, 8, 12, 16, 20, 24, 32 px
+// Spacing scale: ONLY 2, 4, 8, 12, 16, 20, 24, 32 px
+pub const SP_2: f32 = 2.0;
 pub const SP_4: f32 = 4.0;
 pub const SP_8: f32 = 8.0;
 pub const SP_12: f32 = 12.0;
@@ -36,8 +37,9 @@ pub const TABLE_ROW_HEIGHT: f32 = 48.0;
 pub const DONATION_URL: &str = "https://trakteer.id/faidfadjri";
 pub const TAB_HEIGHT: f32 = 40.0;
 pub const ICON_HIT_AREA: f32 = 32.0;
-pub const SIDEBAR_EXPANDED_WIDTH: f32 = 248.0;
+pub const SIDEBAR_EXPANDED_WIDTH: f32 = 272.0;
 pub const SIDEBAR_COLLAPSED_WIDTH: f32 = 64.0;
+pub const SB_PAD_X: f32 = 16.0;
 
 // Theme definition struct for central theme control
 #[derive(Debug, Clone)]

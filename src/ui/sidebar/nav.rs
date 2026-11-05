@@ -9,6 +9,8 @@ impl ShiplyApp {
         full_w: f32,
         sort_trigger_rect_out: &mut Option<Rect>,
     ) {
+        ui.add_space(SP_12);
+
         // Nav Item 1: All Deployments (36px high)
         let is_overview = matches!(self.selection, SidebarSelection::AllDeployments);
         let (nav_rect, nav_resp) = ui.allocate_exact_size(Vec2::new(full_w, 36.0), Sense::click());
@@ -61,7 +63,7 @@ impl ShiplyApp {
 
         // Nav Item 2: Bulk Deploy (36px high)
         if !self.storage.projects.is_empty() {
-            ui.add_space(3.0);
+            ui.add_space(SP_4);
             let is_bulk_active = self.show_bulk_deploy_modal;
             let (bulk_rect, bulk_resp) =
                 ui.allocate_exact_size(Vec2::new(full_w, 36.0), Sense::click());
@@ -117,7 +119,7 @@ impl ShiplyApp {
         }
 
         // Nav Item 3: Secret Management (36px high)
-        ui.add_space(3.0);
+        ui.add_space(SP_4);
         let is_secrets_active = matches!(self.selection, SidebarSelection::SecretManagement);
         let (sec_rect, sec_resp) = ui.allocate_exact_size(Vec2::new(full_w, 36.0), Sense::click());
         let sec_resp = sec_resp.on_hover_cursor(egui::CursorIcon::PointingHand);
@@ -195,12 +197,12 @@ impl ShiplyApp {
                         self.selection = SidebarSelection::SecretManagement;
                     }
 
-        ui.add_space(14.0);
+        ui.add_space(SP_24);
 
         // Projects Header Row (28px)
         let (hdr_rect, _) = ui.allocate_exact_size(Vec2::new(full_w, 28.0), Sense::hover());
         ui.painter().text(
-            Pos2::new(hdr_rect.left() + 2.0, hdr_rect.center().y),
+            Pos2::new(hdr_rect.left(), hdr_rect.center().y),
             Align2::LEFT_CENTER,
             "PROJECTS",
             Typo::Caption.font(),
@@ -249,7 +251,7 @@ impl ShiplyApp {
         // Sort Control as Ghost Sm
         let sort_area_rect = Rect::from_min_size(
             Pos2::new(
-                hdr_rect.right() - add_w - 6.0 - sort_w,
+                add_btn_rect.left() - SP_8 - sort_w,
                 hdr_rect.center().y - 12.0,
             ),
             Vec2::new(sort_w, 24.0),
@@ -305,7 +307,7 @@ impl ShiplyApp {
             sort_fg,
         );
 
-        ui.add_space(8.0);
+        ui.add_space(SP_8);
 
         // Search input
         sidebar_search_text_edit(
@@ -316,6 +318,6 @@ impl ShiplyApp {
             Some("Search projects..."),
         );
 
-        ui.add_space(8.0);
+        ui.add_space(SP_16);
     }
 }

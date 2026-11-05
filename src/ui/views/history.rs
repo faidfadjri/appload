@@ -417,12 +417,15 @@ impl ShiplyApp {
 
         ui.add_space(18.0);
 
-        let selected_dep = self
-            .selected_deployment_id
-            .as_ref()
-            .and_then(|id| filtered.iter().find(|d| &d.id == id))
-            .or_else(|| filtered.first())
-            .cloned();
+        let selected_dep = if !self.console_collapsed {
+            self.selected_deployment_id
+                .as_ref()
+                .and_then(|id| filtered.iter().find(|d| &d.id == id))
+                .or_else(|| filtered.first())
+                .cloned()
+        } else {
+            None
+        };
 
         if let Some(dep) = &selected_dep {
             if self.selected_deployment_id.as_ref() != Some(&dep.id) {

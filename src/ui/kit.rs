@@ -53,6 +53,17 @@ impl ButtonSize {
     }
 }
 
+/// Calculates the exact rendered pixel width of a kit::button with the given label, size, and icon.
+pub(crate) fn button_width(ui: &egui::Ui, size: ButtonSize, label: &str, has_icon: bool) -> f32 {
+    let font_id = size.font();
+    let pad_x = size.pad_x();
+    let text_galley = ui
+        .painter()
+        .layout_no_wrap(label.to_string(), font_id, Color32::WHITE);
+    let icon_w = if has_icon { 16.0 + 6.0 } else { 0.0 };
+    pad_x * 2.0 + icon_w + text_galley.size().x
+}
+
 /// Standardized SaaS button adhering to design tokens.
 #[allow(dead_code)]
 pub(crate) fn button(

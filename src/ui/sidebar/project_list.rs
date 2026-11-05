@@ -14,44 +14,34 @@ impl ShiplyApp {
             let time = ui.input(|i| i.time);
             for _ in 0..3 {
                 let (skel_rect, _) =
-                    ui.allocate_exact_size(Vec2::new(full_w, 56.0), Sense::hover());
+                    ui.allocate_exact_size(Vec2::new(full_w, 58.0), Sense::hover());
                 ui.painter()
                     .rect_filled(skel_rect, CornerRadius::same(R_MD as u8), SB_SURFACE);
-                ui.painter().rect_stroke(
-                    skel_rect,
-                    CornerRadius::same(R_MD as u8),
-                    Stroke::new(1.0_f32, SB_BORDER_LINE),
-                    StrokeKind::Inside,
-                );
 
                 let name_w = (skel_rect.width() - 34.0) * 0.6;
                 let name_rect = Rect::from_min_size(
-                    Pos2::new(skel_rect.left() + 20.0, skel_rect.top() + 10.0),
+                    Pos2::new(skel_rect.left() + 12.0, skel_rect.top() + 10.0),
                     Vec2::new(name_w, 14.0),
                 );
                 paint_shimmer_rect(ui.painter(), name_rect, 4.0, time);
 
                 let pill1 = Rect::from_min_size(
-                    Pos2::new(skel_rect.left() + 20.0, skel_rect.top() + 30.0),
+                    Pos2::new(skel_rect.left() + 12.0, skel_rect.top() + 30.0),
                     Vec2::new(44.0, 18.0),
                 );
                 paint_shimmer_rect(ui.painter(), pill1, R_SM, time);
                 let pill2 = Rect::from_min_size(
-                    Pos2::new(skel_rect.left() + 20.0 + 50.0, skel_rect.top() + 30.0),
+                    Pos2::new(skel_rect.left() + 12.0 + 48.0, skel_rect.top() + 30.0),
                     Vec2::new(52.0, 18.0),
                 );
                 paint_shimmer_rect(ui.painter(), pill2, R_SM, time);
 
-                ui.add_space(6.0);
+                ui.add_space(SP_2);
             }
         } else if self.storage.projects.is_empty() {
-            let (empty_rect, _) = ui.allocate_exact_size(Vec2::new(full_w, 56.0), Sense::hover());
-            ui.painter().rect_stroke(
-                empty_rect,
-                CornerRadius::same(R_MD as u8),
-                Stroke::new(1.0_f32, SB_BORDER_LINE),
-                StrokeKind::Inside,
-            );
+            let (empty_rect, _) = ui.allocate_exact_size(Vec2::new(full_w, 58.0), Sense::hover());
+            ui.painter()
+                .rect_filled(empty_rect, CornerRadius::same(R_MD as u8), SB_SURFACE);
             ui.painter().text(
                 empty_rect.center(),
                 Align2::CENTER_CENTER,
@@ -125,7 +115,7 @@ impl ShiplyApp {
                     let is_collapsed = self.collapsed_project_groups.contains(&group_key);
 
                     let (grp_rect, grp_resp) =
-                        ui.allocate_exact_size(Vec2::new(full_w, 26.0), Sense::click());
+                        ui.allocate_exact_size(Vec2::new(full_w, 28.0), Sense::click());
                     let grp_resp = grp_resp.on_hover_cursor(egui::CursorIcon::PointingHand);
                     if grp_resp.hovered() {
                         ui.painter().rect_filled(
@@ -142,12 +132,12 @@ impl ShiplyApp {
                     };
                     draw_outline_icon(
                         ui.painter(),
-                        Pos2::new(grp_rect.left() + 8.0, grp_rect.center().y),
+                        Pos2::new(grp_rect.left() + 4.0, grp_rect.center().y),
                         chev,
                         SB_TEXT_FAINT,
                     );
                     ui.painter().text(
-                        Pos2::new(grp_rect.left() + 20.0, grp_rect.center().y),
+                        Pos2::new(grp_rect.left() + 18.0, grp_rect.center().y),
                         Align2::LEFT_CENTER,
                         group_title.to_uppercase(),
                         Typo::Caption.font(),
@@ -156,7 +146,7 @@ impl ShiplyApp {
 
                     paint_pill_right_aligned(
                         ui.painter(),
-                        Pos2::new(grp_rect.right() - 4.0, grp_rect.center().y),
+                        Pos2::new(grp_rect.right(), grp_rect.center().y),
                         &format!("{}", proj_indices.len()),
                         SB_SURFACE,
                         SB_TEXT_MUTED,
@@ -170,7 +160,7 @@ impl ShiplyApp {
                         }
                     }
 
-                    ui.add_space(3.0);
+                    ui.add_space(SP_4);
 
                     if is_collapsed {
                         continue;
@@ -184,31 +174,35 @@ impl ShiplyApp {
                     let is_switching =
                         self.project_switch_loading_id.as_deref() == Some(&project.id);
 
-                    // Project Card: 56px high, radius 8px
+                    // Project Card: borderless list item, 58px high, radius 6px
                     let (p_rect, p_resp) =
-                        ui.allocate_exact_size(Vec2::new(full_w, 56.0), Sense::click());
+                        ui.allocate_exact_size(Vec2::new(full_w, 58.0), Sense::click());
                     let p_resp = p_resp.on_hover_cursor(egui::CursorIcon::PointingHand);
 
-                    let fill = if p_resp.hovered() {
+                    let fill = if is_selected {
+                        SB_SURFACE
+                    } else if p_resp.hovered() {
                         SB_SURFACE_HOVER
                     } else {
-                        SB_SURFACE
+                        Color32::TRANSPARENT
                     };
                     if is_being_dragged {
                         let shadow_rect = p_rect.translate(Vec2::new(0.0, 3.0)).expand(1.0);
                         ui.painter().rect_filled(
                             shadow_rect,
-                            CornerRadius::same(8),
+                            CornerRadius::same(R_MD as u8),
                             SB_MENU_SHADOW_SOFT,
                         );
                     }
-                    ui.painter()
-                        .rect_filled(p_rect, CornerRadius::same(8), fill);
+                    if fill != Color32::TRANSPARENT {
+                        ui.painter()
+                            .rect_filled(p_rect, CornerRadius::same(R_MD as u8), fill);
+                    }
 
                     // Drag handle on left
                     let grip_rect = Rect::from_min_size(
                         Pos2::new(p_rect.left() + 2.0, p_rect.top() + 6.0),
-                        Vec2::new(14.0, 44.0),
+                        Vec2::new(10.0, 46.0),
                     );
                     let grip_resp = ui
                         .interact(
@@ -244,9 +238,9 @@ impl ShiplyApp {
                                 if p_rect.contains(pos) {
                                     let is_top_half = pos.y < p_rect.center().y;
                                     let line_y = if is_top_half {
-                                        p_rect.top() - 2.0
+                                        p_rect.top() - 1.0
                                     } else {
-                                        p_rect.bottom() + 2.0
+                                        p_rect.bottom() + 1.0
                                     };
                                     let insert_line = [
                                         Pos2::new(p_rect.left() + 6.0, line_y),
@@ -266,7 +260,7 @@ impl ShiplyApp {
                                     );
                                     ui.painter().rect_filled(
                                         p_rect,
-                                        CornerRadius::same(8),
+                                        CornerRadius::same(R_MD as u8),
                                         SB_SELECTED_BG,
                                     );
                                     if is_pointer_released {
@@ -277,19 +271,11 @@ impl ShiplyApp {
                         }
                     }
 
-                    // Active project: 1px accent border, 2px left bar
-                    let stroke = Stroke::new(1.0_f32, SB_BORDER_LINE);
-                    ui.painter().rect_stroke(
-                        p_rect,
-                        CornerRadius::same(8),
-                        stroke,
-                        StrokeKind::Inside,
-                    );
-
+                    // Selected item: 2px SB_ACCENT left bar (no border)
                     if is_selected || is_switching {
                         let bar_rect = Rect::from_min_max(
-                            Pos2::new(p_rect.left(), p_rect.top() + 8.0),
-                            Pos2::new(p_rect.left() + 2.0, p_rect.bottom() - 8.0),
+                            Pos2::new(p_rect.left(), p_rect.top() + 6.0),
+                            Pos2::new(p_rect.left() + 2.0, p_rect.bottom() - 6.0),
                         );
                         ui.painter().rect_filled(
                             bar_rect,
@@ -303,15 +289,15 @@ impl ShiplyApp {
                         );
                     }
 
-                    let content_x = p_rect.left() + 20.0;
+                    let content_x = p_rect.left() + 12.0;
                     let is_deploying = self.is_project_deploying(&project.id);
 
                     // Row 1: Project Name (13px, weight 500, --sb-text)
                     let name_color = SB_TEXT;
                     let avail_name_w = if is_deploying || is_switching {
-                        (p_rect.right() - 32.0 - content_x).max(20.0)
+                        (p_rect.right() - 28.0 - content_x).max(20.0)
                     } else {
-                        (p_rect.right() - 16.0 - content_x).max(20.0)
+                        (p_rect.right() - 12.0 - content_x).max(20.0)
                     };
                     let mut job = egui::text::LayoutJob::simple_singleline(
                         project.name.clone(),
@@ -323,15 +309,15 @@ impl ShiplyApp {
                     job.wrap.break_anywhere = false;
                     let name_galley = ui.painter().layout_job(job);
                     ui.painter().galley(
-                        Pos2::new(content_x, p_rect.top() + 8.0),
+                        Pos2::new(content_x, p_rect.top() + 10.0),
                         name_galley,
                         name_color,
                     );
 
-                    // Spinner slot on Row 1 (top-right of the card, vertically aligned with project title)
+                    // Spinner slot on Row 1 (vertically aligned with project title)
                     if is_deploying || is_switching {
                         ui.ctx().request_repaint();
-                        let spinner_center = Pos2::new(p_rect.right() - 15.0, p_rect.top() + 15.0);
+                        let spinner_center = Pos2::new(p_rect.right() - 16.0, p_rect.top() + 18.0);
                         let spinner_color = if is_deploying {
                             SB_ACCENT
                         } else {
@@ -365,9 +351,9 @@ impl ShiplyApp {
                         }
                     }
 
-                    // Row 2: Env Badges below (11px mono, radius 4px)
+                    // Row 2: Env Badges below (SP_4 below Row 1: top = 30.0, height 18.0, pad 6, gap SP_4)
                     let row2_y = p_rect.top() + 30.0;
-                    let max_pill_x = p_rect.right() - 8.0;
+                    let max_pill_x = p_rect.right() - 12.0;
                     if is_switching {
                         ui.ctx().request_repaint();
                         let time = ui.input(|i| i.time);
@@ -377,7 +363,7 @@ impl ShiplyApp {
                         );
                         paint_shimmer_rect(ui.painter(), pill1, R_SM, time);
                         let pill2 = Rect::from_min_size(
-                            Pos2::new(content_x + 50.0, row2_y),
+                            Pos2::new(content_x + 48.0, row2_y),
                             Vec2::new(52.0, 18.0),
                         );
                         paint_shimmer_rect(ui.painter(), pill2, R_SM, time);
@@ -391,11 +377,11 @@ impl ShiplyApp {
                             Some(max_pill_x - content_x),
                         );
                     } else {
+                        let total_envs = project.environments.len();
                         let mut pill_x = content_x;
-                        for env in project.environments.iter().take(3) {
-                            if pill_x + 20.0 > max_pill_x {
-                                break;
-                            }
+                        let mut drawn_count = 0;
+                        for (i, env) in project.environments.iter().enumerate() {
+                            let remaining_after_this = total_envs - (i + 1);
                             let badge = env.badge_label();
                             let is_env_running = self.is_env_deploying(&project.id, &env.key)
                                 || self.storage.deployments.iter().any(|d| {
@@ -424,16 +410,43 @@ impl ShiplyApp {
                                 format!("{badge} —")
                             };
 
-                            let remaining_w = max_pill_x - pill_x;
-                            let w = paint_sidebar_env_badge(
-                                ui.painter(),
-                                Pos2::new(pill_x, row2_y),
-                                &label,
-                                bg,
-                                fg,
-                                Some(remaining_w),
-                            );
-                            pill_x += w + 6.0;
+                            let font_id = Typo::MonoSm.font();
+                            let text_w = ui
+                                .painter()
+                                .layout_no_wrap(label.clone(), font_id, fg)
+                                .size()
+                                .x;
+                            let badge_w = text_w + 12.0; // pad_x 6.0 on each side
+
+                            let need_overflow = remaining_after_this > 0;
+                            let reserved_for_overflow =
+                                if need_overflow { SP_4 + 28.0 } else { 0.0 };
+
+                            if pill_x + badge_w + reserved_for_overflow <= max_pill_x {
+                                let w = paint_sidebar_env_badge(
+                                    ui.painter(),
+                                    Pos2::new(pill_x, row2_y),
+                                    &label,
+                                    bg,
+                                    fg,
+                                    Some(max_pill_x - pill_x - reserved_for_overflow),
+                                );
+                                pill_x += w + SP_4;
+                                drawn_count += 1;
+                            } else {
+                                let remaining = total_envs - drawn_count;
+                                if remaining > 0 && pill_x + 20.0 <= max_pill_x {
+                                    paint_sidebar_env_badge(
+                                        ui.painter(),
+                                        Pos2::new(pill_x, row2_y),
+                                        &format!("+{remaining}"),
+                                        SB_SURFACE,
+                                        SB_TEXT_MUTED,
+                                        Some(max_pill_x - pill_x),
+                                    );
+                                }
+                                break;
+                            }
                         }
                     }
 
@@ -441,7 +454,7 @@ impl ShiplyApp {
                         clicked_project_id = Some(project.id.clone());
                     }
 
-                    ui.add_space(6.0);
+                    ui.add_space(SP_2);
                 }
             }
 

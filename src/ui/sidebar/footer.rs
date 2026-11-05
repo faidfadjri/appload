@@ -12,16 +12,16 @@ impl ShiplyApp {
     ) {
         footer_ui.painter().line_segment(
             [
-                Pos2::new(footer_rect.left() - 10.0, footer_rect.top()),
-                Pos2::new(footer_rect.right() + 10.0, footer_rect.top()),
+                Pos2::new(footer_rect.left() - SB_PAD_X, footer_rect.top()),
+                Pos2::new(footer_rect.right() + SB_PAD_X, footer_rect.top()),
             ],
             Stroke::new(1.0_f32, SB_BORDER_LINE),
         );
 
-        // 3 Ghost Buttons (32px high, radius 6px)
+        // 3 Ghost Buttons (32px high, radius 6px) with SP_2 gaps
         // Action 1: Sync App Directory Files
         let sync_rect = Rect::from_min_size(
-            Pos2::new(footer_rect.left(), footer_rect.top() + 6.0),
+            Pos2::new(footer_rect.left(), footer_rect.top() + SP_8),
             Vec2::new(full_w, 32.0),
         );
         let sync_resp = footer_ui
@@ -71,7 +71,7 @@ impl ShiplyApp {
 
         // Action 2: Open App Folder
         let dir_rect = Rect::from_min_size(
-            Pos2::new(footer_rect.left(), footer_rect.top() + 42.0),
+            Pos2::new(footer_rect.left(), sync_rect.bottom() + SP_2),
             Vec2::new(full_w, 32.0),
         );
         let dir_resp = footer_ui
@@ -119,7 +119,7 @@ impl ShiplyApp {
 
         // Action 3: Check for Updates
         let upd_rect = Rect::from_min_size(
-            Pos2::new(footer_rect.left(), footer_rect.top() + 78.0),
+            Pos2::new(footer_rect.left(), dir_rect.bottom() + SP_2),
             Vec2::new(full_w, 32.0),
         );
         let upd_resp = footer_ui
@@ -169,10 +169,10 @@ impl ShiplyApp {
             }
         }
 
-        // Status Row: 7px green circle + "Installed v..." + "Reinstall · Donate" links
+        // Status Row: 28px high, green dot + "v0.11.0" on left, "Reinstall · Donate" right-aligned
         let stat_rect = Rect::from_min_size(
-            Pos2::new(footer_rect.left(), footer_rect.top() + 116.0),
-            Vec2::new(full_w, 20.0),
+            Pos2::new(footer_rect.left(), upd_rect.bottom() + SP_8),
+            Vec2::new(full_w, 28.0),
         );
         let install_state = check_install_state(&default_install_dir(), APP_VERSION);
         let (dot_color, status_text, action_text) = match &install_state {
@@ -180,27 +180,15 @@ impl ShiplyApp {
                 (SB_ACCENT, "Not installed".to_string(), "Install (.exe)")
             }
             InstallState::InstalledCurrent { version, .. } => {
-                let lbl = if full_w < 260.0 {
-                    format!("v{version}")
-                } else {
-                    format!("Installed v{version}")
-                };
-                (theme.success, lbl, "Reinstall")
+                (theme.success, format!("v{version}"), "Reinstall")
             }
             InstallState::UpdateReady {
                 running_version, ..
-            } => {
-                let lbl = if full_w < 260.0 {
-                    format!("v{running_version}")
-                } else {
-                    format!("Update to v{running_version}")
-                };
-                (theme.warning, lbl, "Apply")
-            }
+            } => (theme.warning, format!("v{running_version}"), "Apply"),
         };
 
         footer_ui.painter().circle_filled(
-            Pos2::new(stat_rect.left() + 10.0, stat_rect.center().y),
+            Pos2::new(stat_rect.left() + 4.0, stat_rect.center().y),
             3.5,
             dot_color,
         );
@@ -211,7 +199,7 @@ impl ShiplyApp {
                 .layout_no_wrap(status_text, Typo::MonoSm.font(), SB_TEXT_MUTED);
         let st_rect = Rect::from_min_size(
             Pos2::new(
-                stat_rect.left() + 18.0,
+                stat_rect.left() + 14.0,
                 stat_rect.center().y - st_galley.size().y / 2.0,
             ),
             st_galley.size(),
@@ -223,83 +211,123 @@ impl ShiplyApp {
             .painter()
             .galley(st_rect.min, st_galley, SB_TEXT_MUTED);
 
-        let link_x = st_rect.right() + 6.0;
-        let link_galley = footer_ui.painter().layout_no_wrap(
+        // Right-aligned actions: "Reinstall · Donate", dropping "Donate" at narrow widths before clipping
+        let action_galley = footer_ui.painter().layout_no_wrap(
             action_text.to_string(),
             Typo::Small.font(),
             SB_TEXT_MUTED,
         );
-        let link_rect = Rect::from_min_size(
-            Pos2::new(link_x, stat_rect.center().y - link_galley.size().y / 2.0),
-            link_galley.size(),
-        );
-        let link_resp = footer_ui
-            .interact(
-                link_rect,
-                egui::Id::new("sidebar_reinstall_link"),
-                Sense::click(),
-            )
-            .on_hover_cursor(egui::CursorIcon::PointingHand);
-        let link_color = if link_resp.hovered() {
-            SB_ACCENT
-        } else {
-            SB_TEXT_MUTED
-        };
-        footer_ui
-            .painter()
-            .galley(link_rect.min, link_galley, link_color);
-
-        if link_resp.clicked() {
-            match install_or_update_self() {
-                Ok(msg) => self.status_banner = Some((msg, true)),
-                Err(err) => self.status_banner = Some((err, false)),
-            }
-        }
-
-        // Middle separator dot "·"
-        let sep_x = link_rect.right() + 4.0;
-        let sep_galley =
-            footer_ui
-                .painter()
-                .layout_no_wrap("·".to_string(), Typo::Small.font(), SB_TEXT_FAINT);
-        footer_ui.painter().galley(
-            Pos2::new(sep_x, stat_rect.center().y - sep_galley.size().y / 2.0),
-            sep_galley.clone(),
+        let sep_galley = footer_ui.painter().layout_no_wrap(
+            " · ".to_string(),
+            Typo::Small.font(),
             SB_TEXT_FAINT,
         );
-
-        // Donate link on sidebar status line
-        let don_x = sep_x + sep_galley.size().x + 4.0;
         let don_galley = footer_ui.painter().layout_no_wrap(
             "Donate".to_string(),
             Typo::Small.font(),
             SB_TEXT_MUTED,
         );
-        let don_rect = Rect::from_min_size(
-            Pos2::new(don_x, stat_rect.center().y - don_galley.size().y / 2.0),
-            don_galley.size(),
-        );
-        let don_resp = footer_ui
-            .interact(
-                don_rect,
-                egui::Id::new("sidebar_donate_link"),
-                Sense::click(),
-            )
-            .on_hover_cursor(egui::CursorIcon::PointingHand)
-            .on_hover_text(
-                "Support Shiply development on Trakteer (https://trakteer.id/faidfadjri)",
-            );
-        let don_color = if don_resp.hovered() {
-            HEART_PINK
-        } else {
-            SB_TEXT_MUTED
-        };
-        footer_ui
-            .painter()
-            .galley(don_rect.min, don_galley, don_color);
 
-        if don_resp.clicked() {
-            open_url_in_browser(DONATION_URL);
+        let total_combined_w = action_galley.size().x + sep_galley.size().x + don_galley.size().x;
+        let avail_w = stat_rect.right() - (st_rect.right() + SP_8);
+        let show_donate = avail_w >= total_combined_w;
+
+        if show_donate {
+            // Donate link (right-most)
+            let don_rect = Rect::from_min_size(
+                Pos2::new(
+                    stat_rect.right() - don_galley.size().x,
+                    stat_rect.center().y - don_galley.size().y / 2.0,
+                ),
+                don_galley.size(),
+            );
+            let don_resp = footer_ui
+                .interact(
+                    don_rect,
+                    egui::Id::new("sidebar_donate_link"),
+                    Sense::click(),
+                )
+                .on_hover_cursor(egui::CursorIcon::PointingHand)
+                .on_hover_text(
+                    "Support Shiply development on Trakteer (https://trakteer.id/faidfadjri)",
+                );
+            let don_color = if don_resp.hovered() {
+                HEART_PINK
+            } else {
+                SB_TEXT_MUTED
+            };
+            footer_ui
+                .painter()
+                .galley(don_rect.min, don_galley, don_color);
+            if don_resp.clicked() {
+                open_url_in_browser(DONATION_URL);
+            }
+
+            // Middle separator " · "
+            let sep_x = don_rect.left() - sep_galley.size().x;
+            footer_ui.painter().galley(
+                Pos2::new(sep_x, stat_rect.center().y - sep_galley.size().y / 2.0),
+                sep_galley,
+                SB_TEXT_FAINT,
+            );
+
+            // Reinstall link
+            let link_x = sep_x - action_galley.size().x;
+            let link_rect = Rect::from_min_size(
+                Pos2::new(link_x, stat_rect.center().y - action_galley.size().y / 2.0),
+                action_galley.size(),
+            );
+            let link_resp = footer_ui
+                .interact(
+                    link_rect,
+                    egui::Id::new("sidebar_reinstall_link"),
+                    Sense::click(),
+                )
+                .on_hover_cursor(egui::CursorIcon::PointingHand);
+            let link_color = if link_resp.hovered() {
+                SB_ACCENT
+            } else {
+                SB_TEXT_MUTED
+            };
+            footer_ui
+                .painter()
+                .galley(link_rect.min, action_galley, link_color);
+            if link_resp.clicked() {
+                match install_or_update_self() {
+                    Ok(msg) => self.status_banner = Some((msg, true)),
+                    Err(err) => self.status_banner = Some((err, false)),
+                }
+            }
+        } else {
+            // Only reinstall link right-aligned
+            let link_rect = Rect::from_min_size(
+                Pos2::new(
+                    stat_rect.right() - action_galley.size().x,
+                    stat_rect.center().y - action_galley.size().y / 2.0,
+                ),
+                action_galley.size(),
+            );
+            let link_resp = footer_ui
+                .interact(
+                    link_rect,
+                    egui::Id::new("sidebar_reinstall_link"),
+                    Sense::click(),
+                )
+                .on_hover_cursor(egui::CursorIcon::PointingHand);
+            let link_color = if link_resp.hovered() {
+                SB_ACCENT
+            } else {
+                SB_TEXT_MUTED
+            };
+            footer_ui
+                .painter()
+                .galley(link_rect.min, action_galley, link_color);
+            if link_resp.clicked() {
+                match install_or_update_self() {
+                    Ok(msg) => self.status_banner = Some((msg, true)),
+                    Err(err) => self.status_banner = Some((err, false)),
+                }
+            }
         }
     }
 }

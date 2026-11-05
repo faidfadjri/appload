@@ -40,7 +40,7 @@ impl ShiplyApp {
                 );
 
                 let mut inner_ui = drawer_ui.new_child(
-                    egui::UiBuilder::new().max_rect(drawer_rect.shrink2(Vec2::new(10.0, 0.0))),
+                    egui::UiBuilder::new().max_rect(drawer_rect.shrink2(Vec2::new(SB_PAD_X, 0.0))),
                 );
                 inner_ui.visuals_mut().override_text_color = Some(SB_TEXT);
                 let mut sort_trigger_rect_out = None;
@@ -54,14 +54,7 @@ impl ShiplyApp {
 
     pub(crate) fn render_sidebar(&mut self, ctx: &egui::Context, anim_t: f32) {
         let is_rail = anim_t < 0.35;
-        let screen_w = ctx.screen_rect().width();
-        let target_expanded_w = if screen_w >= 1150.0 {
-            SIDEBAR_EXPANDED_WIDTH
-        } else if screen_w >= 920.0 {
-            224.0
-        } else {
-            200.0
-        };
+        let target_expanded_w = SIDEBAR_EXPANDED_WIDTH;
         let width = if is_rail {
             SIDEBAR_COLLAPSED_WIDTH
         } else {
@@ -69,7 +62,7 @@ impl ShiplyApp {
                 + (target_expanded_w - SIDEBAR_COLLAPSED_WIDTH)
                     * ((anim_t - 0.35) / 0.65).clamp(0.0, 1.0)
         };
-        let pad_x = if is_rail { 4.0 } else { 10.0 };
+        let pad_x = if is_rail { 8.0 } else { SB_PAD_X };
         let mut sort_trigger_rect_out = None;
 
         egui::SidePanel::left("shiply_sidebar")
@@ -115,8 +108,8 @@ impl ShiplyApp {
 
         if is_rail {
             // ==================== COLLAPSED RAIL MODE (64px) ====================
-            // 1. Pinned Brand Top Bar (52px)
-            let brand_rect = Rect::from_min_size(inner_rect.min, Vec2::new(full_w, 52.0));
+            // 1. Pinned Brand Top Bar (56px)
+            let brand_rect = Rect::from_min_size(inner_rect.min, Vec2::new(full_w, 56.0));
             let brand_ui = ui.new_child(egui::UiBuilder::new().max_rect(brand_rect));
             let logo_rect = Rect::from_center_size(brand_rect.center(), Vec2::new(26.0, 26.0));
             draw_shiply_logo(
@@ -128,14 +121,14 @@ impl ShiplyApp {
             );
             brand_ui.painter().line_segment(
                 [
-                    Pos2::new(brand_rect.left(), brand_rect.bottom()),
-                    Pos2::new(brand_rect.right(), brand_rect.bottom()),
+                    Pos2::new(brand_rect.left() - 8.0, brand_rect.bottom()),
+                    Pos2::new(brand_rect.right() + 8.0, brand_rect.bottom()),
                 ],
                 Stroke::new(1.0_f32, SB_BORDER_LINE),
             );
 
-            // 2. Pinned Footer (132px)
-            let footer_h = 132.0_f32;
+            // 2. Pinned Footer (160px)
+            let footer_h = 160.0_f32;
             let footer_rect = Rect::from_min_size(
                 Pos2::new(inner_rect.left(), inner_rect.bottom() - footer_h),
                 Vec2::new(full_w, footer_h),
@@ -144,8 +137,8 @@ impl ShiplyApp {
             footer_ui.spacing_mut().item_spacing = Vec2::ZERO;
             footer_ui.painter().line_segment(
                 [
-                    Pos2::new(footer_rect.left(), footer_rect.top()),
-                    Pos2::new(footer_rect.right(), footer_rect.top()),
+                    Pos2::new(footer_rect.left() - 8.0, footer_rect.top()),
+                    Pos2::new(footer_rect.right() + 8.0, footer_rect.top()),
                 ],
                 Stroke::new(1.0_f32, SB_BORDER_LINE),
             );
@@ -154,8 +147,10 @@ impl ShiplyApp {
             let center_x = footer_rect.center().x;
 
             // Sync Button
-            let sync_rect =
-                Rect::from_center_size(Pos2::new(center_x, footer_rect.top() + 20.0), btn_size);
+            let sync_rect = Rect::from_center_size(
+                Pos2::new(center_x, footer_rect.top() + SP_8 + 16.0),
+                btn_size,
+            );
             let sync_resp = footer_ui
                 .interact(sync_rect, egui::Id::new("rail_sync_btn"), Sense::click())
                 .on_hover_cursor(egui::CursorIcon::PointingHand)
@@ -194,8 +189,10 @@ impl ShiplyApp {
             }
 
             // Folder Button
-            let dir_rect =
-                Rect::from_center_size(Pos2::new(center_x, footer_rect.top() + 54.0), btn_size);
+            let dir_rect = Rect::from_center_size(
+                Pos2::new(center_x, footer_rect.top() + SP_8 + 32.0 + SP_2 + 16.0),
+                btn_size,
+            );
             let dir_resp = footer_ui
                 .interact(dir_rect, egui::Id::new("rail_folder_btn"), Sense::click())
                 .on_hover_cursor(egui::CursorIcon::PointingHand)
@@ -223,8 +220,10 @@ impl ShiplyApp {
             }
 
             // Updates Button
-            let upd_rect =
-                Rect::from_center_size(Pos2::new(center_x, footer_rect.top() + 88.0), btn_size);
+            let upd_rect = Rect::from_center_size(
+                Pos2::new(center_x, footer_rect.top() + SP_8 + 64.0 + 4.0 + 16.0),
+                btn_size,
+            );
             let upd_resp = footer_ui
                 .interact(upd_rect, egui::Id::new("rail_upd_btn"), Sense::click())
                 .on_hover_cursor(egui::CursorIcon::PointingHand)
@@ -257,7 +256,7 @@ impl ShiplyApp {
             }
 
             // Status Green Dot
-            let dot_pos = Pos2::new(center_x, footer_rect.top() + 118.0);
+            let dot_pos = Pos2::new(center_x, footer_rect.top() + 116.0 + 14.0);
             let dot_color = if self.available_update.is_some() {
                 theme.warning
             } else {
@@ -276,8 +275,8 @@ impl ShiplyApp {
 
             // 3. Middle Scrollable Rail Content
             let middle_rect = Rect::from_min_max(
-                Pos2::new(inner_rect.left(), brand_rect.bottom() + 8.0),
-                Pos2::new(inner_rect.right(), footer_rect.top() - 6.0),
+                Pos2::new(inner_rect.left(), brand_rect.bottom() + 1.0),
+                Pos2::new(inner_rect.right(), footer_rect.top() - 1.0),
             );
             let mut middle_ui = ui.new_child(egui::UiBuilder::new().max_rect(middle_rect));
             ScrollArea::vertical()
@@ -289,7 +288,8 @@ impl ShiplyApp {
 
                     // Nav item 1: All Deployments
                     let is_overview = matches!(self.selection, SidebarSelection::AllDeployments);
-                    let all_rect = Rect::from_center_size(Pos2::new(center_x, ui.cursor().min.y + 18.0), btn_size);
+                    let (slot_rect, _) = ui.allocate_exact_size(Vec2::new(full_w, 32.0), Sense::hover());
+                    let all_rect = Rect::from_center_size(slot_rect.center(), btn_size);
                     let all_resp = ui
                         .interact(all_rect, egui::Id::new("rail_all_deploy_btn"), Sense::click())
                         .on_hover_cursor(egui::CursorIcon::PointingHand)
@@ -322,12 +322,13 @@ impl ShiplyApp {
                     if all_resp.clicked() {
                         self.selection = SidebarSelection::AllDeployments;
                     }
-                    ui.add_space(40.0);
+                    ui.add_space(SP_8);
 
                     // Nav item 2: Bulk Deploy
                     if !self.storage.projects.is_empty() {
                         let is_bulk = self.show_bulk_deploy_modal;
-                        let bulk_rect = Rect::from_center_size(Pos2::new(center_x, ui.cursor().min.y + 18.0), btn_size);
+                        let (slot_rect, _) = ui.allocate_exact_size(Vec2::new(full_w, 32.0), Sense::hover());
+                        let bulk_rect = Rect::from_center_size(slot_rect.center(), btn_size);
                         let bulk_resp = ui
                             .interact(bulk_rect, egui::Id::new("rail_bulk_deploy_btn"), Sense::click())
                             .on_hover_cursor(egui::CursorIcon::PointingHand)
@@ -360,13 +361,13 @@ impl ShiplyApp {
                         if bulk_resp.clicked() {
                             self.open_bulk_deploy_modal();
                         }
-                        ui.add_space(40.0);
+                        ui.add_space(SP_8);
                     }
 
                     // Nav item 3: Secret Management (OS Credential Manager)
                     let is_secrets = matches!(self.selection, SidebarSelection::SecretManagement);
-                    let sec_rect =
-                        Rect::from_center_size(Pos2::new(center_x, ui.cursor().min.y + 18.0), btn_size);
+                    let (slot_rect, _) = ui.allocate_exact_size(Vec2::new(full_w, 32.0), Sense::hover());
+                    let sec_rect = Rect::from_center_size(slot_rect.center(), btn_size);
                     let sec_resp = ui
                         .interact(
                             sec_rect,
@@ -404,18 +405,20 @@ impl ShiplyApp {
                     if sec_resp.clicked() {
                         self.selection = SidebarSelection::SecretManagement;
                     }
-                    ui.add_space(40.0);
+                    ui.add_space(SP_8);
 
                     // Separator
-                    let sep_y = ui.cursor().min.y + 4.0;
+                    let (sep_rect, _) = ui.allocate_exact_size(Vec2::new(full_w, 1.0), Sense::hover());
+                    let sep_y = sep_rect.center().y;
                     ui.painter().line_segment(
                         [Pos2::new(center_x - 14.0, sep_y), Pos2::new(center_x + 14.0, sep_y)],
                         Stroke::new(1.0_f32, SB_BORDER_LINE),
                     );
-                    ui.add_space(12.0);
+                    ui.add_space(SP_12);
 
                     // Add Project Button (+)
-                    let add_rect = Rect::from_center_size(Pos2::new(center_x, ui.cursor().min.y + 16.0), btn_size);
+                    let (slot_rect, _) = ui.allocate_exact_size(Vec2::new(full_w, 32.0), Sense::hover());
+                    let add_rect = Rect::from_center_size(slot_rect.center(), btn_size);
                     let add_resp = ui
                         .interact(add_rect, egui::Id::new("rail_add_proj_btn"), Sense::click())
                         .on_hover_cursor(egui::CursorIcon::PointingHand)
@@ -426,13 +429,14 @@ impl ShiplyApp {
                     if add_resp.clicked() {
                         self.open_new_project_modal();
                     }
-                    ui.add_space(36.0);
+                    ui.add_space(SP_8);
 
                     // Project Avatars
                     let mut clicked_project_id = None;
                     for project in &self.storage.projects {
                         let is_selected = matches!(&self.selection, SidebarSelection::Project(id) if id == &project.id);
-                        let p_avatar_rect = Rect::from_center_size(Pos2::new(center_x, ui.cursor().min.y + 18.0), Vec2::new(32.0, 32.0));
+                        let (slot_rect, _) = ui.allocate_exact_size(Vec2::new(full_w, 32.0), Sense::hover());
+                        let p_avatar_rect = Rect::from_center_size(slot_rect.center(), Vec2::new(32.0, 32.0));
                         let p_resp = ui
                             .interact(p_avatar_rect, egui::Id::new(("rail_proj", &project.id)), Sense::click())
                             .on_hover_cursor(egui::CursorIcon::PointingHand);
@@ -488,7 +492,7 @@ impl ShiplyApp {
                             clicked_project_id = Some(project.id.clone());
                         }
 
-                        ui.add_space(38.0);
+                        ui.add_space(SP_8);
                     }
 
                     if let Some(pid) = clicked_project_id {
@@ -507,13 +511,13 @@ impl ShiplyApp {
                     }
                 });
         } else {
-            // ==================== EXPANDED SIDEBAR MODE (248px) ====================
-            // 1. Pinned Brand Top Bar (52px)
-            let brand_rect = Rect::from_min_size(inner_rect.min, Vec2::new(full_w, 52.0));
+            // ==================== EXPANDED SIDEBAR MODE (272px) ====================
+            // 1. Pinned Brand Top Bar (56px)
+            let brand_rect = Rect::from_min_size(inner_rect.min, Vec2::new(full_w, 56.0));
             let brand_ui = ui.new_child(egui::UiBuilder::new().max_rect(brand_rect));
             {
                 let logo_rect = Rect::from_min_size(
-                    Pos2::new(brand_rect.left() + 2.0, brand_rect.center().y - 13.0),
+                    Pos2::new(brand_rect.left(), brand_rect.center().y - 13.0),
                     Vec2::new(26.0, 26.0),
                 );
                 draw_shiply_logo(
@@ -524,7 +528,7 @@ impl ShiplyApp {
                     self.logo_texture.as_ref(),
                 );
                 brand_ui.painter().text(
-                    Pos2::new(logo_rect.right() + 8.0, brand_rect.center().y),
+                    Pos2::new(logo_rect.right() + SP_8, brand_rect.center().y),
                     Align2::LEFT_CENTER,
                     "Shiply",
                     Typo::H2.font(),
@@ -534,15 +538,15 @@ impl ShiplyApp {
                 // Hairline bottom border
                 brand_ui.painter().line_segment(
                     [
-                        Pos2::new(brand_rect.left() - 10.0, brand_rect.bottom()),
-                        Pos2::new(brand_rect.right() + 10.0, brand_rect.bottom()),
+                        Pos2::new(brand_rect.left() - SB_PAD_X, brand_rect.bottom()),
+                        Pos2::new(brand_rect.right() + SB_PAD_X, brand_rect.bottom()),
                     ],
                     Stroke::new(1.0_f32, SB_BORDER_LINE),
                 );
             }
 
-            // 2. Pinned Footer (142px) with zero-spacing to guarantee no bottom overflow
-            let footer_h = 142.0_f32;
+            // 2. Pinned Footer (160px) with zero-spacing to guarantee no bottom overflow
+            let footer_h = 160.0_f32;
             let footer_rect = Rect::from_min_size(
                 Pos2::new(inner_rect.left(), inner_rect.bottom() - footer_h),
                 Vec2::new(full_w, footer_h),
@@ -553,10 +557,11 @@ impl ShiplyApp {
 
             // 3. Middle Scrollable Content (Nav items + Projects header + Search + Projects list)
             let middle_rect = Rect::from_min_max(
-                Pos2::new(inner_rect.left(), brand_rect.bottom() + 10.0),
-                Pos2::new(inner_rect.right(), footer_rect.top() - 6.0),
+                Pos2::new(inner_rect.left(), brand_rect.bottom() + 1.0),
+                Pos2::new(inner_rect.right(), footer_rect.top() - 1.0),
             );
             let mut middle_ui = ui.new_child(egui::UiBuilder::new().max_rect(middle_rect));
+            middle_ui.spacing_mut().scroll.floating = true;
             middle_ui.spacing_mut().scroll.bar_width = 4.0;
             middle_ui.spacing_mut().scroll.bar_inner_margin = 1.0;
 

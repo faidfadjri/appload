@@ -252,8 +252,8 @@ pub(crate) fn paint_sidebar_env_badge(
     max_w: Option<f32>,
 ) -> f32 {
     let font_id = Typo::MonoSm.font();
-    let pad_x = 8.0_f32;
-    let h = 20.0_f32;
+    let pad_x = 6.0_f32;
+    let h = 18.0_f32;
 
     let galley = if let Some(mw) = max_w {
         let max_text_w = (mw - pad_x * 2.0).max(8.0);
