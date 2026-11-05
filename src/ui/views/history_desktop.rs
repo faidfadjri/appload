@@ -192,11 +192,68 @@ impl ShiplyApp {
                         &row_more_resp,
                         egui::PopupCloseBehavior::CloseOnClick,
                         |ui| {
-                            ui.set_min_width(140.0);
-                            if ui.button("Copy version").clicked() {
+                            ui.set_min_width(180.0);
+                            ui.spacing_mut().item_spacing = Vec2::new(0.0, 4.0);
+
+                            if dep.status == DeploymentStatus::Succeeded {
+                                let rb_btn = egui::Button::new(
+                                    RichText::new("Roll back to this version")
+                                        .typo(Typo::SmallMedium)
+                                        .color(if !is_busy {
+                                            TEXT_PRIMARY
+                                        } else {
+                                            TEXT_PLACEHOLDER
+                                        }),
+                                )
+                                .fill(Color32::TRANSPARENT)
+                                .stroke(Stroke::NONE);
+                                if ui
+                                    .add_enabled(!is_busy, rb_btn)
+                                    .on_hover_text(format!(
+                                        "Rollback {} to v{}",
+                                        dep.environment, dep.version
+                                    ))
+                                    .clicked()
+                                {
+                                    actions.redeploy_target = Some((dep.clone(), true));
+                                    ui.memory_mut(|m| m.close_popup());
+                                }
+                            }
+
+                            let rerun_btn = egui::Button::new(
+                                RichText::new("Redeploy").typo(Typo::SmallMedium).color(
+                                    if !is_busy {
+                                        TEXT_PRIMARY
+                                    } else {
+                                        TEXT_PLACEHOLDER
+                                    },
+                                ),
+                            )
+                            .fill(Color32::TRANSPARENT)
+                            .stroke(Stroke::NONE);
+                            if ui
+                                .add_enabled(!is_busy, rerun_btn)
+                                .on_hover_text("Re-run this deployment")
+                                .clicked()
+                            {
+                                actions.redeploy_target = Some((dep.clone(), false));
+                                ui.memory_mut(|m| m.close_popup());
+                            }
+
+                            let copy_btn = egui::Button::new(
+                                RichText::new("Copy version")
+                                    .typo(Typo::SmallMedium)
+                                    .color(TEXT_SECONDARY),
+                            )
+                            .fill(Color32::TRANSPARENT)
+                            .stroke(Stroke::NONE);
+                            if ui.add(copy_btn).clicked() {
                                 ui.ctx().copy_text(dep.version.clone());
                                 ui.memory_mut(|m| m.close_popup());
                             }
+
+                            draw_divider(ui, SUBTLE_BG);
+
                             let del_btn = egui::Button::new(
                                 RichText::new("Delete record")
                                     .typo(Typo::SmallMedium)
@@ -214,49 +271,6 @@ impl ShiplyApp {
                             }
                         },
                     );
-
-                    // Rollback / Redeploy button
-                    if dep.status == DeploymentStatus::Succeeded {
-                        if outline_icon_button(
-                            ui,
-                            ("hist_rollback_btn", &dep.id),
-                            OutlineIcon::RotateCcw,
-                            Some("Rollback"),
-                            IconButtonVisuals::new(
-                                WARN_PILL_TEXT,
-                                WARN_PILL_BG,
-                                WARNING_SOFT,
-                                WARNING,
-                            ),
-                            !is_busy,
-                        )
-                        .on_hover_text(format!("Rollback {} to v{}", dep.environment, dep.version))
-                        .clicked()
-                            && !is_busy
-                        {
-                            actions.redeploy_target = Some((dep.clone(), true));
-                        }
-                    } else {
-                        if outline_icon_button(
-                            ui,
-                            ("hist_rerun_btn", &dep.id),
-                            OutlineIcon::Refresh,
-                            None,
-                            IconButtonVisuals::new(
-                                TEXT_SECONDARY,
-                                SUBTLE_BG,
-                                PILL_CONTAINER_BG,
-                                CARD_BORDER,
-                            ),
-                            !is_busy,
-                        )
-                        .on_hover_text("Re-run this deployment")
-                        .clicked()
-                            && !is_busy
-                        {
-                            actions.redeploy_target = Some((dep.clone(), false));
-                        }
-                    }
 
                     if dep.status == DeploymentStatus::Running
                         && outline_icon_button(
@@ -278,21 +292,21 @@ impl ShiplyApp {
                         actions.cancel_target = Some(dep.id.clone());
                     }
 
-                    // View log button
+                    // Secondary Sm "Logs" button
                     let logs_btn = egui::Button::new(
-                        RichText::new(if is_selected {
-                            "Viewing log"
-                        } else {
-                            "View log"
-                        })
-                        .typo(Typo::SmallMedium)
-                        .color(if is_selected {
-                            PRIMARY_BLUE
-                        } else {
-                            TEXT_PRIMARY
-                        }),
+                        RichText::new(if is_selected { "Viewing logs" } else { "Logs" })
+                            .typo(Typo::SmallMedium)
+                            .color(if is_selected {
+                                PRIMARY_BLUE
+                            } else {
+                                TEXT_PRIMARY
+                            }),
                     )
-                    .fill(if is_selected { BLUE_PILL_BG } else { SUBTLE_BG })
+                    .fill(if is_selected {
+                        BLUE_PILL_HOVER_BG
+                    } else {
+                        SUBTLE_BG
+                    })
                     .stroke(Stroke::new(
                         1.0_f32,
                         if is_selected {
@@ -301,7 +315,8 @@ impl ShiplyApp {
                             CARD_BORDER
                         },
                     ))
-                    .corner_radius(CornerRadius::same(6));
+                    .corner_radius(CornerRadius::same(6))
+                    .min_size(Vec2::new(56.0, 30.0));
 
                     if ui.add(logs_btn).clicked() {
                         self.selected_deployment_id = Some(dep.id.clone());
