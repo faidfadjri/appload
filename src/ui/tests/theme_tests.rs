@@ -94,6 +94,43 @@ fn test_input_core_vertical_centring() {
 }
 
 #[test]
+fn test_input_core_dimensions_and_insets_in_horizontal_layout() {
+    let ctx = egui::Context::default();
+    AppLoadApp::install_fonts(&ctx);
+    AppLoadApp::configure_light_workspace_style(&ctx);
+
+    for w in [80.0_f32, 120.0_f32, 240.0_f32] {
+        let mut val = "".to_string();
+        let _ = ctx.run(Default::default(), |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    let opts = InputCoreOpts {
+                        hint: Some("Search projects..."),
+                        left_pad: 32.0,
+                        right_pad: 10.0,
+                        ..Default::default()
+                    };
+                    let output = input_core(ui, format!("test_narrow_hint_{w}"), &mut val, w, opts);
+                    assert_eq!(
+                        output.response.rect.height(),
+                        INPUT_HEIGHT,
+                        "height for w={w}"
+                    );
+                    assert_eq!(output.response.rect.width(), w, "width for w={w}");
+                    assert!(
+                        output.galley_pos.x >= output.response.rect.left() + 32.0,
+                        "Galley x ({:.1}) must be >= rect left ({:.1}) + left_pad (32.0) = {:.1} for w={w}",
+                        output.galley_pos.x,
+                        output.response.rect.left(),
+                        output.response.rect.left() + 32.0
+                    );
+                });
+            });
+        });
+    }
+}
+
+#[test]
 fn test_input_core_single_click_mid_text() {
     let ctx = egui::Context::default();
     AppLoadApp::install_fonts(&ctx);

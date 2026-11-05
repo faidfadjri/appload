@@ -100,15 +100,13 @@ pub(crate) fn input_core(
     width: f32,
     mut opts: InputCoreOpts<'_>,
 ) -> egui::text_edit::TextEditOutput {
-    let bg_idx = if opts.draw_bg_and_border {
-        Some(ui.painter().add(egui::Shape::Noop))
-    } else {
-        None
-    };
+    let height = opts.height;
+    // Always reserve the exact width × height in the parent UI layout
+    let (outer_rect, outer_resp) =
+        ui.allocate_exact_size(Vec2::new(width, height), Sense::click_and_drag());
 
     let left_pad = opts.left_pad;
     let right_pad = opts.right_pad;
-    let height = opts.height;
     let desired_text_w = (width - left_pad - right_pad).max(10.0);
 
     let row_height = ui.fonts(|f| f.row_height(&opts.font));
@@ -139,25 +137,30 @@ pub(crate) fn input_core(
         );
     }
 
-    let output = if let Some(layouter) = opts.layouter.as_mut() {
-        edit.layouter(*layouter).show(ui)
+    let mut child_ui = ui.new_child(
+        egui::UiBuilder::new()
+            .max_rect(outer_rect)
+            .layout(Layout::left_to_right(Align::Center)),
+    );
+
+    let mut output = if let Some(layouter) = opts.layouter.as_mut() {
+        edit.layouter(*layouter).show(&mut child_ui)
     } else {
-        edit.show(ui)
+        edit.show(&mut child_ui)
     };
 
-    let full_rect = Rect::from_center_size(output.response.rect.center(), Vec2::new(width, height));
+    // Guarantee the response rect is exactly the allocated field rect
+    output.response.rect = outer_rect;
 
     if opts.draw_bg_and_border {
-        if let Some(bg) = bg_idx {
-            ui.painter().set(
-                bg,
-                egui::Shape::rect_filled(full_rect, opts.corner_radius, opts.bg_color),
-            );
-        }
+        ui.painter()
+            .rect_filled(outer_rect, opts.corner_radius, opts.bg_color);
 
         let is_focused =
             output.response.has_focus() || ui.memory(|mem| mem.has_focus(output.response.id));
-        let is_hovered = output.response.hovered() || ui.rect_contains_pointer(full_rect);
+        let is_hovered = output.response.hovered()
+            || outer_resp.hovered()
+            || ui.rect_contains_pointer(outer_rect);
 
         let stroke = if is_focused {
             Stroke::new(1.5_f32, opts.border_focus_color)
@@ -167,7 +170,7 @@ pub(crate) fn input_core(
             Stroke::new(1.0_f32, opts.border_color)
         };
         ui.painter()
-            .rect_stroke(full_rect, opts.corner_radius, stroke, StrokeKind::Inside);
+            .rect_stroke(outer_rect, opts.corner_radius, stroke, StrokeKind::Inside);
     }
 
     output
@@ -191,7 +194,7 @@ pub(crate) fn styled_search_input(
 
     // Left magnifying glass search icon
     let icon_center = Pos2::new(
-        output.response.rect.left() + 16.0,
+        output.response.rect.left() + 14.0,
         output.response.rect.center().y,
     );
     draw_outline_icon(
@@ -237,70 +240,12 @@ pub(crate) fn sidebar_search_text_edit(
     let clear_w = if has_clear { 28.0_f32 } else { 0.0_f32 };
     let edit_w = (width - clear_w).max(10.0);
 
-    // Placeholder shape for outer container background
-    let bg_idx = ui.painter().add(egui::Shape::Noop);
+    // 1. Allocate exact container rect within sidebar bounds
+    let (container_rect, _) = ui.allocate_exact_size(Vec2::new(width, height), Sense::hover());
 
-    let mut value_cleared = false;
-    let mut output_resp = None;
-
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 0.0;
-
-        let opts = InputCoreOpts {
-            hint: Some(placeholder_str),
-            hint_color: Some(SB_TEXT_FAINT),
-            left_pad: 30.0,
-            right_pad: 6.0,
-            height,
-            font: Typo::Body.font(),
-            text_color: SB_TEXT,
-            bg_color: Color32::TRANSPARENT,
-            draw_bg_and_border: false,
-            ..Default::default()
-        };
-        let output = input_core(ui, id_salt, value, edit_w, opts);
-        let resp = output.response;
-
-        if has_clear {
-            let (clear_rect, clear_resp) =
-                ui.allocate_exact_size(Vec2::new(clear_w, height), Sense::click());
-            let clear_resp = clear_resp.on_hover_cursor(egui::CursorIcon::PointingHand);
-            let clear_fg = if clear_resp.hovered() {
-                SB_TEXT
-            } else {
-                SB_TEXT_FAINT
-            };
-            draw_outline_icon(ui.painter(), clear_rect.center(), OutlineIcon::X, clear_fg);
-            if clear_resp.clicked() {
-                value.clear();
-                value_cleared = true;
-            }
-        }
-
-        output_resp = Some(resp);
-    });
-
-    let resp = output_resp.unwrap();
-    let full_rect = Rect::from_min_size(resp.rect.min, Vec2::new(width, height));
-
-    // Single background fill for the entire container
-    ui.painter().set(
-        bg_idx,
-        egui::Shape::rect_filled(full_rect, CornerRadius::same(R_SM as u8), SB_SURFACE),
-    );
-
-    // Left magnifying glass search icon
-    let icon_center = Pos2::new(full_rect.left() + 14.0, full_rect.center().y);
-    draw_outline_icon(
-        ui.painter(),
-        icon_center,
-        OutlineIcon::Search,
-        SB_TEXT_FAINT,
-    );
-
-    // Outline border
-    let is_focused = resp.has_focus() || ui.memory(|mem| mem.has_focus(resp.id));
-    let is_hovered = resp.hovered() || ui.rect_contains_pointer(full_rect);
+    // 2. Background and border for the search box
+    let is_focused = ui.memory(|mem| mem.has_focus(ui.make_persistent_id(&id_salt)));
+    let is_hovered = ui.rect_contains_pointer(container_rect);
     let stroke = if is_focused {
         Stroke::new(1.5_f32, SB_ACCENT)
     } else if is_hovered {
@@ -308,14 +253,75 @@ pub(crate) fn sidebar_search_text_edit(
     } else {
         Stroke::new(1.0_f32, SB_BORDER_LINE)
     };
+    ui.painter()
+        .rect_filled(container_rect, CornerRadius::same(R_SM as u8), SB_SURFACE);
     ui.painter().rect_stroke(
-        full_rect,
+        container_rect,
         CornerRadius::same(R_SM as u8),
         stroke,
         StrokeKind::Inside,
     );
 
-    resp.changed() || value_cleared
+    // 3. Left magnifying glass search icon (centered at x = left + 14.0)
+    let icon_center = Pos2::new(container_rect.left() + 14.0, container_rect.center().y);
+    draw_outline_icon(
+        ui.painter(),
+        icon_center,
+        OutlineIcon::Search,
+        SB_TEXT_FAINT,
+    );
+
+    // 4. Text input occupying the area before clear button
+    let input_rect = Rect::from_min_max(
+        container_rect.min,
+        Pos2::new(container_rect.right() - clear_w, container_rect.bottom()),
+    );
+    let mut child_ui = ui.new_child(
+        egui::UiBuilder::new()
+            .max_rect(input_rect)
+            .layout(Layout::left_to_right(Align::Center)),
+    );
+
+    let opts = InputCoreOpts {
+        hint: Some(placeholder_str),
+        hint_color: Some(SB_TEXT_FAINT),
+        left_pad: 32.0, // starts well after the 14px icon
+        right_pad: 6.0,
+        height,
+        font: Typo::Body.font(),
+        text_color: SB_TEXT,
+        draw_bg_and_border: false,
+        ..Default::default()
+    };
+    let output = input_core(&mut child_ui, id_salt, value, edit_w, opts);
+
+    // 5. Clear (x) button on the right
+    let mut value_cleared = false;
+    if has_clear {
+        let clear_rect = Rect::from_min_max(
+            Pos2::new(container_rect.right() - clear_w, container_rect.top()),
+            container_rect.max,
+        );
+        let clear_resp = ui
+            .interact(
+                clear_rect,
+                ui.make_persistent_id("sidebar_search_clear_btn"),
+                Sense::click(),
+            )
+            .on_hover_cursor(egui::CursorIcon::PointingHand);
+        let clear_fg = if clear_resp.hovered() {
+            SB_TEXT
+        } else {
+            SB_TEXT_FAINT
+        };
+        draw_outline_icon(ui.painter(), clear_rect.center(), OutlineIcon::X, clear_fg);
+        if clear_resp.clicked() {
+            value.clear();
+            value_cleared = true;
+        }
+    }
+
+    output.response.changed() || value_cleared
 }
 
 /// Syntax-highlighted single-line text editor for pipeline commands, paths, and SCP sources.
