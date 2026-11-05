@@ -48,30 +48,25 @@ impl ShiplyApp {
 
         let total_avail = ui.available_width();
         let max_content_w = total_avail.min(880.0);
-        let pad_x = ((total_avail - max_content_w) / 2.0).max(0.0);
+        let full_w = max_content_w - 40.0;
+        let is_2col = full_w >= 560.0;
+        let col_w = if is_2col {
+            (full_w - SP_16) / 2.0
+        } else {
+            full_w
+        };
 
         let mut guide_vault_target = String::new();
         let mut guide_remote_user = String::new();
 
-        ui.horizontal(|ui| {
-            if pad_x > 0.0 {
-                ui.add_space(pad_x);
-            }
-            ui.vertical(|ui| {
-                ui.set_max_width(max_content_w);
-                let content_w = ui.available_width();
-                let is_2col = content_w >= 600.0;
-                let col_w = if is_2col {
-                    (content_w - 40.0 - SP_16) / 2.0
-                } else {
-                    content_w - 40.0
-                };
-                let full_w = content_w - 40.0;
+        ui.vertical(|ui| {
+            ui.set_width(max_content_w);
 
                 let project = &mut self.storage.projects[proj_idx];
 
                 // Card 1: General
                 kit::card(ui, |ui| {
+                    ui.set_width(full_w);
                     ui.label(Typo::H3.rich("General"));
                     ui.add_space(2.0);
                     ui.label(Typo::Small.rich("Environment name and local repository path").color(TEXT_SECONDARY));
@@ -168,6 +163,7 @@ impl ShiplyApp {
 
                 // Card 2: Servers
                 kit::card(ui, |ui| {
+                    ui.set_width(full_w);
                     ui.label(Typo::H3.rich("Servers"));
                     ui.add_space(2.0);
                     ui.label(Typo::Small.rich("Target destination and SSH access").color(TEXT_SECONDARY));
@@ -465,6 +461,7 @@ impl ShiplyApp {
                     })
                     .inner_margin(Margin::same(20))
                     .show(ui, |ui| {
+                        ui.set_width(full_w);
                         ui.horizontal(|ui| {
                             ui.vertical(|ui| {
                                 ui.label(Typo::H3.rich("Delete environment").color(DANGER));
@@ -493,7 +490,6 @@ impl ShiplyApp {
                     });
 
                 ui.add_space(SP_24);
-            });
         });
 
         // Handlers
