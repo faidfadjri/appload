@@ -153,6 +153,7 @@ impl Theme {
 pub const CANVAS_BG: Color32 = Color32::from_rgb(247, 248, 250); // #F7F8FA flat page background
 pub const CANVAS_GRADIENT_BOTTOM: Color32 = CANVAS_BG;
 pub const CARD_BG: Color32 = Color32::from_rgb(255, 255, 255); // #FFFFFF
+pub const CARD_SELECTED_BG: Color32 = Color32::from_rgb(240, 246, 255); // #F0F6FF
 pub const CARD_BORDER: Color32 = Color32::from_rgb(229, 231, 235); // #E5E7EB hairline
 pub const SUBTLE_BG: Color32 = Color32::from_rgb(243, 244, 246); // #F3F4F6
 pub const CARD_TINT_TOP: Color32 = CARD_BG;

@@ -384,7 +384,7 @@ impl ShiplyApp {
 
                 let (bg_fill, stroke) = if is_active {
                     (
-                        Color32::from_rgb(240, 246, 255),
+                        CARD_SELECTED_BG,
                         Stroke::new(1.5_f32, PRIMARY_BLUE),
                     )
                 } else if card_resp.hovered() {

@@ -184,7 +184,7 @@ impl ShiplyApp {
 
                 // Card frame
                 let card_bg = if is_checked {
-                    Color32::from_rgba_premultiplied(20, 110, 245, 12)
+                    CARD_SELECTED_BG
                 } else {
                     CARD_BG
                 };
