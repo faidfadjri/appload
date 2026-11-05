@@ -1061,7 +1061,9 @@ pub fn run_deployment(
                                 command_summary: summary,
                                 status: DeploymentStatus::Failed,
                                 output: if out.is_empty() {
-                                    format!("Command '{interpolated}' failed with non-zero exit code.")
+                                    format!(
+                                        "Command '{interpolated}' failed with non-zero exit code."
+                                    )
                                 } else {
                                     out
                                 },
