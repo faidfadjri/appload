@@ -117,6 +117,16 @@ fn main() -> eframe::Result<()> {
         return Ok(());
     }
 
+    // 4b. Single-instance guard: ensure only one AppLoad GUI process writes to appload_state.db.
+    let Some(_single_instance_guard) = appload::single_instance::SingleInstanceGuard::try_acquire()
+    else {
+        let _ = appload::single_instance::focus_existing_appload_window();
+        eprintln!(
+            "[AppLoad] Another instance of AppLoad is already running. Focusing existing window and exiting."
+        );
+        return Ok(());
+    };
+
     // 5. First-run data migration (copy with rename, leaving legacy intact, marker recorded)
     let migration_outcome = run_first_run_data_migration();
 

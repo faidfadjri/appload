@@ -8,6 +8,7 @@ pub mod migration;
 pub mod paths;
 pub mod presets;
 pub mod ps1_importer;
+pub mod single_instance;
 pub mod storage;
 pub mod ui;
 pub mod updater;

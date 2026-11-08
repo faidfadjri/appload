@@ -209,3 +209,106 @@ fn test_delete_single_deployment_and_clear_history_modal() {
         app.render_delete_confirmation_modal(ctx);
     });
 }
+
+#[test]
+fn test_confirm_delete_deployment_shows_error_toast_on_sqlite_failure_and_success_on_ok() {
+    let sandbox = crate::paths::TestSandbox::new();
+    let db_path = sandbox.path().join("appload_state.db");
+    let mut storage = crate::storage::AppStorage::load_or_default(&db_path);
+    let now = chrono::Utc::now();
+    storage.upsert_deployment(DeploymentRecord {
+        id: "dep-ui-1".to_string(),
+        project_id: "backend-cdo".to_string(),
+        project_name: "Backend Customer Data Ops".to_string(),
+        environment: "production".to_string(),
+        app_name: "backend-cdo".to_string(),
+        version: "1.1.22".to_string(),
+        git_branch: Some("main".to_string()),
+        git_commit: Some("70c0d68".to_string()),
+        git_changes: vec![],
+        is_rollback: false,
+        servers: vec!["10.0.0.1".to_string()],
+        status: DeploymentStatus::Succeeded,
+        started_at: now,
+        finished_at: Some(now),
+        duration_ms: Some(1500),
+        step_logs: vec![],
+        executed_steps: vec![],
+    });
+
+    // Inject temporary SQLite trigger to force DELETE failure
+    {
+        let conn = rusqlite::Connection::open(&db_path).expect("open conn");
+        conn.execute_batch(
+            "CREATE TRIGGER fail_ui_del BEFORE DELETE ON deployments
+             BEGIN SELECT RAISE(ABORT, 'simulated SQLite lock'); END;",
+        )
+        .expect("create trigger");
+    }
+
+    let mut app = AppLoadApp::new(storage);
+    app.pending_delete_confirm = Some(ConfirmDeleteAction::DeploymentRecord {
+        deployment_id: "dep-ui-1".to_string(),
+        project_name: "Backend Customer Data Ops".to_string(),
+        env_name: "production".to_string(),
+        version: "1.1.22".to_string(),
+    });
+
+    let ctx = egui::Context::default();
+    AppLoadApp::configure_light_workspace_style(&ctx);
+    let mut raw_enter = egui::RawInput::default();
+    raw_enter.events.push(egui::Event::Key {
+        key: egui::Key::Enter,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: egui::Modifiers::NONE,
+    });
+    let _ = ctx.run(raw_enter, |ctx| {
+        app.render_delete_confirmation_modal(ctx);
+    });
+
+    let (msg_err, is_success_err) = app.status_banner.clone().expect("error banner must be set");
+    assert!(
+        !is_success_err,
+        "Status banner must be an error toast when SQLite DELETE fails, got: {msg_err}"
+    );
+    assert_eq!(
+        app.storage.deployments.len(),
+        1,
+        "Record must remain in memory when SQLite DELETE fails"
+    );
+
+    // Drop the failure trigger and confirm delete succeeds with success toast
+    {
+        let conn = rusqlite::Connection::open(&db_path).expect("open conn");
+        conn.execute_batch("DROP TRIGGER fail_ui_del;")
+            .expect("drop trigger");
+    }
+
+    app.pending_delete_confirm = Some(ConfirmDeleteAction::DeploymentRecord {
+        deployment_id: "dep-ui-1".to_string(),
+        project_name: "Backend Customer Data Ops".to_string(),
+        env_name: "production".to_string(),
+        version: "1.1.22".to_string(),
+    });
+    let mut raw_enter2 = egui::RawInput::default();
+    raw_enter2.events.push(egui::Event::Key {
+        key: egui::Key::Enter,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: egui::Modifiers::NONE,
+    });
+    let _ = ctx.run(raw_enter2, |ctx| {
+        app.render_delete_confirmation_modal(ctx);
+    });
+
+    let (msg_ok, is_success_ok) = app
+        .status_banner
+        .clone()
+        .expect("success banner must be set");
+    assert!(is_success_ok, "Status banner must be a success toast on Ok");
+    assert!(msg_ok.contains("Deleted deployment record v1.1.22"));
+    assert!(app.storage.deployments.is_empty());
+}

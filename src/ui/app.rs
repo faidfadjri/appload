@@ -394,8 +394,23 @@ impl AppLoadApp {
     /// Removes a secret from both the OS Credential Manager and `AppStorage` metadata.
     pub fn delete_secret_from_os_vault(&mut self, key: &str) -> Result<(), String> {
         let trimmed = key.trim();
+        let had_metadata = self
+            .storage
+            .secrets
+            .iter()
+            .any(|s| s.key.eq_ignore_ascii_case(trimmed));
+        let meta_res = if had_metadata {
+            self.storage.remove_secret_metadata(trimmed).map(|_| ())
+        } else {
+            Ok(())
+        };
+        if let Err(err) = meta_res {
+            self.status_banner = Some((err.clone(), false));
+            self.status_banner_time = Some(Instant::now());
+            return Err(err);
+        }
+
         let res = delete_os_vault_credential(trimmed);
-        self.storage.remove_secret_metadata(trimmed);
         self.refresh_selected_project_metadata(false);
         self.refresh_secret_vault_cache();
         match res {

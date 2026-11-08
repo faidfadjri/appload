@@ -733,6 +733,7 @@ pub fn spawn_download_and_apply_update(release: ReleaseInfo, tx: Sender<UpdaterE
 
 /// Spawns a fresh instance of the updated executable and requests the current process to exit.
 pub fn restart_application(exe_path: &Path) -> Result<(), String> {
+    crate::single_instance::release_active_guard();
     let mut cmd = Command::new(exe_path);
     if let Some(parent) = exe_path.parent() {
         cmd.current_dir(parent);

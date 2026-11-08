@@ -238,8 +238,8 @@ impl AppLoadApp {
                     project_name,
                     env_name,
                     version,
-                } => {
-                    if self.storage.remove_deployment(&deployment_id).is_some() {
+                } => match self.storage.remove_deployment(&deployment_id) {
+                    Ok(_) => {
                         if self.selected_deployment_id.as_deref() == Some(deployment_id.as_str()) {
                             self.selected_deployment_id =
                                 self.storage.deployments.first().map(|d| d.id.clone());
@@ -252,27 +252,35 @@ impl AppLoadApp {
                             true,
                         ));
                     }
-                }
+                    Err(err) => {
+                        self.status_banner = Some((err, false));
+                    }
+                },
                 ConfirmDeleteAction::ClearDeploymentHistory {
                     project_id,
                     env_key,
                     ..
-                } => {
-                    let removed = self
-                        .storage
-                        .clear_deployment_history(project_id.as_deref(), env_key.as_deref());
-                    if let Some(sel_id) = &self.selected_deployment_id {
-                        if !self.storage.deployments.iter().any(|d| &d.id == sel_id) {
-                            self.selected_deployment_id =
-                                self.storage.deployments.first().map(|d| d.id.clone());
+                } => match self
+                    .storage
+                    .clear_deployment_history(project_id.as_deref(), env_key.as_deref())
+                {
+                    Ok(removed) => {
+                        if let Some(sel_id) = &self.selected_deployment_id {
+                            if !self.storage.deployments.iter().any(|d| &d.id == sel_id) {
+                                self.selected_deployment_id =
+                                    self.storage.deployments.first().map(|d| d.id.clone());
+                            }
                         }
+                        self.refresh_selected_project_metadata(false);
+                        self.status_banner = Some((
+                            format!("Cleared {removed} deployment history record(s)."),
+                            true,
+                        ));
                     }
-                    self.refresh_selected_project_metadata(false);
-                    self.status_banner = Some((
-                        format!("Cleared {removed} deployment history record(s)."),
-                        true,
-                    ));
-                }
+                    Err(err) => {
+                        self.status_banner = Some((err, false));
+                    }
+                },
                 ConfirmDeleteAction::Secret { key } => {
                     let _ = self.delete_secret_from_os_vault(&key);
                 }

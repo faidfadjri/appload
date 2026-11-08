@@ -26,6 +26,10 @@ pub struct AppStorage {
     #[serde(skip)]
     imported_files_mtime: HashMap<PathBuf, SystemTime>,
     #[serde(skip)]
+    synced_deployments: HashMap<String, DeploymentRecord>,
+    #[serde(skip)]
+    synced_secrets: HashMap<String, SecretEntry>,
+    #[serde(skip)]
     pub migration_notice: Option<String>,
 }
 
@@ -48,8 +52,24 @@ pub enum ProjectSortMode {
     RecentDeploy,
 }
 
+/// Opens a SQLite connection configured with a 5-second busy timeout so concurrent or transient
+/// readers/checkpoint operations do not fail immediately with `SQLITE_BUSY`.
+fn open_db_connection(path: &Path) -> Result<Connection, String> {
+    let conn = Connection::open(path)
+        .map_err(|e| format!("Failed to open SQLite database {}: {e}", path.display()))?;
+    conn.busy_timeout(std::time::Duration::from_secs(5))
+        .map_err(|e| {
+            format!(
+                "Failed to configure SQLite busy timeout on {}: {e}",
+                path.display()
+            )
+        })?;
+    Ok(conn)
+}
+
 /// SQLite database initialization and schema creation.
 pub fn init_db(conn: &Connection) -> Result<(), rusqlite::Error> {
+    let _ = conn.busy_timeout(std::time::Duration::from_secs(5));
     conn.execute_batch(
         "PRAGMA journal_mode = WAL;
          PRAGMA synchronous = NORMAL;
@@ -396,7 +416,150 @@ pub fn upsert_deployment_to_db(
     Ok(())
 }
 
+/// Incrementally persists state to SQLite without full-table `DELETE FROM deployments` or
+/// `DELETE FROM secrets` rewrites, preventing stale in-memory rows from resurrecting rows
+/// that were deleted on disk.
+fn save_incremental_to_db(
+    conn: &mut Connection,
+    projects: &[Project],
+    deployments: &[DeploymentRecord],
+    synced_deployments: &HashMap<String, DeploymentRecord>,
+    secrets: &[SecretEntry],
+    synced_secrets: &HashMap<String, SecretEntry>,
+) -> Result<(), rusqlite::Error> {
+    init_db(conn)?;
+    let tx = conn.transaction()?;
+
+    tx.execute("DELETE FROM projects", [])?;
+    {
+        let mut stmt = tx.prepare(
+            "INSERT INTO projects (id, name, description, local_path, environments_json, group_name, sort_order)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        )?;
+        for (idx, proj) in projects.iter().enumerate() {
+            let envs_json = serde_json::to_string(&proj.environments).unwrap_or_default();
+            let effective_order = proj.sort_order.unwrap_or(idx as i32);
+            stmt.execute(params![
+                proj.id,
+                proj.name,
+                proj.description,
+                proj.local_path,
+                envs_json,
+                proj.group,
+                effective_order,
+            ])?;
+        }
+    }
+
+    // Delete only deployment IDs that were present in `synced_deployments` and removed from `deployments`
+    let current_dep_ids: HashSet<&str> = deployments.iter().map(|d| d.id.as_str()).collect();
+    for synced_id in synced_deployments.keys() {
+        if !current_dep_ids.contains(synced_id.as_str()) {
+            tx.execute("DELETE FROM deployments WHERE id = ?1", params![synced_id])?;
+        }
+    }
+
+    // Upsert only deployments that were added or modified relative to `synced_deployments`
+    {
+        let mut stmt = tx.prepare(
+            "INSERT OR REPLACE INTO deployments (id, project_id, project_name, environment, app_name, version, git_branch, git_commit, git_changes, is_rollback, servers, status, started_at, finished_at, duration_ms, step_logs, executed_steps)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
+        )?;
+        for dep in deployments {
+            if synced_deployments.get(&dep.id) == Some(dep) {
+                continue;
+            }
+            let git_changes_json = serde_json::to_string(&dep.git_changes).unwrap_or_default();
+            let servers_json = serde_json::to_string(&dep.servers).unwrap_or_default();
+            let step_logs_json = serde_json::to_string(&dep.step_logs).unwrap_or_default();
+            let executed_steps_json =
+                serde_json::to_string(&dep.executed_steps).unwrap_or_default();
+            let status_str = match dep.status {
+                DeploymentStatus::Running => "Running",
+                DeploymentStatus::Succeeded => "Succeeded",
+                DeploymentStatus::Cancelled => "Cancelled",
+                DeploymentStatus::Failed => "Failed",
+            };
+            let started_at_str = dep.started_at.to_rfc3339();
+            let finished_at_str = dep.finished_at.as_ref().map(|dt| dt.to_rfc3339());
+            let is_rollback_int = if dep.is_rollback { 1i64 } else { 0i64 };
+            let duration_ms_int = dep.duration_ms.map(|d| d as i64);
+
+            stmt.execute(params![
+                dep.id,
+                dep.project_id,
+                dep.project_name,
+                dep.environment,
+                dep.app_name,
+                dep.version,
+                dep.git_branch,
+                dep.git_commit,
+                git_changes_json,
+                is_rollback_int,
+                servers_json,
+                status_str,
+                started_at_str,
+                finished_at_str,
+                duration_ms_int,
+                step_logs_json,
+                executed_steps_json,
+            ])?;
+        }
+    }
+
+    // Delete only secret keys that were present in `synced_secrets` and removed from `secrets`
+    for synced_entry in synced_secrets.values() {
+        let still_exists = secrets
+            .iter()
+            .any(|s| s.key.eq_ignore_ascii_case(&synced_entry.key));
+        if !still_exists {
+            tx.execute(
+                "DELETE FROM secrets WHERE key = ?1 COLLATE NOCASE",
+                params![synced_entry.key],
+            )?;
+        }
+    }
+
+    // Upsert only secrets that were added or modified relative to `synced_secrets`
+    {
+        let mut del_stmt = tx.prepare("DELETE FROM secrets WHERE key = ?1 COLLATE NOCASE")?;
+        let mut ins_stmt = tx.prepare(
+            "INSERT INTO secrets (key, username, description, updated_at)
+             VALUES (?1, ?2, ?3, ?4)",
+        )?;
+        for s in secrets {
+            let lower_key = s.key.to_lowercase();
+            if synced_secrets.get(&lower_key) == Some(s) {
+                continue;
+            }
+            del_stmt.execute(params![s.key])?;
+            ins_stmt.execute(params![
+                s.key,
+                s.username,
+                s.description,
+                s.updated_at.to_rfc3339()
+            ])?;
+        }
+    }
+
+    tx.commit()?;
+    Ok(())
+}
+
 impl AppStorage {
+    fn refresh_synced_snapshots(&mut self) {
+        self.synced_deployments = self
+            .deployments
+            .iter()
+            .map(|d| (d.id.clone(), d.clone()))
+            .collect();
+        self.synced_secrets = self
+            .secrets
+            .iter()
+            .map(|s| (s.key.to_lowercase(), s.clone()))
+            .collect();
+    }
+
     /// Resolves `appload_state.db` strictly through `crate::paths::data_dir()`.
     /// Portable mode is only active if an explicit `appload.portable` marker file sits next to the exe.
     pub fn default_storage_path() -> PathBuf {
@@ -452,12 +615,14 @@ impl AppStorage {
             storage_path: Some(db_path.clone()),
             last_state_mtime: None,
             imported_files_mtime: HashMap::new(),
+            synced_deployments: HashMap::new(),
+            synced_secrets: HashMap::new(),
             migration_notice: None,
         };
 
         let mut needs_save = false;
 
-        if let Ok(mut conn) = Connection::open(&db_path) {
+        if let Ok(mut conn) = open_db_connection(&db_path) {
             let _ = init_db(&conn);
             let mut db_projects = load_projects_from_db(&conn).unwrap_or_default();
             let mut db_deployments = load_deployments_from_db(&conn).unwrap_or_default();
@@ -565,6 +730,7 @@ impl AppStorage {
             }
         }
 
+        state.refresh_synced_snapshots();
         state.last_state_mtime = file_mtime(&db_path);
         let _ = state.sync_from_app_directory();
         state
@@ -574,8 +740,64 @@ impl AppStorage {
         let Some(path) = self.storage_path.clone() else {
             return Ok(());
         };
-        self.save_to(&path)?;
-        self.last_state_mtime = file_mtime(&path);
+        if crate::paths::is_in_legacy_dir(&path) {
+            return Err(format!(
+                "Safety guard: refusing to write storage into legacy directory '{}'",
+                path.display()
+            ));
+        }
+
+        let db_path = if path
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("json"))
+        {
+            path.with_extension("db")
+        } else {
+            path.clone()
+        };
+
+        if let Some(parent) = db_path.parent() {
+            if !parent.as_os_str().is_empty() {
+                fs::create_dir_all(parent)
+                    .map_err(|e| format!("Failed to create storage directory: {e}"))?;
+            }
+        }
+
+        {
+            let mut conn = open_db_connection(&db_path)?;
+            save_incremental_to_db(
+                &mut conn,
+                &self.projects,
+                &self.deployments,
+                &self.synced_deployments,
+                &self.secrets,
+                &self.synced_secrets,
+            )
+            .map_err(|e| format!("Failed to save state to SQLite database: {e}"))?;
+
+            // Reconcile in-memory deployments and secrets with disk so any unchanged row
+            // deleted on disk by another handle is pruned from memory too.
+            if let Ok(disk_deployments) = load_deployments_from_db(&conn) {
+                self.deployments = disk_deployments;
+            }
+            if let Ok(disk_secrets) = load_secrets_from_db(&conn) {
+                self.secrets = disk_secrets;
+            }
+            self.refresh_synced_snapshots();
+        }
+
+        if path
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("json"))
+        {
+            if let Ok(json) = serde_json::to_string_pretty(self) {
+                let _ = fs::write(&path, json);
+            }
+        }
+
+        // Capture last_state_mtime strictly AFTER the SQLite connection is closed so any
+        // WAL checkpoint on close does not bump the `.db` mtime past `last_state_mtime`.
+        self.last_state_mtime = file_mtime(&db_path);
         Ok(())
     }
 
@@ -603,12 +825,24 @@ impl AppStorage {
             }
         }
 
-        let mut conn = Connection::open(&db_path)
-            .map_err(|e| format!("Failed to open SQLite database {}: {e}", db_path.display()))?;
-        save_all_to_db(&mut conn, &self.projects, &self.deployments)
+        let mut conn = open_db_connection(&db_path)?;
+        if self.storage_path.as_deref() == Some(db_path.as_path()) {
+            save_incremental_to_db(
+                &mut conn,
+                &self.projects,
+                &self.deployments,
+                &self.synced_deployments,
+                &self.secrets,
+                &self.synced_secrets,
+            )
             .map_err(|e| format!("Failed to save state to SQLite database: {e}"))?;
-        save_secrets_to_db(&mut conn, &self.secrets)
-            .map_err(|e| format!("Failed to save secrets metadata to SQLite database: {e}"))?;
+        } else {
+            save_all_to_db(&mut conn, &self.projects, &self.deployments)
+                .map_err(|e| format!("Failed to save state to SQLite database: {e}"))?;
+            save_secrets_to_db(&mut conn, &self.secrets)
+                .map_err(|e| format!("Failed to save secrets metadata to SQLite database: {e}"))?;
+        }
+        drop(conn);
 
         // If path was originally requested as JSON (e.g. drop-in export), also write JSON mirror
         if path
@@ -639,34 +873,36 @@ impl AppStorage {
         if let Some(disk_mtime) = file_mtime(&state_path) {
             let is_changed = self.last_state_mtime.is_none_or(|prev| disk_mtime > prev);
             if is_changed {
-                if let Ok(conn) = Connection::open(&state_path) {
-                    if let (Ok(p), Ok(d)) = (
-                        load_projects_from_db(&conn),
-                        load_deployments_from_db(&conn),
-                    ) {
-                        self.projects = p;
-                        self.deployments = d;
-                        if let Ok(s) = load_secrets_from_db(&conn) {
-                            self.secrets = s;
-                        }
-                        let mut changed_on_sync = self.sync_project_vault_targets_to_secrets();
-                        if self.reconcile_orphaned_running_deployments(&HashSet::new()) > 0 {
-                            changed_on_sync = true;
-                        }
-                        if changed_on_sync {
-                            let _ = self.save();
-                        }
-                        self.last_state_mtime = file_mtime(&state_path).or(Some(disk_mtime));
-                        notifications.push(format!(
-                            "Loaded {} project(s) and {} deployment(s) from SQLite database ({})",
-                            self.projects.len(),
-                            self.deployments.len(),
-                            state_path
-                                .file_name()
-                                .and_then(|s| s.to_str())
-                                .unwrap_or("appload_state.db")
-                        ));
+                let loaded = open_db_connection(&state_path).ok().and_then(|conn| {
+                    let p = load_projects_from_db(&conn).ok()?;
+                    let d = load_deployments_from_db(&conn).ok()?;
+                    let s = load_secrets_from_db(&conn).ok();
+                    Some((p, d, s))
+                });
+                if let Some((p, d, s)) = loaded {
+                    self.projects = p;
+                    self.deployments = d;
+                    if let Some(secrets) = s {
+                        self.secrets = secrets;
                     }
+                    self.refresh_synced_snapshots();
+                    let mut changed_on_sync = self.sync_project_vault_targets_to_secrets();
+                    if self.reconcile_orphaned_running_deployments(&HashSet::new()) > 0 {
+                        changed_on_sync = true;
+                    }
+                    if changed_on_sync {
+                        let _ = self.save();
+                    }
+                    self.last_state_mtime = file_mtime(&state_path).or(Some(disk_mtime));
+                    notifications.push(format!(
+                        "Loaded {} project(s) and {} deployment(s) from SQLite database ({})",
+                        self.projects.len(),
+                        self.deployments.len(),
+                        state_path
+                            .file_name()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("appload_state.db")
+                    ));
                 }
             }
         }
@@ -709,7 +945,7 @@ impl AppStorage {
             }
 
             if ext.eq_ignore_ascii_case("json") {
-                // Ignore backup files and migration markers
+                // Ignore backup files, migration markers, and JSON state files already backed up as `.json.bak`
                 if file_path
                     .file_name()
                     .and_then(|s| s.to_str())
@@ -719,6 +955,7 @@ impl AppStorage {
                             || s.starts_with("appload_state.pre-migration-")
                             || s.starts_with("migrated_from_shiply")
                     })
+                    || file_path.with_extension("json.bak").exists()
                 {
                     continue;
                 }
@@ -1028,13 +1265,16 @@ impl AppStorage {
     /// Inserts a new deployment record at the top (newest-first) or updates an existing record with the same ID,
     /// atomically persisting directly to SQLite.
     pub fn upsert_deployment(&mut self, record: DeploymentRecord) {
-        if let Some(path) = &self.storage_path {
-            if let Ok(conn) = Connection::open(path) {
+        if let Some(path) = self.storage_path.clone() {
+            if let Ok(conn) = open_db_connection(&path) {
                 let _ = upsert_deployment_to_db(&conn, &record);
-                self.last_state_mtime = file_mtime(path);
+                drop(conn);
+                self.last_state_mtime = file_mtime(&path);
             }
         }
 
+        self.synced_deployments
+            .insert(record.id.clone(), record.clone());
         if let Some(existing) = self.deployments.iter_mut().find(|d| d.id == record.id) {
             *existing = record;
         } else {
@@ -1042,47 +1282,96 @@ impl AppStorage {
         }
     }
 
-    /// Removes a single deployment record by ID (if it is not currently Running) and persists to SQLite.
-    pub fn remove_deployment(&mut self, deployment_id: &str) -> Option<DeploymentRecord> {
-        let pos = self
-            .deployments
-            .iter()
-            .position(|d| d.id == deployment_id && d.status != DeploymentStatus::Running)?;
-        let removed = self.deployments.remove(pos);
+    /// Removes a single deployment record by ID (if it is not currently Running) by deleting it
+    /// from SQLite first (checking `rows_affected == 1` with a 5s busy timeout), closing the
+    /// connection, and only then updating in-memory state and `last_state_mtime`.
+    pub fn remove_deployment(&mut self, deployment_id: &str) -> Result<DeploymentRecord, String> {
+        let Some(pos) = self.deployments.iter().position(|d| d.id == deployment_id) else {
+            return Err(format!("Deployment record '{deployment_id}' not found."));
+        };
+        if self.deployments[pos].status == DeploymentStatus::Running {
+            return Err("Cannot delete a deployment while it is currently running.".to_string());
+        }
 
-        if let Some(path) = &self.storage_path {
-            if let Ok(conn) = Connection::open(path) {
-                let _ = conn.execute(
+        if let Some(path) = self.storage_path.clone() {
+            let conn = open_db_connection(&path)?;
+            let rows_affected = conn
+                .execute(
                     "DELETE FROM deployments WHERE id = ?1",
                     params![deployment_id],
-                );
-                self.last_state_mtime = file_mtime(path);
+                )
+                .map_err(|e| {
+                    format!("Failed to delete deployment '{deployment_id}' from SQLite: {e}")
+                })?;
+            if rows_affected != 1 {
+                return Err(format!(
+                    "Failed to delete deployment '{deployment_id}' from SQLite (rows affected: {rows_affected})."
+                ));
             }
+            drop(conn);
+            self.last_state_mtime = file_mtime(&path);
         }
-        Some(removed)
+
+        let removed = self.deployments.remove(pos);
+        self.synced_deployments.remove(deployment_id);
+        Ok(removed)
     }
 
     /// Clears non-running deployment history matching the optional `project_id` and `env_key` filters,
-    /// persisting to SQLite and returning the number of deleted records.
+    /// deleting from SQLite first inside a transaction (checking `rows_affected == 1`), closing the
+    /// connection, and only then updating in-memory state and `last_state_mtime`.
     pub fn clear_deployment_history(
         &mut self,
         project_id: Option<&str>,
         env_key: Option<&str>,
-    ) -> usize {
-        let before = self.deployments.len();
-        self.deployments.retain(|d| {
-            if d.status == DeploymentStatus::Running {
-                return true;
-            }
-            let matches_proj = project_id.is_none_or(|pid| d.project_id == pid);
-            let matches_env = env_key.is_none_or(|ek| d.environment == ek);
-            !(matches_proj && matches_env)
-        });
-        let removed_count = before.saturating_sub(self.deployments.len());
-        if removed_count > 0 {
-            let _ = self.save();
+    ) -> Result<usize, String> {
+        let ids_to_remove: Vec<String> = self
+            .deployments
+            .iter()
+            .filter(|d| {
+                if d.status == DeploymentStatus::Running {
+                    return false;
+                }
+                let matches_proj = project_id.is_none_or(|pid| d.project_id == pid);
+                let matches_env = env_key.is_none_or(|ek| d.environment == ek);
+                matches_proj && matches_env
+            })
+            .map(|d| d.id.clone())
+            .collect();
+
+        if ids_to_remove.is_empty() {
+            return Ok(0);
         }
-        removed_count
+
+        if let Some(path) = self.storage_path.clone() {
+            let mut conn = open_db_connection(&path)?;
+            let tx = conn
+                .transaction()
+                .map_err(|e| format!("Failed to start SQLite transaction: {e}"))?;
+            for id in &ids_to_remove {
+                let rows_affected = tx
+                    .execute("DELETE FROM deployments WHERE id = ?1", params![id])
+                    .map_err(|e| format!("Failed to delete deployment '{id}' from SQLite: {e}"))?;
+                if rows_affected != 1 {
+                    return Err(format!(
+                        "Failed to delete deployment '{id}' from SQLite (rows affected: {rows_affected})."
+                    ));
+                }
+            }
+            tx.commit().map_err(|e| {
+                format!("Failed to commit cleared deployment history to SQLite: {e}")
+            })?;
+            drop(conn);
+            self.last_state_mtime = file_mtime(&path);
+        }
+
+        let removed_set: HashSet<&str> = ids_to_remove.iter().map(|s| s.as_str()).collect();
+        self.deployments
+            .retain(|d| !removed_set.contains(d.id.as_str()));
+        for id in &ids_to_remove {
+            self.synced_deployments.remove(id);
+        }
+        Ok(ids_to_remove.len())
     }
 
     /// Inserts or updates a secret metadata entry in `self.secrets` and persists to SQLite.
@@ -1104,16 +1393,39 @@ impl AppStorage {
         let _ = self.save();
     }
 
-    /// Removes a secret metadata entry by key and persists to SQLite.
-    pub fn remove_secret_metadata(&mut self, key: &str) -> Option<SecretEntry> {
+    /// Removes a secret metadata entry by key by deleting it from SQLite first (checking
+    /// `rows_affected == 1`), closing the connection, and only then updating in-memory state.
+    pub fn remove_secret_metadata(&mut self, key: &str) -> Result<SecretEntry, String> {
         let trimmed = key.trim();
-        let pos = self
+        let Some(pos) = self
             .secrets
             .iter()
-            .position(|s| s.key.eq_ignore_ascii_case(trimmed))?;
+            .position(|s| s.key.eq_ignore_ascii_case(trimmed))
+        else {
+            return Err(format!("Secret metadata '{trimmed}' not found."));
+        };
+        let target_key = self.secrets[pos].key.clone();
+
+        if let Some(path) = self.storage_path.clone() {
+            let conn = open_db_connection(&path)?;
+            let rows_affected = conn
+                .execute(
+                    "DELETE FROM secrets WHERE key = ?1 COLLATE NOCASE",
+                    params![target_key],
+                )
+                .map_err(|e| format!("Failed to delete secret '{target_key}' from SQLite: {e}"))?;
+            if rows_affected != 1 {
+                return Err(format!(
+                    "Failed to delete secret '{target_key}' from SQLite (rows affected: {rows_affected})."
+                ));
+            }
+            drop(conn);
+            self.last_state_mtime = file_mtime(&path);
+        }
+
         let removed = self.secrets.remove(pos);
-        let _ = self.save();
-        Some(removed)
+        self.synced_secrets.remove(&removed.key.to_lowercase());
+        Ok(removed)
     }
 
     /// Ensures any non-empty `vault_target` configured across project environments is registered
@@ -1799,16 +2111,18 @@ mod tests {
         storage.upsert_deployment(make_dep("dep-4", "p2", "prod", DeploymentStatus::Cancelled));
 
         // 1. Running deployments cannot be removed while running
-        assert!(storage.remove_deployment("dep-running").is_none());
+        assert!(storage.remove_deployment("dep-running").is_err());
 
         // 2. Remove a single completed deployment record and verify SQLite persistence
         let removed = storage.remove_deployment("dep-1");
-        assert!(removed.is_some());
+        assert!(removed.is_ok());
         assert_eq!(removed.unwrap().id, "dep-1");
         assert_eq!(storage.deployments.len(), 4);
 
         // 3. Clear history for p1 + dev (should remove dep-2, keep dep-running, dep-3, dep-4)
-        let cleared_dev = storage.clear_deployment_history(Some("p1"), Some("dev"));
+        let cleared_dev = storage
+            .clear_deployment_history(Some("p1"), Some("dev"))
+            .expect("clear dev history");
         assert_eq!(cleared_dev, 1);
         assert!(storage.deployments.iter().any(|d| d.id == "dep-running"));
         assert!(!storage.deployments.iter().any(|d| d.id == "dep-2"));
@@ -1816,7 +2130,9 @@ mod tests {
         assert!(storage.deployments.iter().any(|d| d.id == "dep-4"));
 
         // 4. Clear all remaining non-running history across all projects/environments
-        let cleared_all = storage.clear_deployment_history(None, None);
+        let cleared_all = storage
+            .clear_deployment_history(None, None)
+            .expect("clear all history");
         assert_eq!(cleared_all, 2);
         assert_eq!(storage.deployments.len(), 1);
         assert_eq!(storage.deployments[0].id, "dep-running");
@@ -1849,7 +2165,7 @@ mod tests {
 
         // Remove a secret metadata entry and verify
         let removed = reloaded.remove_secret_metadata("GITHUB_TOKEN");
-        assert!(removed.is_some());
+        assert!(removed.is_ok());
         assert_eq!(reloaded.secrets.len(), 1);
     }
 
@@ -1897,5 +2213,239 @@ mod tests {
         assert_eq!(storage.projects[0].environments[0].key, "prod");
         assert_eq!(storage.secrets.len(), 1);
         assert_eq!(storage.secrets[0].key, "ALPHA_KEY");
+    }
+
+    #[test]
+    fn test_bug_008_delete_record_wal_mtime_race_and_sync_cycles() {
+        let sandbox = crate::paths::TestSandbox::new();
+        let db_path = sandbox.path().join("appload_state.db");
+
+        let mut storage = AppStorage::load_or_default(&db_path);
+        storage.projects.push(Project {
+            id: "proj-1".to_string(),
+            name: "Project 1".to_string(),
+            description: "Test".to_string(),
+            local_path: "/tmp/proj-1".to_string(),
+            environments: Vec::new(),
+            group: None,
+            sort_order: Some(0),
+        });
+        storage.save().expect("initial save");
+
+        storage.upsert_deployment(dummy_record(
+            "dep-1",
+            "proj-1",
+            "prod",
+            "1.0.1",
+            DeploymentStatus::Succeeded,
+        ));
+        storage.upsert_deployment(dummy_record(
+            "dep-2",
+            "proj-1",
+            "prod",
+            "1.0.2",
+            DeploymentStatus::Succeeded,
+        ));
+
+        // Ensure filesystem timestamp advances before delete triggers WAL checkpoint on close
+        std::thread::sleep(std::time::Duration::from_millis(30));
+
+        // 1. Delete dep-1
+        let removed = storage.remove_deployment("dep-1");
+        assert!(removed.is_ok(), "dep-1 should be removed");
+        assert!(!storage.deployments.iter().any(|d| d.id == "dep-1"));
+
+        // Because remove_deployment was our own write, the next sync cycle must NOT think
+        // the DB was modified externally (which happens when last_state_mtime is captured
+        // while the connection is still open before the WAL checkpoint on close bumps mtime).
+        let sync_notice = storage.sync_from_app_directory();
+        assert!(
+            sync_notice.is_none(),
+            "Own delete must not trigger spurious external DB reload notice on next sync, got: {sync_notice:?}"
+        );
+    }
+
+    #[test]
+    fn test_bug_008_transient_sqlite_lock_during_delete_does_not_swallow_or_resurrect() {
+        let sandbox = crate::paths::TestSandbox::new();
+        let db_path = sandbox.path().join("appload_state.db");
+
+        let mut storage = AppStorage::load_or_default(&db_path);
+        storage.projects.push(Project {
+            id: "proj-1".to_string(),
+            name: "Project 1".to_string(),
+            description: "Test".to_string(),
+            local_path: "/tmp/proj-1".to_string(),
+            environments: Vec::new(),
+            group: None,
+            sort_order: Some(0),
+        });
+        storage.save().expect("initial save");
+        storage.upsert_deployment(dummy_record(
+            "dep-2",
+            "proj-1",
+            "prod",
+            "1.0.2",
+            DeploymentStatus::Succeeded,
+        ));
+
+        // Simulate a SQLite failure during DELETE (e.g. SQLITE_BUSY / locked / aborted write).
+        // Before the fix, remove_deployment mutates in-memory state first, swallows the SQLite
+        // error (`let _ = conn.execute(...)`), returns Some (showing a false success toast),
+        // and the next sync cycle resurrects the record from disk!
+        {
+            let conn = Connection::open(&db_path).expect("open conn");
+            conn.execute_batch(
+                "CREATE TRIGGER fail_delete_temp BEFORE DELETE ON deployments
+                 BEGIN SELECT RAISE(ABORT, 'simulated SQLITE_BUSY write failure'); END;",
+            )
+            .expect("create fail trigger");
+        }
+
+        let failed_attempt = storage.remove_deployment("dep-2");
+        assert!(
+            failed_attempt.is_err(),
+            "When SQLite DELETE fails, remove_deployment must NOT report success or mutate memory!"
+        );
+        assert!(
+            storage.deployments.iter().any(|d| d.id == "dep-2"),
+            "dep-2 must remain in memory when SQLite DELETE fails"
+        );
+
+        // Drop the temporary failure trigger and verify the real delete now succeeds and stays gone
+        {
+            let conn = Connection::open(&db_path).expect("open conn");
+            conn.execute_batch("DROP TRIGGER fail_delete_temp;")
+                .expect("drop fail trigger");
+        }
+
+        let removed_2 = storage.remove_deployment("dep-2");
+        assert!(
+            removed_2.is_ok(),
+            "dep-2 should be removed once SQLite write succeeds"
+        );
+
+        // Run multiple sync cycles including after WAL checkpoint/mtime bump and full reload
+        for _ in 0..3 {
+            let _ = storage.sync_from_app_directory();
+            assert!(
+                !storage.deployments.iter().any(|d| d.id == "dep-2"),
+                "dep-2 was resurrected after sync_from_app_directory because SQLITE_BUSY was swallowed!"
+            );
+        }
+        storage.reset_sync_cache();
+        let _ = storage.sync_from_app_directory();
+        assert!(
+            storage.deployments.is_empty(),
+            "Deleted deployments must not come back after sync cycles, found: {:?}",
+            storage
+                .deployments
+                .iter()
+                .map(|d| &d.id)
+                .collect::<Vec<_>>()
+        );
+
+        let reloaded = AppStorage::load_or_default(&db_path);
+        assert!(
+            reloaded.deployments.is_empty(),
+            "Deleted deployments must stay gone after full load_or_default reload"
+        );
+    }
+
+    #[test]
+    fn test_bug_008_two_instances_delete_then_save_does_not_resurrect_records() {
+        let sandbox = crate::paths::TestSandbox::new();
+        let db_path = sandbox.path().join("appload_state.db");
+
+        // Seed initial state with 3 deployments and 2 secrets
+        let mut seed = AppStorage::load_or_default(&db_path);
+        seed.projects.push(Project {
+            id: "proj-1".to_string(),
+            name: "Project 1".to_string(),
+            description: "Initial".to_string(),
+            local_path: "/tmp/proj-1".to_string(),
+            environments: Vec::new(),
+            group: None,
+            sort_order: Some(0),
+        });
+        seed.upsert_deployment(dummy_record(
+            "dep-1",
+            "proj-1",
+            "prod",
+            "1.0.1",
+            DeploymentStatus::Succeeded,
+        ));
+        seed.upsert_deployment(dummy_record(
+            "dep-2",
+            "proj-1",
+            "prod",
+            "1.0.2",
+            DeploymentStatus::Succeeded,
+        ));
+        seed.upsert_deployment(dummy_record(
+            "dep-3",
+            "proj-1",
+            "dev",
+            "1.0.3",
+            DeploymentStatus::Failed,
+        ));
+        seed.upsert_secret_metadata(SecretEntry::new(
+            "SECRET_KEEP",
+            Some("admin".to_string()),
+            "Keep",
+        ));
+        seed.upsert_secret_metadata(SecretEntry::new(
+            "SECRET_DELETE",
+            Some("admin".to_string()),
+            "Delete",
+        ));
+        seed.save().expect("seed save");
+
+        // Open two independent AppStorage handles on the same DB file
+        let mut instance_a = AppStorage::load_or_default(&db_path);
+        let mut instance_b = AppStorage::load_or_default(&db_path);
+        assert_eq!(instance_a.deployments.len(), 3);
+        assert_eq!(instance_b.deployments.len(), 3);
+
+        // Instance A deletes dep-1 and removes SECRET_DELETE
+        assert!(instance_a.remove_deployment("dep-1").is_ok());
+        assert!(instance_a.remove_secret_metadata("SECRET_DELETE").is_ok());
+
+        // Instance B saves (e.g. routine save after project edit or debounced save)
+        instance_b.projects[0].description = "Updated by B".to_string();
+        instance_b.save().expect("instance B save");
+
+        // Instance A runs sync cycles
+        for _ in 0..3 {
+            let _ = instance_a.sync_from_app_directory();
+        }
+
+        // dep-1 and SECRET_DELETE must NOT be resurrected by Instance B's save()!
+        assert!(
+            !instance_a.deployments.iter().any(|d| d.id == "dep-1"),
+            "dep-1 was resurrected in instance_a after instance_b.save()!"
+        );
+        assert!(
+            !instance_a.secrets.iter().any(|s| s.key == "SECRET_DELETE"),
+            "SECRET_DELETE was resurrected in instance_a after instance_b.save()!"
+        );
+
+        // Now Instance A clears dev deployment history (dep-3), and Instance B saves again
+        let cleared = instance_a
+            .clear_deployment_history(Some("proj-1"), Some("dev"))
+            .expect("clear dev history");
+        assert_eq!(cleared, 1);
+        instance_b.save().expect("instance B second save");
+
+        let reloaded = AppStorage::load_or_default(&db_path);
+        let remaining_ids: Vec<&str> = reloaded.deployments.iter().map(|d| d.id.as_str()).collect();
+        assert_eq!(
+            remaining_ids,
+            vec!["dep-2"],
+            "Only dep-2 should remain on disk; deleted/cleared records must not be resurrected"
+        );
+        let remaining_secrets: Vec<&str> =
+            reloaded.secrets.iter().map(|s| s.key.as_str()).collect();
+        assert_eq!(remaining_secrets, vec!["SECRET_KEEP"]);
     }
 }
