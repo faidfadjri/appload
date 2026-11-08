@@ -103,6 +103,31 @@ pub fn release_active_guard() {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProcessInstanceCheck {
+    pub other_pids: Vec<u32>,
+    pub parent_pid: Option<u32>,
+    pub is_parent_running_instance: bool,
+}
+
+/// Inspects running AppLoad/Shiply processes, returning all other running instance PIDs,
+/// the current process's parent PID, and whether that parent is one of the running instances
+/// (indicating an in-app update relaunch).
+pub fn check_running_instances() -> ProcessInstanceCheck {
+    #[cfg(windows)]
+    {
+        check_windows_running_instances()
+    }
+    #[cfg(not(windows))]
+    {
+        ProcessInstanceCheck {
+            other_pids: Vec::new(),
+            parent_pid: None,
+            is_parent_running_instance: false,
+        }
+    }
+}
+
 /// Returns the process IDs of any other running AppLoad or Shiply processes.
 ///
 /// - In normal production mode: inspects system processes matching `appload.exe` or `shiply.exe`
@@ -111,13 +136,24 @@ pub fn release_active_guard() {
 ///   is located inside the active sandbox root. This guarantees sandboxed test runs never
 ///   inspect, wait on, or interfere with any real AppLoad instance running on the host system.
 pub fn find_other_running_instances() -> Vec<u32> {
+    check_running_instances().other_pids
+}
+
+/// Returns the process ID of our parent process if detectable.
+pub fn get_parent_pid() -> Option<u32> {
+    check_running_instances().parent_pid
+}
+
+/// Returns `true` if the specified process ID is currently alive and active.
+pub fn is_process_alive(pid: u32) -> bool {
     #[cfg(windows)]
     {
-        find_windows_running_instances()
+        is_windows_process_alive(pid)
     }
     #[cfg(not(windows))]
     {
-        Vec::new()
+        let _ = pid;
+        false
     }
 }
 
@@ -138,21 +174,193 @@ pub fn wait_for_process_exit(pid: u32, timeout: std::time::Duration) -> bool {
 /// Waits for all other running AppLoad / Shiply instances to exit, up to `timeout`.
 /// Returns `true` if all other instances have terminated, `false` if one or more are still running.
 pub fn wait_for_other_instances_to_exit(timeout: std::time::Duration) -> bool {
-    let other_pids = find_other_running_instances();
-    if other_pids.is_empty() {
+    wait_for_instances_with_splash(&find_other_running_instances(), timeout, false)
+}
+
+/// Waits for the specified process IDs to exit up to `timeout`.
+/// If `show_splash` is true and waiting exceeds 2 seconds, displays a splash window
+/// ("Finishing update — waiting for the previous AppLoad window to close…") until all processes exit.
+pub fn wait_for_instances_with_splash(
+    pids: &[u32],
+    timeout: std::time::Duration,
+    show_splash: bool,
+) -> bool {
+    if pids.is_empty() {
         return true;
     }
+
     let start = std::time::Instant::now();
-    for pid in other_pids {
-        let remaining = timeout.saturating_sub(start.elapsed());
-        if remaining.is_zero() {
+    let mut splash: Option<SplashGuard> = None;
+
+    loop {
+        let mut still_alive = false;
+        for &pid in pids {
+            if is_process_alive(pid) {
+                still_alive = true;
+                break;
+            }
+        }
+
+        if !still_alive {
+            return true;
+        }
+
+        let elapsed = start.elapsed();
+        if elapsed >= timeout {
             return false;
         }
-        if !wait_for_process_exit(pid, remaining) {
-            return false;
+
+        if show_splash && splash.is_none() && elapsed >= std::time::Duration::from_secs(2) {
+            splash = Some(SplashGuard::show(
+                "Finishing update — waiting for the previous AppLoad window to close…",
+            ));
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+}
+
+/// Displays a modal dialog when another AppLoad instance remains running after timeout.
+/// In sandbox mode (`APPLOAD_SANDBOX_ROOT` set), logs to stderr without blocking automated tests.
+pub fn show_timeout_dialog(message: &str) {
+    #[cfg(windows)]
+    {
+        if crate::paths::sandbox_root().is_some() {
+            eprintln!("[AppLoad Timeout] {message}");
+            return;
+        }
+        let wide_msg: Vec<u16> = message.encode_utf16().chain(std::iter::once(0)).collect();
+        let wide_title: Vec<u16> = "AppLoad\0".encode_utf16().collect();
+        use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONEXCLAMATION, MB_OK};
+        unsafe {
+            MessageBoxW(
+                std::ptr::null_mut(),
+                wide_msg.as_ptr(),
+                wide_title.as_ptr(),
+                MB_OK | MB_ICONEXCLAMATION,
+            );
         }
     }
-    find_other_running_instances().is_empty()
+    #[cfg(not(windows))]
+    {
+        eprintln!("[AppLoad Timeout] {message}");
+    }
+}
+
+#[cfg(windows)]
+pub struct SplashGuard {
+    stop_tx: Option<std::sync::mpsc::Sender<()>>,
+    handle: Option<std::thread::JoinHandle<()>>,
+}
+
+#[cfg(windows)]
+impl SplashGuard {
+    pub fn show(text: &str) -> Self {
+        if crate::paths::sandbox_root().is_some() {
+            eprintln!("[AppLoad Splash] {text}");
+            return Self {
+                stop_tx: None,
+                handle: None,
+            };
+        }
+
+        let (stop_tx, stop_rx) = std::sync::mpsc::channel();
+        let text_owned = text.to_string();
+
+        let handle = std::thread::spawn(move || {
+            use std::ptr;
+            use windows_sys::Win32::UI::WindowsAndMessaging::*;
+
+            let class_name: Vec<u16> = "STATIC\0".encode_utf16().collect();
+            let wide_text: Vec<u16> = text_owned
+                .encode_utf16()
+                .chain(std::iter::once(0))
+                .collect();
+
+            let screen_w = unsafe { GetSystemMetrics(SM_CXSCREEN) };
+            let screen_h = unsafe { GetSystemMetrics(SM_CYSCREEN) };
+            let width = 460;
+            let height = 90;
+            let x = (screen_w - width) / 2;
+            let y = (screen_h - height) / 2;
+
+            const SS_CENTER: u32 = 0x00000001;
+            const SS_CENTERIMAGE: u32 = 0x00000200;
+
+            let hwnd = unsafe {
+                CreateWindowExW(
+                    WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
+                    class_name.as_ptr(),
+                    wide_text.as_ptr(),
+                    WS_POPUP | WS_BORDER | WS_VISIBLE | SS_CENTER | SS_CENTERIMAGE,
+                    x,
+                    y,
+                    width,
+                    height,
+                    ptr::null_mut(),
+                    ptr::null_mut(),
+                    ptr::null_mut(),
+                    ptr::null(),
+                )
+            };
+
+            if hwnd.is_null() {
+                return;
+            }
+
+            unsafe {
+                let _ = ShowWindow(hwnd, SW_SHOW);
+            }
+
+            loop {
+                if stop_rx.try_recv().is_ok() {
+                    break;
+                }
+
+                unsafe {
+                    let mut msg: MSG = std::mem::zeroed();
+                    while PeekMessageW(&mut msg, hwnd, 0, 0, PM_REMOVE) != 0 {
+                        TranslateMessage(&msg);
+                        DispatchMessageW(&msg);
+                    }
+                }
+
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+
+            unsafe {
+                DestroyWindow(hwnd);
+            }
+        });
+
+        Self {
+            stop_tx: Some(stop_tx),
+            handle: Some(handle),
+        }
+    }
+}
+
+#[cfg(windows)]
+impl Drop for SplashGuard {
+    fn drop(&mut self) {
+        if let Some(tx) = self.stop_tx.take() {
+            let _ = tx.send(());
+        }
+        if let Some(h) = self.handle.take() {
+            let _ = h.join();
+        }
+    }
+}
+
+#[cfg(not(windows))]
+pub struct SplashGuard;
+
+#[cfg(not(windows))]
+impl SplashGuard {
+    pub fn show(text: &str) -> Self {
+        let _ = text;
+        Self
+    }
 }
 
 /// Brings an existing running AppLoad window to the foreground if found.
@@ -278,7 +486,7 @@ fn focus_windows_appload_window() -> bool {
 }
 
 #[cfg(windows)]
-fn find_windows_running_instances() -> Vec<u32> {
+fn check_windows_running_instances() -> ProcessInstanceCheck {
     use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
     use windows_sys::Win32::System::Diagnostics::ToolHelp::{
         CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
@@ -287,12 +495,17 @@ fn find_windows_running_instances() -> Vec<u32> {
 
     let current_pid = std::process::id();
     let sandbox_opt = crate::paths::sandbox_root();
-    let mut result = Vec::new();
+    let mut other_pids = Vec::new();
+    let mut parent_pid = None;
 
     unsafe {
         let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
         if snapshot == INVALID_HANDLE_VALUE {
-            return result;
+            return ProcessInstanceCheck {
+                other_pids,
+                parent_pid,
+                is_parent_running_instance: false,
+            };
         }
 
         let mut entry: PROCESSENTRY32W = std::mem::zeroed();
@@ -301,6 +514,11 @@ fn find_windows_running_instances() -> Vec<u32> {
         if Process32FirstW(snapshot, &mut entry) != 0 {
             loop {
                 let pid = entry.th32ProcessID;
+
+                if pid == current_pid {
+                    parent_pid = Some(entry.th32ParentProcessID);
+                }
+
                 if pid != current_pid && pid != 0 {
                     let name_len = entry
                         .szExeFile
@@ -315,11 +533,11 @@ fn find_windows_running_instances() -> Vec<u32> {
                         if let Some(ref sb) = sandbox_opt {
                             if let Some(proc_path) = query_windows_process_image_path(pid) {
                                 if is_path_in_sandbox_dir(&proc_path, sb) {
-                                    result.push(pid);
+                                    other_pids.push(pid);
                                 }
                             }
                         } else {
-                            result.push(pid);
+                            other_pids.push(pid);
                         }
                     }
                 }
@@ -333,7 +551,17 @@ fn find_windows_running_instances() -> Vec<u32> {
         CloseHandle(snapshot);
     }
 
-    result
+    let is_parent_running_instance = if let Some(ppid) = parent_pid {
+        other_pids.contains(&ppid)
+    } else {
+        false
+    };
+
+    ProcessInstanceCheck {
+        other_pids,
+        parent_pid,
+        is_parent_running_instance,
+    }
 }
 
 #[cfg(windows)]
@@ -401,16 +629,21 @@ fn wait_windows_process_exit(pid: u32, timeout: std::time::Duration) -> bool {
 #[cfg(windows)]
 fn is_windows_process_alive(pid: u32) -> bool {
     use windows_sys::Win32::Foundation::{CloseHandle, FALSE};
-    use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
+    use windows_sys::Win32::System::Threading::{
+        GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+
+    const STILL_ACTIVE: u32 = 259;
 
     unsafe {
         let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
-        if !handle.is_null() {
-            CloseHandle(handle);
-            true
-        } else {
-            false
+        if handle.is_null() {
+            return false;
         }
+        let mut exit_code: u32 = 0;
+        let success = GetExitCodeProcess(handle, &mut exit_code);
+        CloseHandle(handle);
+        success != 0 && exit_code == STILL_ACTIVE
     }
 }
 

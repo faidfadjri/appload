@@ -27,15 +27,18 @@ fn main() -> eframe::Result<()> {
     let args: Vec<String> = env::args().skip(1).collect();
 
     // 2a. If invoked with `--wait-for-pid <PID>` (used on in-app update restart to wait for previous instance to exit)
-    if let Some(pos) = args.iter().position(|a| a == "--wait-for-pid") {
-        if let Some(pid_str) = args.get(pos + 1) {
-            if let Ok(pid) = pid_str.parse::<u32>() {
-                let _ = appload::single_instance::wait_for_process_exit(
-                    pid,
-                    std::time::Duration::from_secs(10),
-                );
-            }
-        }
+    let cli_wait_pid = args
+        .iter()
+        .position(|a| a == "--wait-for-pid")
+        .and_then(|pos| args.get(pos + 1))
+        .and_then(|s| s.parse::<u32>().ok());
+
+    if let Some(pid) = cli_wait_pid {
+        let _ = appload::single_instance::wait_for_instances_with_splash(
+            &[pid],
+            std::time::Duration::from_secs(90),
+            true,
+        );
     }
 
     // 2b. Dedicated headless migration entry point (--migrate-only [--json])
@@ -132,15 +135,46 @@ fn main() -> eframe::Result<()> {
     // 4b. Multi-process and single-instance guards:
     // First, check for any other running AppLoad / Shiply processes by image name (e.g. from an
     // older version without a single-instance mutex, or during an update restart transition).
-    let other_pids = appload::single_instance::find_other_running_instances();
-    if !other_pids.is_empty() {
-        let all_exited = appload::single_instance::wait_for_other_instances_to_exit(
-            std::time::Duration::from_secs(5),
+    let instance_check = appload::single_instance::check_running_instances();
+    let is_update_restart = instance_check.is_parent_running_instance
+        || cli_wait_pid.is_some()
+        || instance_check
+            .parent_pid
+            .map(|p| cli_wait_pid == Some(p))
+            .unwrap_or(false);
+
+    if !instance_check.other_pids.is_empty() || cli_wait_pid.is_some() {
+        let timeout = if is_update_restart {
+            std::time::Duration::from_secs(90)
+        } else {
+            std::time::Duration::from_secs(5)
+        };
+
+        let wait_pids: Vec<u32> = if let Some(p) = cli_wait_pid {
+            let mut list = instance_check.other_pids;
+            if !list.contains(&p) {
+                list.push(p);
+            }
+            list
+        } else {
+            instance_check.other_pids
+        };
+
+        let all_exited = appload::single_instance::wait_for_instances_with_splash(
+            &wait_pids,
+            timeout,
+            is_update_restart,
         );
+
         if !all_exited {
             let _ = appload::single_instance::focus_existing_appload_window();
+            if is_update_restart {
+                appload::single_instance::show_timeout_dialog(
+                    "Another AppLoad is still running. Close it and start AppLoad again.",
+                );
+            }
             eprintln!(
-                "[AppLoad] Another AppLoad or Shiply process is already running. Focusing existing window and exiting."
+                "[AppLoad] Another AppLoad or Shiply process is still running. Exiting cleanly."
             );
             return Ok(());
         }

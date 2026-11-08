@@ -229,7 +229,15 @@ fn test_repro_010_process_detection_and_wait_helpers() {
         "sandbox must never match host processes"
     );
 
-    // 2. Wait for a non-existent or dead PID returns true immediately
+    // 2. Parent PID detection returns Some
+    let parent_pid = crate::single_instance::get_parent_pid();
+    assert!(parent_pid.is_some(), "parent PID must be detected");
+
+    // 3. Current process is alive; dead PID is not
+    assert!(crate::single_instance::is_process_alive(std::process::id()));
+    assert!(!crate::single_instance::is_process_alive(99999999));
+
+    // 4. Wait for a non-existent or dead PID returns true immediately
     let dead_pid = 99999999;
     let exited = crate::single_instance::wait_for_process_exit(
         dead_pid,
@@ -237,10 +245,86 @@ fn test_repro_010_process_detection_and_wait_helpers() {
     );
     assert!(exited, "dead PID must be reported as exited");
 
-    // 3. wait_for_other_instances_to_exit in empty sandbox returns true
+    // 5. wait_for_other_instances_to_exit in empty sandbox returns true
     assert!(crate::single_instance::wait_for_other_instances_to_exit(
         std::time::Duration::from_millis(50)
     ));
+}
+
+#[test]
+fn test_repro_010_parent_alive_waits_for_exit_and_opens_db_only_after() {
+    let sandbox = crate::paths::TestSandbox::new();
+    let db_path = sandbox.path().join("parent_wait_test.db");
+
+    // Simulate an old version parent process staying alive for ~2.5s without --wait-for-pid
+    let mut child = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-Command", "Start-Sleep -Milliseconds 2500"])
+        .spawn()
+        .expect("spawn simulated parent process");
+
+    let parent_pid = child.id();
+    assert!(crate::single_instance::is_process_alive(parent_pid));
+
+    let start = std::time::Instant::now();
+    // In update restart mode, wait up to 90s with splash enabled
+    let exited = crate::single_instance::wait_for_instances_with_splash(
+        &[parent_pid],
+        std::time::Duration::from_secs(90),
+        true,
+    );
+    let elapsed = start.elapsed();
+
+    assert!(exited, "parent process must be reported exited");
+    assert!(
+        elapsed >= std::time::Duration::from_millis(2000),
+        "wait must have waited for the parent process (elapsed: {elapsed:?})"
+    );
+    assert!(
+        !crate::single_instance::is_process_alive(parent_pid),
+        "parent process must be dead before database access"
+    );
+
+    // Verify DB opens cleanly only after the parent process has fully terminated
+    let storage = AppStorage::load_or_default(&db_path);
+    assert_eq!(storage.deployments.len(), 0);
+
+    let _ = child.wait();
+}
+
+#[test]
+fn test_repro_010_non_parent_second_instance_short_wait_and_focus() {
+    let _sandbox = crate::paths::TestSandbox::new();
+
+    // Simulate a genuine second launch where another running instance is NOT our parent
+    let mut child = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-Command", "Start-Sleep -Seconds 10"])
+        .spawn()
+        .expect("spawn simulated non-parent instance");
+
+    let other_pid = child.id();
+    assert!(crate::single_instance::is_process_alive(other_pid));
+
+    let start = std::time::Instant::now();
+    // For non-parent second launch, short wait (500ms timeout for test, 5s in main)
+    let all_exited = crate::single_instance::wait_for_instances_with_splash(
+        &[other_pid],
+        std::time::Duration::from_millis(500),
+        false,
+    );
+    let elapsed = start.elapsed();
+
+    assert!(
+        !all_exited,
+        "non-parent instance still running must time out quickly"
+    );
+    assert!(
+        elapsed < std::time::Duration::from_secs(3),
+        "non-parent launch must not wait 90s (elapsed: {elapsed:?})"
+    );
+
+    // Clean up simulated instance
+    let _ = child.kill();
+    let _ = child.wait();
 }
 
 #[test]
