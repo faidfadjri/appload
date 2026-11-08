@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.12.1] - 2026-11-08
+
+### Fixed
+- **Deployment History Record Deletion Persistence (Brief 008):**
+  - Fixed a bug where deleting a deployment history record showed a `"Deployment record deleted"` success toast while the record stayed or reappeared on the next sync cycle.
+  - `remove_deployment`, `clear_deployment_history`, and `remove_secret_metadata` now execute targeted `DELETE` statements in SQLite first (with a 5-second `busy_timeout`), verify affected rows, close the SQLite connection *before* capturing `last_state_mtime` (eliminating the Windows WAL/SHM mtime race with `sync_from_app_directory()`), and only mutate in-memory state after disk commit succeeds.
+  - Replaced unconditional success toasts in `confirm_delete.rs` with result-aware success/error banners.
+- **Incremental SQLite Persistence (`save_incremental_to_db`):**
+  - Replaced destructive full-table `DELETE FROM deployments` / `DELETE FROM secrets` rewrites in `save_to` with incremental `INSERT OR REPLACE` upserts and targeted deletes tracked via `synced_deployments` and `synced_secrets`, preventing concurrent or debounced saves from resurrecting records deleted on disk.
+- **Left-Click `"⋯"` Overflow Menus & Vector Icons (Brief 009 Addendum A):**
+  - Fixed the project workspace header `"⋯"` overflow button doing nothing on left-click (`context_menu` only opened on secondary/right-click).
+  - Created shared `kit::overflow_menu` and `kit::overflow_menu_item` helpers opening on left-click (and right-click) via `toggle_popup` + `popup_below_widget` (`CloseOnClickOutside`), anchored right-aligned below the trigger button, with 32px item height, `OutlineIcon` + `Typo::Label` styling, and closing on item click, `Esc`, or outside click.
+  - Standardized all `"⋯"` overflow buttons across Project Header, Deployments Toolbar, Desktop History Rows, and Mobile/Stacked History Rows, and replaced Unicode glyph menu icons (`✎`, `⧉`, `↻`, `🗑`) with crisp vector `OutlineIcon` variants (`Edit`, `Copy`, `Refresh`, `Trash`, `RotateCcw`).
+- **Toast Auto-Dismiss Timer Reset:**
+  - Fixed `set_status_banner` and `confirm_delete.rs` so replacing an existing status toast always resets `status_banner_time = Some(Instant::now())`, preventing subsequent toasts from expiring prematurely.
+
+### Added
+- **Single-Instance Application Guard (`src/single_instance.rs`):**
+  - Added a Windows named mutex guard (`Local\AppLoad.SingleInstance`) that focuses the existing running AppLoad window and exits cleanly when a second instance is launched.
+  - In sandbox mode (`APPLOAD_SANDBOX_ROOT`), the mutex name is scoped by an FNV-1a 64-bit hash of the normalized sandbox path (`Local\AppLoad.SingleInstance.Sandbox.<hash>`) and window focusing is disabled so sandboxed runs never interfere with a live installed AppLoad instance.
+- **Full Sandbox QA Automation Suite (`docs/qa/v0.12.1-QA-REPORT.md`):**
+  - Added end-to-end `egui_kittest` UI automation and sandbox QA matrix tests (`src/ui/tests/qa_v0121_matrix_tests.rs`, 134 total passing tests) covering Projects, Environments, Pipeline Steps, Local & Fake-SSH/SCP Deploys, History & Console, Secret Management (`appload-test-<uuid>` guard with RAII cleanup), Overview, Inputs/Regressions, App Lifecycle, and v0.11.0/v0.12.0 → v0.12.1 migration & update paths.
+
 ## [0.12.0] - 2026-11-06
 
 ### Changed
