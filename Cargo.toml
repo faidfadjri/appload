@@ -1,6 +1,6 @@
 [package]
 name = "appload"
-version = "0.12.0"
+version = "0.12.1"
 edition = "2021"
 description = "Universal Desktop Deployment Tool for multi-server pipelines"
 
@@ -17,6 +17,7 @@ uuid = { version = "1.11", features = ["v4", "serde"] }
 windows-sys = { version = "0.59", features = ["Win32_Security_Credentials", "Win32_Foundation"] }
 
 [dev-dependencies]
+egui_kittest = "0.31"
 tempfile = "3.14"
 
 [profile.release]

@@ -93,6 +93,10 @@ pub fn read_os_vault_credential(target: &str) -> Option<VaultCredential> {
     if target.is_empty() {
         return None;
     }
+    // Safety guard: in sandbox mode, never read non-test credentials from the global OS Credential Manager.
+    if crate::paths::sandbox_root().is_some() && !target.starts_with("appload-test-") {
+        return None;
+    }
 
     #[cfg(windows)]
     {
@@ -206,6 +210,11 @@ pub fn write_os_vault_credential(
     }
     if secret_value.is_empty() {
         return Err("Secret value / password cannot be empty.".to_string());
+    }
+    if crate::paths::sandbox_root().is_some() && !target.starts_with("appload-test-") {
+        return Err(format!(
+            "Sandbox safety guard: refusing to write non-test credential '{target}' (must start with 'appload-test-')."
+        ));
     }
 
     #[cfg(windows)]
@@ -344,6 +353,11 @@ pub fn delete_os_vault_credential(target: &str) -> Result<(), String> {
     let target = target.trim();
     if target.is_empty() {
         return Err("Secret name / target key cannot be empty.".to_string());
+    }
+    if crate::paths::sandbox_root().is_some() && !target.starts_with("appload-test-") {
+        return Err(format!(
+            "Sandbox safety guard: refusing to delete non-test credential '{target}' (must start with 'appload-test-')."
+        ));
     }
 
     #[cfg(windows)]
@@ -516,6 +530,33 @@ pub fn redact_secrets(text: &str, secrets: &[&str]) -> String {
     sanitized
 }
 
+/// RAII cleanup guard for test credentials in the global OS Credential Manager.
+/// Guarantees that `appload-test-<uuid>` keys are deleted when dropped, even if a test panics.
+pub struct TestVaultCredentialGuard {
+    key: String,
+}
+
+impl TestVaultCredentialGuard {
+    pub fn new(key: impl Into<String>) -> Self {
+        let key = key.into();
+        assert!(
+            key.starts_with("appload-test-"),
+            "TestVaultCredentialGuard key must start with 'appload-test-', got: {key}"
+        );
+        Self { key }
+    }
+
+    pub fn key(&self) -> &str {
+        &self.key
+    }
+}
+
+impl Drop for TestVaultCredentialGuard {
+    fn drop(&mut self) {
+        let _ = delete_os_vault_credential(&self.key);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -568,7 +609,9 @@ mod tests {
 
     #[test]
     fn test_write_read_delete_os_vault_credential_and_secret_interpolation() {
-        let target = format!("appload_test_secret_{}", uuid::Uuid::new_v4().simple());
+        let _sb = crate::paths::TestSandbox::new();
+        let target = format!("appload-test-{}", uuid::Uuid::new_v4());
+        let _guard = TestVaultCredentialGuard::new(target.clone());
         write_os_vault_credential(&target, Some("deploy_admin"), "MyVaultS3cret!99")
             .expect("write credential to OS vault");
 
@@ -592,5 +635,10 @@ mod tests {
 
         delete_os_vault_credential(&target).expect("delete credential from OS vault");
         assert!(read_os_vault_credential(&target).is_none());
+
+        // Verify sandbox safety guard blocks non-test credential keys
+        assert!(read_os_vault_credential("indyserver").is_none());
+        assert!(write_os_vault_credential("indyserver", Some("admin"), "pw").is_err());
+        assert!(delete_os_vault_credential("indyserver").is_err());
     }
 }

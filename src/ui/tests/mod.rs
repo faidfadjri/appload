@@ -13,6 +13,8 @@ mod modal_tests;
 #[cfg(test)]
 mod pipeline_tests;
 #[cfg(test)]
+mod qa_v0121_matrix_tests;
+#[cfg(test)]
 mod secret_tests;
 #[cfg(test)]
 mod sidebar_tests;

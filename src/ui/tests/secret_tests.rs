@@ -12,7 +12,8 @@ fn test_secret_management_page_and_os_vault_roundtrip() {
     let storage = crate::storage::AppStorage::load_or_default(&db_path);
     let mut app = AppLoadApp::new(storage);
 
-    let test_key = format!("appload_ui_test_secret_{}", uuid::Uuid::new_v4().simple());
+    let test_key = format!("appload-test-{}", uuid::Uuid::new_v4());
+    let _vault_guard = crate::credentials::TestVaultCredentialGuard::new(test_key.clone());
     app.open_secret_management_for_target(
         &test_key,
         "deploy_user",

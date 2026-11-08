@@ -16,7 +16,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." 2>/dev/null && pwd || echo "$SCRIPT_DIR")"
 GITHUB_REPO="faidfadjri/appload"
 APP_NAME="AppLoad"
-VERSION="0.12.0"
+VERSION="0.12.1"
 
 echo "========================================================"
 echo "           AppLoad macOS Application Installer          "
