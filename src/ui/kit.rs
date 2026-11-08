@@ -123,6 +123,7 @@ pub(crate) fn button(
     let (rect, resp) = ui.allocate_exact_size(Vec2::new(width, height), Sense::click());
     let hovered = resp.hovered();
     let enabled = ui.is_enabled();
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, enabled, label));
 
     let (fill, border, current_text_color) = if !enabled {
         (
@@ -186,6 +187,7 @@ pub(crate) fn icon_button(
     let (rect, resp) = ui.allocate_exact_size(Vec2::splat(side), Sense::click());
     let hovered = resp.hovered();
     let enabled = ui.is_enabled();
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, enabled, tooltip));
 
     if enabled && hovered {
         ui.painter()
@@ -230,6 +232,7 @@ pub(crate) fn danger_icon_button(
     let (rect, resp) = ui.allocate_exact_size(Vec2::splat(side), Sense::click());
     let hovered = resp.hovered();
     let enabled = ui.is_enabled();
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, enabled, tooltip));
 
     if enabled && hovered {
         ui.painter()
@@ -712,4 +715,186 @@ pub(crate) fn empty_state(
         ui.add_space(SP_32);
     });
     cta_clicked
+}
+
+/// Standardized 32px-tall menu item with a 16px `OutlineIcon` and `Typo::Label` text.
+/// Automatically closes the enclosing popup/menu when clicked.
+pub(crate) fn overflow_menu_item(
+    ui: &mut egui::Ui,
+    icon: OutlineIcon,
+    label: &str,
+    is_danger: bool,
+    enabled: bool,
+) -> bool {
+    let item_h = 32.0;
+    let avail_w = ui.available_width().max(180.0);
+    let (rect, resp) = ui.allocate_exact_size(
+        Vec2::new(avail_w, item_h),
+        if enabled {
+            Sense::click()
+        } else {
+            Sense::hover()
+        },
+    );
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, enabled, label));
+
+    let hovered = enabled && resp.hovered();
+    let fill = if hovered {
+        if is_danger {
+            DANGER_SOFT
+        } else {
+            SUBTLE_BG
+        }
+    } else {
+        Color32::TRANSPARENT
+    };
+
+    let fg = if !enabled {
+        TEXT_PLACEHOLDER
+    } else if is_danger {
+        DANGER
+    } else {
+        TEXT_PRIMARY
+    };
+
+    let icon_color = if !enabled {
+        TEXT_PLACEHOLDER
+    } else if is_danger {
+        DANGER
+    } else if hovered {
+        TEXT_PRIMARY
+    } else {
+        TEXT_SECONDARY
+    };
+
+    if fill != Color32::TRANSPARENT {
+        ui.painter()
+            .rect_filled(rect, CornerRadius::same(R_SM as u8), fill);
+    }
+
+    let icon_center = Pos2::new(rect.left() + 16.0, rect.center().y);
+    draw_outline_icon(ui.painter(), icon_center, icon, icon_color);
+
+    let galley = ui
+        .painter()
+        .layout_no_wrap(label.to_string(), Typo::Label.font(), fg);
+    let text_pos = Pos2::new(rect.left() + 34.0, rect.center().y - galley.size().y / 2.0);
+    ui.painter().galley(text_pos, galley, fg);
+
+    if enabled {
+        let _ = resp.clone().on_hover_cursor(egui::CursorIcon::PointingHand);
+    }
+
+    let clicked = enabled && resp.clicked();
+    if clicked {
+        ui.memory_mut(|m| m.close_popup());
+        ui.close_menu();
+    }
+    clicked
+}
+
+/// Shared `"⋯"` overflow menu helper:
+/// - Renders a 32x32 `OutlineIcon::MoreHorizontal` button with `tooltip`.
+/// - Opens on **left-click** (and right-click) via `toggle_popup` + `popup_below_widget`
+///   with `PopupCloseBehavior::CloseOnClickOutside`.
+/// - Anchored right-aligned below the button (`right_bottom() - menu_w`), with a consistent width
+///   and 32px item height.
+/// - Closes on item click, `Esc`, and click outside.
+pub(crate) fn overflow_menu(
+    ui: &mut egui::Ui,
+    id_salt: impl std::hash::Hash,
+    tooltip: &str,
+    add_contents: impl FnOnce(&mut egui::Ui),
+) -> egui::Response {
+    let (more_resp, popup_id) = ui
+        .push_id(&id_salt, |ui| {
+            let popup_id = ui.make_persistent_id("overflow_popup");
+            let (rect, resp) = ui.allocate_exact_size(Vec2::splat(32.0), Sense::click());
+            resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tooltip));
+            let hovered = resp.hovered();
+            let fill = if hovered { SUBTLE_BG } else { CARD_BG };
+            let stroke_color = if hovered { TEXT_PRIMARY } else { CARD_BORDER };
+            ui.painter().rect_filled(rect, CornerRadius::same(6), fill);
+            ui.painter().rect_stroke(
+                rect,
+                CornerRadius::same(6),
+                Stroke::new(1.0_f32, stroke_color),
+                StrokeKind::Inside,
+            );
+            draw_outline_icon(
+                ui.painter(),
+                rect.center(),
+                OutlineIcon::MoreHorizontal,
+                TEXT_PRIMARY,
+            );
+            let resp = resp
+                .on_hover_text(tooltip)
+                .on_hover_cursor(egui::CursorIcon::PointingHand);
+            (resp, popup_id)
+        })
+        .inner;
+
+    let was_open = ui.memory(|m| m.is_popup_open(popup_id));
+    if !was_open
+        && crate::ui::app::app_env_var("APPLOAD_OPEN_OVERFLOW")
+            .is_ok_and(|v| v.eq_ignore_ascii_case(tooltip))
+    {
+        ui.memory_mut(|m| m.open_popup(popup_id));
+    }
+
+    if more_resp.clicked() || more_resp.secondary_clicked() {
+        ui.memory_mut(|m| m.toggle_popup(popup_id));
+    } else if was_open {
+        let popup_rect = ui
+            .ctx()
+            .data(|d| d.get_temp::<Rect>(popup_id))
+            .unwrap_or(Rect::NOTHING);
+
+        let should_close = ui.input(|i| {
+            if i.key_pressed(egui::Key::Escape) {
+                return true;
+            }
+            for ev in &i.events {
+                if let egui::Event::PointerButton {
+                    pos, pressed: true, ..
+                } = ev
+                {
+                    if !more_resp.rect.contains(*pos) && !popup_rect.contains(*pos) {
+                        return true;
+                    }
+                }
+            }
+            false
+        });
+
+        if should_close {
+            ui.memory_mut(|m| m.close_popup());
+        }
+    }
+
+    let menu_width = 196.0_f32;
+    let mut anchor_resp = more_resp.clone();
+    let screen_left = ui.ctx().screen_rect().left() + 8.0;
+    let aligned_left = (more_resp.rect.right() - menu_width).max(screen_left);
+    anchor_resp.rect = Rect::from_min_max(
+        Pos2::new(aligned_left, more_resp.rect.top()),
+        Pos2::new(more_resp.rect.right(), more_resp.rect.bottom() + 4.0),
+    );
+
+    egui::popup_below_widget(
+        ui,
+        popup_id,
+        &anchor_resp,
+        egui::PopupCloseBehavior::CloseOnClickOutside,
+        |ui| {
+            ui.set_min_width(menu_width);
+            ui.set_max_width(menu_width);
+            ui.spacing_mut().item_spacing = Vec2::new(0.0, 2.0);
+            add_contents(ui);
+            let r = ui.min_rect().expand(8.0);
+            ui.ctx().data_mut(|d| d.insert_temp(popup_id, r));
+        },
+    );
+
+    more_resp
 }

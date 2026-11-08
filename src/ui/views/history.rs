@@ -114,43 +114,20 @@ impl AppLoadApp {
                 ui.spacing_mut().item_spacing = Vec2::new(8.0, 0.0);
 
                 // ⋯ Overflow menu button containing "Clear history…"
-                let more_id = ui.make_persistent_id("history_overflow_menu");
-                let more_resp = outline_icon_button(
+                let can_clear = deletable_count > 0;
+                kit::overflow_menu(
                     ui,
                     ("history_more_btn", project_filter.unwrap_or("all")),
-                    OutlineIcon::MoreHorizontal,
-                    None,
-                    IconButtonVisuals::new(TEXT_PRIMARY, CARD_BG, SUBTLE_BG, CARD_BORDER),
-                    true,
-                )
-                .on_hover_text("More actions");
-
-                if more_resp.clicked() {
-                    ui.memory_mut(|m| m.toggle_popup(more_id));
-                }
-
-                egui::popup_below_widget(
-                    ui,
-                    more_id,
-                    &more_resp,
-                    egui::PopupCloseBehavior::CloseOnClick,
+                    "More history actions",
                     |ui| {
-                        ui.set_min_width(140.0);
-                        let can_clear = deletable_count > 0;
-                        let clr_btn = egui::Button::new(
-                            RichText::new("Clear history…")
-                                .typo(Typo::SmallMedium)
-                                .color(if can_clear {
-                                    FAIL_PILL_TEXT
-                                } else {
-                                    TEXT_PLACEHOLDER
-                                }),
-                        )
-                        .fill(Color32::TRANSPARENT)
-                        .stroke(Stroke::NONE);
-                        if ui.add_enabled(can_clear, clr_btn).clicked() {
+                        if kit::overflow_menu_item(
+                            ui,
+                            OutlineIcon::Trash,
+                            "Clear history…",
+                            true,
+                            can_clear,
+                        ) {
                             trigger_clear_history = true;
-                            ui.memory_mut(|m| m.close_popup());
                         }
                     },
                 );

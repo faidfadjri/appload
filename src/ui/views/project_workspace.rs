@@ -21,7 +21,9 @@ impl AppLoadApp {
         let proj_name = self.storage.projects[proj_idx].name.clone();
 
         // If currently in the loading skeleton transition for switching active project:
-        if self.project_switch_loading_id.as_deref() == Some(project_id) {
+        if self.project_switch_loading_id.as_deref() == Some(project_id)
+            && crate::ui::app::app_env_var("APPLOAD_SCREENSHOT_PATH").is_err()
+        {
             if let Some(start) = self.project_switch_loading_start {
                 if start.elapsed() < Duration::from_millis(300) {
                     render_project_workspace_skeleton(ui, &proj_name);
@@ -60,70 +62,33 @@ impl AppLoadApp {
                     .sense(Sense::click()),
             );
             title_resp.context_menu(|ui| {
-                ui.set_min_width(180.0);
+                ui.set_min_width(196.0);
+                ui.set_max_width(196.0);
                 ui.spacing_mut().item_spacing = Vec2::new(0.0, 2.0);
-                ui.spacing_mut().button_padding = Vec2::new(10.0, 6.0);
 
-                if ui
-                    .add(
-                        egui::Button::new(
-                            RichText::new("✎  Edit Project")
-                                .typo(Typo::Label)
-                                .color(TEXT_PRIMARY),
-                        )
-                        .fill(CARD_BG),
-                    )
-                    .clicked()
-                {
+                if kit::overflow_menu_item(ui, OutlineIcon::Edit, "Edit Project", false, true) {
                     edit_project_clicked = true;
-                    ui.close_menu();
                 }
 
-                if ui
-                    .add(
-                        egui::Button::new(
-                            RichText::new("⧉  Duplicate Project")
-                                .typo(Typo::Label)
-                                .color(TEXT_PRIMARY),
-                        )
-                        .fill(CARD_BG),
-                    )
-                    .clicked()
+                if kit::overflow_menu_item(ui, OutlineIcon::Copy, "Duplicate Project", false, true)
                 {
                     duplicate_project_clicked = true;
-                    ui.close_menu();
                 }
 
-                if ui
-                    .add(
-                        egui::Button::new(
-                            RichText::new("↻  Refresh Metadata")
-                                .typo(Typo::Label)
-                                .color(TEXT_SECONDARY),
-                        )
-                        .fill(CARD_BG),
-                    )
-                    .clicked()
-                {
+                if kit::overflow_menu_item(
+                    ui,
+                    OutlineIcon::Refresh,
+                    "Refresh Metadata",
+                    false,
+                    true,
+                ) {
                     self.refresh_selected_project_metadata(true);
-                    ui.close_menu();
                 }
 
                 ui.separator();
 
-                if ui
-                    .add(
-                        egui::Button::new(
-                            RichText::new("🗑  Delete Project")
-                                .typo(Typo::Label)
-                                .color(FAIL_PILL_TEXT),
-                        )
-                        .fill(CARD_BG),
-                    )
-                    .clicked()
-                {
+                if kit::overflow_menu_item(ui, OutlineIcon::Trash, "Delete Project", true, true) {
                     delete_project_clicked = true;
-                    ui.close_menu();
                 }
             });
 
@@ -143,68 +108,44 @@ impl AppLoadApp {
                     ui.spacing_mut().item_spacing = Vec2::new(8.0, 0.0);
 
                     // 1. "⋯" Overflow Menu (furthest right)
-                    let more_resp = outline_icon_button(
+                    kit::overflow_menu(
                         ui,
                         ("hdr_more_menu_btn", project_id),
-                        OutlineIcon::MoreHorizontal,
-                        None,
-                        IconButtonVisuals::new(TEXT_MUTED, CARD_BG, SUBTLE_BG, CARD_BORDER),
-                        true,
-                    )
-                    .on_hover_text("More actions");
+                        "More project actions",
+                        |ui| {
+                            if kit::overflow_menu_item(
+                                ui,
+                                OutlineIcon::Copy,
+                                "Duplicate project",
+                                false,
+                                true,
+                            ) {
+                                duplicate_project_clicked = true;
+                            }
 
-                    more_resp.context_menu(|ui| {
-                        ui.set_min_width(170.0);
-                        ui.spacing_mut().item_spacing = Vec2::new(0.0, 2.0);
-                        ui.spacing_mut().button_padding = Vec2::new(10.0, 6.0);
+                            if kit::overflow_menu_item(
+                                ui,
+                                OutlineIcon::Refresh,
+                                "Refresh metadata",
+                                false,
+                                true,
+                            ) {
+                                self.refresh_selected_project_metadata(true);
+                            }
 
-                        if ui
-                            .add(
-                                egui::Button::new(
-                                    RichText::new("⧉  Duplicate project")
-                                        .typo(Typo::Label)
-                                        .color(TEXT_PRIMARY),
-                                )
-                                .fill(CARD_BG),
-                            )
-                            .clicked()
-                        {
-                            duplicate_project_clicked = true;
-                            ui.close_menu();
-                        }
+                            ui.separator();
 
-                        if ui
-                            .add(
-                                egui::Button::new(
-                                    RichText::new("↻  Refresh metadata")
-                                        .typo(Typo::Label)
-                                        .color(TEXT_SECONDARY),
-                                )
-                                .fill(CARD_BG),
-                            )
-                            .clicked()
-                        {
-                            self.refresh_selected_project_metadata(true);
-                            ui.close_menu();
-                        }
-
-                        ui.separator();
-
-                        if ui
-                            .add(
-                                egui::Button::new(
-                                    RichText::new("🗑  Delete project")
-                                        .typo(Typo::Label)
-                                        .color(DANGER),
-                                )
-                                .fill(CARD_BG),
-                            )
-                            .clicked()
-                        {
-                            delete_project_clicked = true;
-                            ui.close_menu();
-                        }
-                    });
+                            if kit::overflow_menu_item(
+                                ui,
+                                OutlineIcon::Trash,
+                                "Delete project",
+                                true,
+                                true,
+                            ) {
+                                delete_project_clicked = true;
+                            }
+                        },
+                    );
 
                     // 2. Secondary "Edit" Button
                     if outline_icon_button(

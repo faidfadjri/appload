@@ -118,45 +118,56 @@ impl AppLoadApp {
                     let is_busy = self.is_env_deploying(&dep.project_id, &dep.environment);
                     let can_delete = dep.status != DeploymentStatus::Running;
 
-                    if outline_icon_button(
+                    kit::overflow_menu(
                         ui,
-                        ("stacked_del_dep_btn", &dep.id),
-                        OutlineIcon::Trash,
-                        None,
-                        IconButtonVisuals::new(
-                            FAIL_PILL_TEXT,
-                            SUBTLE_BG,
-                            FAIL_PILL_BG,
-                            CARD_BORDER,
-                        ),
-                        can_delete,
-                    )
-                    .on_hover_text("Delete this deployment record")
-                    .clicked()
-                        && can_delete
-                    {
-                        actions.delete_target = Some(dep.clone());
-                    }
+                        ("stacked_row_more_btn", &dep.id),
+                        "Row actions",
+                        |ui| {
+                            if dep.status == DeploymentStatus::Succeeded
+                                && kit::overflow_menu_item(
+                                    ui,
+                                    OutlineIcon::RotateCcw,
+                                    "Roll back to this version",
+                                    false,
+                                    !is_busy,
+                                )
+                            {
+                                actions.redeploy_target = Some((dep.clone(), true));
+                            }
 
-                    if outline_icon_button(
-                        ui,
-                        ("stacked_rerun_btn", &dep.id),
-                        OutlineIcon::Refresh,
-                        None,
-                        IconButtonVisuals::new(
-                            TEXT_SECONDARY,
-                            SUBTLE_BG,
-                            PILL_CONTAINER_BG,
-                            CARD_BORDER,
-                        ),
-                        !is_busy,
-                    )
-                    .on_hover_text("Re-run this deployment")
-                    .clicked()
-                        && !is_busy
-                    {
-                        actions.redeploy_target = Some((dep.clone(), false));
-                    }
+                            if kit::overflow_menu_item(
+                                ui,
+                                OutlineIcon::Refresh,
+                                "Redeploy",
+                                false,
+                                !is_busy,
+                            ) {
+                                actions.redeploy_target = Some((dep.clone(), false));
+                            }
+
+                            if kit::overflow_menu_item(
+                                ui,
+                                OutlineIcon::Copy,
+                                "Copy version",
+                                false,
+                                true,
+                            ) {
+                                ui.ctx().copy_text(dep.version.clone());
+                            }
+
+                            ui.separator();
+
+                            if kit::overflow_menu_item(
+                                ui,
+                                OutlineIcon::Trash,
+                                "Delete record",
+                                true,
+                                can_delete,
+                            ) {
+                                actions.delete_target = Some(dep.clone());
+                            }
+                        },
+                    );
 
                     if dep.status == DeploymentStatus::Running
                         && outline_icon_button(

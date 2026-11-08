@@ -179,106 +179,51 @@ impl AppLoadApp {
                     let can_delete = dep.status != DeploymentStatus::Running;
 
                     // Row overflow menu "⋯"
-                    let row_more_id = ui.make_persistent_id(("row_more_menu", &dep.id));
-                    let row_more_resp = outline_icon_button(
-                        ui,
-                        ("row_more_btn", &dep.id),
-                        OutlineIcon::MoreHorizontal,
-                        None,
-                        IconButtonVisuals::new(TEXT_PRIMARY, CARD_BG, SUBTLE_BG, CARD_BORDER),
-                        true,
-                    )
-                    .on_hover_text("Row actions");
-
-                    if row_more_resp.clicked() {
-                        ui.memory_mut(|m| m.toggle_popup(row_more_id));
-                    }
-
-                    egui::popup_below_widget(
-                        ui,
-                        row_more_id,
-                        &row_more_resp,
-                        egui::PopupCloseBehavior::CloseOnClick,
-                        |ui| {
-                            ui.set_min_width(180.0);
-                            ui.spacing_mut().item_spacing = Vec2::new(0.0, 4.0);
-
-                            if dep.status == DeploymentStatus::Succeeded {
-                                let rb_btn = egui::Button::new(
-                                    RichText::new("Roll back to this version")
-                                        .typo(Typo::SmallMedium)
-                                        .color(if !is_busy {
-                                            TEXT_PRIMARY
-                                        } else {
-                                            TEXT_PLACEHOLDER
-                                        }),
-                                )
-                                .fill(Color32::TRANSPARENT)
-                                .stroke(Stroke::NONE);
-                                if ui
-                                    .add_enabled(!is_busy, rb_btn)
-                                    .on_hover_text(format!(
-                                        "Rollback {} to v{}",
-                                        dep.environment, dep.version
-                                    ))
-                                    .clicked()
-                                {
-                                    actions.redeploy_target = Some((dep.clone(), true));
-                                    ui.memory_mut(|m| m.close_popup());
-                                }
-                            }
-
-                            let rerun_btn = egui::Button::new(
-                                RichText::new("Redeploy").typo(Typo::SmallMedium).color(
-                                    if !is_busy {
-                                        TEXT_PRIMARY
-                                    } else {
-                                        TEXT_PLACEHOLDER
-                                    },
-                                ),
+                    kit::overflow_menu(ui, ("row_more_btn", &dep.id), "Row actions", |ui| {
+                        if dep.status == DeploymentStatus::Succeeded
+                            && kit::overflow_menu_item(
+                                ui,
+                                OutlineIcon::RotateCcw,
+                                "Roll back to this version",
+                                false,
+                                !is_busy,
                             )
-                            .fill(Color32::TRANSPARENT)
-                            .stroke(Stroke::NONE);
-                            if ui
-                                .add_enabled(!is_busy, rerun_btn)
-                                .on_hover_text("Re-run this deployment")
-                                .clicked()
-                            {
-                                actions.redeploy_target = Some((dep.clone(), false));
-                                ui.memory_mut(|m| m.close_popup());
-                            }
+                        {
+                            actions.redeploy_target = Some((dep.clone(), true));
+                        }
 
-                            let copy_btn = egui::Button::new(
-                                RichText::new("Copy version")
-                                    .typo(Typo::SmallMedium)
-                                    .color(TEXT_SECONDARY),
-                            )
-                            .fill(Color32::TRANSPARENT)
-                            .stroke(Stroke::NONE);
-                            if ui.add(copy_btn).clicked() {
-                                ui.ctx().copy_text(dep.version.clone());
-                                ui.memory_mut(|m| m.close_popup());
-                            }
+                        if kit::overflow_menu_item(
+                            ui,
+                            OutlineIcon::Refresh,
+                            "Redeploy",
+                            false,
+                            !is_busy,
+                        ) {
+                            actions.redeploy_target = Some((dep.clone(), false));
+                        }
 
-                            draw_divider(ui, SUBTLE_BG);
+                        if kit::overflow_menu_item(
+                            ui,
+                            OutlineIcon::Copy,
+                            "Copy version",
+                            false,
+                            true,
+                        ) {
+                            ui.ctx().copy_text(dep.version.clone());
+                        }
 
-                            let del_btn = egui::Button::new(
-                                RichText::new("Delete record")
-                                    .typo(Typo::SmallMedium)
-                                    .color(if can_delete {
-                                        FAIL_PILL_TEXT
-                                    } else {
-                                        TEXT_PLACEHOLDER
-                                    }),
-                            )
-                            .fill(Color32::TRANSPARENT)
-                            .stroke(Stroke::NONE);
-                            if ui.add_enabled(can_delete, del_btn).clicked() {
-                                actions.delete_target = Some(dep.clone());
-                                ui.memory_mut(|m| m.close_popup());
-                            }
-                        },
-                    );
+                        ui.separator();
+
+                        if kit::overflow_menu_item(
+                            ui,
+                            OutlineIcon::Trash,
+                            "Delete record",
+                            true,
+                            can_delete,
+                        ) {
+                            actions.delete_target = Some(dep.clone());
+                        }
+                    });
 
                     if dep.status == DeploymentStatus::Running
                         && outline_icon_button(
