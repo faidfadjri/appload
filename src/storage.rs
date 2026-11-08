@@ -31,6 +31,8 @@ pub struct AppStorage {
     synced_secrets: HashMap<String, SecretEntry>,
     #[serde(skip)]
     pub migration_notice: Option<String>,
+    #[serde(skip)]
+    pub deleted_deployment_ids: HashSet<String>,
 }
 
 #[derive(Deserialize)]
@@ -290,6 +292,52 @@ pub fn save_secrets_to_db(
     }
     tx.commit()?;
     Ok(())
+}
+
+/// Loads tombstoned deployment IDs from SQLite `metadata` table.
+pub fn load_tombstones_from_db(conn: &Connection) -> Result<HashSet<String>, rusqlite::Error> {
+    init_db(conn)?;
+    let mut stmt =
+        conn.prepare("SELECT value FROM metadata WHERE key = 'deleted_deployment_ids'")?;
+    let mut rows = stmt.query([])?;
+    if let Some(row) = rows.next()? {
+        let val: String = row.get(0)?;
+        if let Ok(ids) = serde_json::from_str::<HashSet<String>>(&val) {
+            return Ok(ids);
+        }
+    }
+    Ok(HashSet::new())
+}
+
+/// Persists tombstoned deployment IDs to SQLite `metadata` table.
+pub fn save_tombstones_to_db(
+    conn: &Connection,
+    tombstones: &HashSet<String>,
+) -> Result<(), rusqlite::Error> {
+    init_db(conn)?;
+    let json = serde_json::to_string(tombstones)
+        .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
+    conn.execute(
+        "INSERT OR REPLACE INTO metadata (key, value) VALUES ('deleted_deployment_ids', ?1)",
+        params![json],
+    )?;
+    Ok(())
+}
+
+/// Purges any deployment records from SQLite that match the given tombstone IDs.
+pub fn purge_tombstoned_deployments_from_db(
+    conn: &Connection,
+    tombstones: &HashSet<String>,
+) -> Result<usize, rusqlite::Error> {
+    if tombstones.is_empty() {
+        return Ok(0);
+    }
+    let mut purged = 0;
+    for id in tombstones {
+        let count = conn.execute("DELETE FROM deployments WHERE id = ?1", params![id])?;
+        purged += count;
+    }
+    Ok(purged)
 }
 
 pub fn save_all_to_db(
@@ -618,15 +666,23 @@ impl AppStorage {
             synced_deployments: HashMap::new(),
             synced_secrets: HashMap::new(),
             migration_notice: None,
+            deleted_deployment_ids: HashSet::new(),
         };
 
         let mut needs_save = false;
 
         if let Ok(mut conn) = open_db_connection(&db_path) {
             let _ = init_db(&conn);
+            let tombstones = load_tombstones_from_db(&conn).unwrap_or_default();
+            state.deleted_deployment_ids = tombstones;
             let mut db_projects = load_projects_from_db(&conn).unwrap_or_default();
             let mut db_deployments = load_deployments_from_db(&conn).unwrap_or_default();
             let mut db_secrets = load_secrets_from_db(&conn).unwrap_or_default();
+
+            if !state.deleted_deployment_ids.is_empty() {
+                db_deployments.retain(|d| !state.deleted_deployment_ids.contains(&d.id));
+                let _ = purge_tombstoned_deployments_from_db(&conn, &state.deleted_deployment_ids);
+            }
 
             // If SQLite is completely empty, check for legacy JSON state file to migrate seamlessly
             if db_projects.is_empty() && db_deployments.is_empty() {
@@ -874,12 +930,30 @@ impl AppStorage {
             let is_changed = self.last_state_mtime.is_none_or(|prev| disk_mtime > prev);
             if is_changed {
                 let loaded = open_db_connection(&state_path).ok().and_then(|conn| {
+                    let tombstones = load_tombstones_from_db(&conn).unwrap_or_default();
                     let p = load_projects_from_db(&conn).ok()?;
                     let d = load_deployments_from_db(&conn).ok()?;
                     let s = load_secrets_from_db(&conn).ok();
-                    Some((p, d, s))
+                    Some((tombstones, p, d, s))
                 });
-                if let Some((p, d, s)) = loaded {
+                if let Some((tombstones, p, mut d, s)) = loaded {
+                    self.deleted_deployment_ids.extend(tombstones);
+                    if !self.deleted_deployment_ids.is_empty() {
+                        let before_len = d.len();
+                        d.retain(|dep| !self.deleted_deployment_ids.contains(&dep.id));
+                        let resurrected_count = before_len - d.len();
+                        if resurrected_count > 0 {
+                            if let Ok(conn) = open_db_connection(&state_path) {
+                                let _ = purge_tombstoned_deployments_from_db(
+                                    &conn,
+                                    &self.deleted_deployment_ids,
+                                );
+                            }
+                            notifications.push(format!(
+                                "Prevented {resurrected_count} resurrected deployment record(s) from external stale writer and purged from database."
+                            ));
+                        }
+                    }
                     self.projects = p;
                     self.deployments = d;
                     if let Some(secrets) = s {
@@ -1252,6 +1326,9 @@ impl AppStorage {
     pub fn merge_deployments(&mut self, incoming: Vec<DeploymentRecord>) -> usize {
         let mut count = 0;
         for dep in incoming {
+            if self.deleted_deployment_ids.contains(&dep.id) {
+                continue;
+            }
             if !self.deployments.iter().any(|d| d.id == dep.id) {
                 self.deployments.push(dep);
                 count += 1;
@@ -1293,6 +1370,9 @@ impl AppStorage {
             return Err("Cannot delete a deployment while it is currently running.".to_string());
         }
 
+        self.deleted_deployment_ids
+            .insert(deployment_id.to_string());
+
         if let Some(path) = self.storage_path.clone() {
             let conn = open_db_connection(&path)?;
             let rows_affected = conn
@@ -1308,6 +1388,7 @@ impl AppStorage {
                     "Failed to delete deployment '{deployment_id}' from SQLite (rows affected: {rows_affected})."
                 ));
             }
+            let _ = save_tombstones_to_db(&conn, &self.deleted_deployment_ids);
             drop(conn);
             self.last_state_mtime = file_mtime(&path);
         }
@@ -1343,6 +1424,10 @@ impl AppStorage {
             return Ok(0);
         }
 
+        for id in &ids_to_remove {
+            self.deleted_deployment_ids.insert(id.clone());
+        }
+
         if let Some(path) = self.storage_path.clone() {
             let mut conn = open_db_connection(&path)?;
             let tx = conn
@@ -1358,6 +1443,13 @@ impl AppStorage {
                     ));
                 }
             }
+            let json = serde_json::to_string(&self.deleted_deployment_ids)
+                .map_err(|e| format!("Failed to serialize tombstones: {e}"))?;
+            tx.execute(
+                "INSERT OR REPLACE INTO metadata (key, value) VALUES ('deleted_deployment_ids', ?1)",
+                params![json],
+            )
+            .map_err(|e| format!("Failed to save tombstones to SQLite: {e}"))?;
             tx.commit().map_err(|e| {
                 format!("Failed to commit cleared deployment history to SQLite: {e}")
             })?;

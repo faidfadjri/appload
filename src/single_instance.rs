@@ -103,6 +103,58 @@ pub fn release_active_guard() {
     }
 }
 
+/// Returns the process IDs of any other running AppLoad or Shiply processes.
+///
+/// - In normal production mode: inspects system processes matching `appload.exe` or `shiply.exe`
+///   (excluding the current process PID).
+/// - In sandbox mode (`APPLOAD_SANDBOX_ROOT` set): ONLY matches processes whose executable path
+///   is located inside the active sandbox root. This guarantees sandboxed test runs never
+///   inspect, wait on, or interfere with any real AppLoad instance running on the host system.
+pub fn find_other_running_instances() -> Vec<u32> {
+    #[cfg(windows)]
+    {
+        find_windows_running_instances()
+    }
+    #[cfg(not(windows))]
+    {
+        Vec::new()
+    }
+}
+
+/// Waits for a specific process ID to terminate, up to `timeout`.
+/// Returns `true` if the process has exited (or never existed), `false` if it timed out.
+pub fn wait_for_process_exit(pid: u32, timeout: std::time::Duration) -> bool {
+    #[cfg(windows)]
+    {
+        wait_windows_process_exit(pid, timeout)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (pid, timeout);
+        true
+    }
+}
+
+/// Waits for all other running AppLoad / Shiply instances to exit, up to `timeout`.
+/// Returns `true` if all other instances have terminated, `false` if one or more are still running.
+pub fn wait_for_other_instances_to_exit(timeout: std::time::Duration) -> bool {
+    let other_pids = find_other_running_instances();
+    if other_pids.is_empty() {
+        return true;
+    }
+    let start = std::time::Instant::now();
+    for pid in other_pids {
+        let remaining = timeout.saturating_sub(start.elapsed());
+        if remaining.is_zero() {
+            return false;
+        }
+        if !wait_for_process_exit(pid, remaining) {
+            return false;
+        }
+    }
+    find_other_running_instances().is_empty()
+}
+
 /// Brings an existing running AppLoad window to the foreground if found.
 /// In sandbox mode (`APPLOAD_SANDBOX_ROOT` set), this is a no-op so sandboxed runs never
 /// focus or interact with a live installed AppLoad window on the host desktop.
@@ -223,6 +275,143 @@ fn focus_windows_appload_window() -> bool {
         let _ = EnumWindows(enum_windows_proc, (&mut found as *mut bool) as isize);
     }
     found
+}
+
+#[cfg(windows)]
+fn find_windows_running_instances() -> Vec<u32> {
+    use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
+    use windows_sys::Win32::System::Diagnostics::ToolHelp::{
+        CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
+        TH32CS_SNAPPROCESS,
+    };
+
+    let current_pid = std::process::id();
+    let sandbox_opt = crate::paths::sandbox_root();
+    let mut result = Vec::new();
+
+    unsafe {
+        let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if snapshot == INVALID_HANDLE_VALUE {
+            return result;
+        }
+
+        let mut entry: PROCESSENTRY32W = std::mem::zeroed();
+        entry.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
+
+        if Process32FirstW(snapshot, &mut entry) != 0 {
+            loop {
+                let pid = entry.th32ProcessID;
+                if pid != current_pid && pid != 0 {
+                    let name_len = entry
+                        .szExeFile
+                        .iter()
+                        .position(|&c| c == 0)
+                        .unwrap_or(entry.szExeFile.len());
+                    let exe_name = String::from_utf16_lossy(&entry.szExeFile[..name_len]);
+
+                    if exe_name.eq_ignore_ascii_case("appload.exe")
+                        || exe_name.eq_ignore_ascii_case("shiply.exe")
+                    {
+                        if let Some(ref sb) = sandbox_opt {
+                            if let Some(proc_path) = query_windows_process_image_path(pid) {
+                                if is_path_in_sandbox_dir(&proc_path, sb) {
+                                    result.push(pid);
+                                }
+                            }
+                        } else {
+                            result.push(pid);
+                        }
+                    }
+                }
+
+                if Process32NextW(snapshot, &mut entry) == 0 {
+                    break;
+                }
+            }
+        }
+
+        CloseHandle(snapshot);
+    }
+
+    result
+}
+
+#[cfg(windows)]
+fn query_windows_process_image_path(pid: u32) -> Option<std::path::PathBuf> {
+    use windows_sys::Win32::Foundation::{CloseHandle, FALSE};
+    use windows_sys::Win32::System::Threading::{
+        OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+
+    unsafe {
+        let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+        if handle.is_null() {
+            return None;
+        }
+        let mut buf = [0u16; 1024];
+        let mut size = buf.len() as u32;
+        let success = QueryFullProcessImageNameW(handle, 0, buf.as_mut_ptr(), &mut size);
+        CloseHandle(handle);
+        if success != 0 && size > 0 {
+            let path_str = String::from_utf16_lossy(&buf[..size as usize]);
+            Some(std::path::PathBuf::from(path_str))
+        } else {
+            None
+        }
+    }
+}
+
+#[cfg(windows)]
+fn is_path_in_sandbox_dir(proc_path: &std::path::Path, sandbox_root: &std::path::Path) -> bool {
+    let norm_proc = proc_path
+        .to_string_lossy()
+        .replace('/', "\\")
+        .to_lowercase();
+    let norm_sb = sandbox_root
+        .to_string_lossy()
+        .replace('/', "\\")
+        .to_lowercase();
+    norm_proc.starts_with(norm_sb.trim_end_matches('\\'))
+}
+
+#[cfg(windows)]
+fn wait_windows_process_exit(pid: u32, timeout: std::time::Duration) -> bool {
+    use std::time::Instant;
+    use windows_sys::Win32::Foundation::{CloseHandle, FALSE, WAIT_OBJECT_0};
+    use windows_sys::Win32::System::Threading::{OpenProcess, WaitForSingleObject};
+
+    const SYNCHRONIZE: u32 = 0x0010_0000;
+
+    let start = Instant::now();
+    unsafe {
+        let handle = OpenProcess(SYNCHRONIZE, FALSE, pid);
+        if handle.is_null() {
+            return !is_windows_process_alive(pid);
+        }
+
+        let remaining = timeout.saturating_sub(start.elapsed());
+        let millis = remaining.as_millis().min(u32::MAX as u128) as u32;
+        let res = WaitForSingleObject(handle, millis);
+        CloseHandle(handle);
+
+        res == WAIT_OBJECT_0
+    }
+}
+
+#[cfg(windows)]
+fn is_windows_process_alive(pid: u32) -> bool {
+    use windows_sys::Win32::Foundation::{CloseHandle, FALSE};
+    use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
+
+    unsafe {
+        let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+        if !handle.is_null() {
+            CloseHandle(handle);
+            true
+        } else {
+            false
+        }
+    }
 }
 
 #[cfg(test)]

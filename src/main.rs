@@ -26,6 +26,18 @@ fn main() -> eframe::Result<()> {
     // 2. If invoked with `--install` / `--silent` / `install`, install/update binary + shortcuts headlessly and exit.
     let args: Vec<String> = env::args().skip(1).collect();
 
+    // 2a. If invoked with `--wait-for-pid <PID>` (used on in-app update restart to wait for previous instance to exit)
+    if let Some(pos) = args.iter().position(|a| a == "--wait-for-pid") {
+        if let Some(pid_str) = args.get(pos + 1) {
+            if let Ok(pid) = pid_str.parse::<u32>() {
+                let _ = appload::single_instance::wait_for_process_exit(
+                    pid,
+                    std::time::Duration::from_secs(10),
+                );
+            }
+        }
+    }
+
     // 2b. Dedicated headless migration entry point (--migrate-only [--json])
     if args.iter().any(|a| a == "--migrate-only") {
         let is_json = args.iter().any(|a| a == "--json");
@@ -117,7 +129,24 @@ fn main() -> eframe::Result<()> {
         return Ok(());
     }
 
-    // 4b. Single-instance guard: ensure only one AppLoad GUI process writes to appload_state.db.
+    // 4b. Multi-process and single-instance guards:
+    // First, check for any other running AppLoad / Shiply processes by image name (e.g. from an
+    // older version without a single-instance mutex, or during an update restart transition).
+    let other_pids = appload::single_instance::find_other_running_instances();
+    if !other_pids.is_empty() {
+        let all_exited = appload::single_instance::wait_for_other_instances_to_exit(
+            std::time::Duration::from_secs(5),
+        );
+        if !all_exited {
+            let _ = appload::single_instance::focus_existing_appload_window();
+            eprintln!(
+                "[AppLoad] Another AppLoad or Shiply process is already running. Focusing existing window and exiting."
+            );
+            return Ok(());
+        }
+    }
+
+    // Second, acquire the named OS mutex guard to ensure single-instance exclusivity.
     let Some(_single_instance_guard) = appload::single_instance::SingleInstanceGuard::try_acquire()
     else {
         let _ = appload::single_instance::focus_existing_appload_window();

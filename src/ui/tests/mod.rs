@@ -3,6 +3,8 @@
 use super::*;
 
 #[cfg(test)]
+mod brief_010_repro_tests;
+#[cfg(test)]
 mod concurrent_deploy_tests;
 #[cfg(test)]
 mod context_menu_tests;
