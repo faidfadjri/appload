@@ -190,8 +190,7 @@ impl AppLoadApp {
                             .map(|p| SidebarSelection::Project(p.id.clone()))
                             .unwrap_or(SidebarSelection::AllDeployments);
                         self.refresh_selected_project_metadata(true);
-                        self.status_banner =
-                            Some((format!("Removed project '{project_name}'."), true));
+                        self.set_status_banner(format!("Removed project '{project_name}'."), true);
                     }
                 }
                 ConfirmDeleteAction::Environment {
@@ -221,14 +220,16 @@ impl AppLoadApp {
 
                     match remove_res {
                         Some(Err(err)) => {
-                            self.status_banner = Some((err, false));
+                            self.set_status_banner(err, false);
                         }
                         Some(Ok(next_key)) => {
                             let _ = self.storage.save();
                             self.selected_env_key = next_key;
                             self.refresh_selected_project_metadata(true);
-                            self.status_banner =
-                                Some((format!("Removed environment '{env_name}'."), true));
+                            self.set_status_banner(
+                                format!("Removed environment '{env_name}'."),
+                                true,
+                            );
                         }
                         None => {}
                     }
@@ -245,15 +246,15 @@ impl AppLoadApp {
                                 self.storage.deployments.first().map(|d| d.id.clone());
                         }
                         self.refresh_selected_project_metadata(false);
-                        self.status_banner = Some((
+                        self.set_status_banner(
                             format!(
                                 "Deleted deployment record v{version} ({project_name} - {env_name})."
                             ),
                             true,
-                        ));
+                        );
                     }
                     Err(err) => {
-                        self.status_banner = Some((err, false));
+                        self.set_status_banner(err, false);
                     }
                 },
                 ConfirmDeleteAction::ClearDeploymentHistory {
@@ -272,13 +273,13 @@ impl AppLoadApp {
                             }
                         }
                         self.refresh_selected_project_metadata(false);
-                        self.status_banner = Some((
+                        self.set_status_banner(
                             format!("Cleared {removed} deployment history record(s)."),
                             true,
-                        ));
+                        );
                     }
                     Err(err) => {
-                        self.status_banner = Some((err, false));
+                        self.set_status_banner(err, false);
                     }
                 },
                 ConfirmDeleteAction::Secret { key } => {

@@ -1832,11 +1832,26 @@ impl eframe::App for AppLoadApp {
                                 ui.set_width(col_w);
                                 if let Some((msg, is_ok)) = &self.status_banner.clone() {
                                     let now = Instant::now();
+                                    let banner_id = egui::Id::new("last_rendered_status_banner");
+                                    let prev_banner: Option<(String, bool)> =
+                                        ctx.data_mut(|d| d.get_temp(banner_id));
+                                    if prev_banner.is_some()
+                                        && prev_banner.as_ref() != Some(&(msg.clone(), *is_ok))
+                                    {
+                                        self.status_banner_time = Some(now);
+                                    }
+                                    ctx.data_mut(|d| {
+                                        d.insert_temp(banner_id, (msg.clone(), *is_ok));
+                                    });
                                     let banner_time = *self.status_banner_time.get_or_insert(now);
                                     if *is_ok && now.duration_since(banner_time).as_secs_f32() > 4.0 {
                                         self.status_banner = None;
                                         self.status_banner_time = None;
+                                        ctx.data_mut(|d| d.remove::<(String, bool)>(banner_id));
                                     } else {
+                                        if *is_ok {
+                                            ctx.request_repaint_after(Duration::from_millis(200));
+                                        }
                                         let bar_color = if *is_ok { SUCCESS } else { DANGER };
                                         let icon = if *is_ok { OutlineIcon::Check } else { OutlineIcon::Info };
                                         let icon_color = if *is_ok { SUCCESS } else { DANGER };
@@ -1899,11 +1914,24 @@ impl eframe::App for AppLoadApp {
                                                             if close_resp.clicked() {
                                                                 self.status_banner = None;
                                                                 self.status_banner_time = None;
+                                                                ctx.data_mut(|d| {
+                                                                    d.remove::<(String, bool)>(
+                                                                        egui::Id::new(
+                                                                            "last_rendered_status_banner",
+                                                                        ),
+                                                                    );
+                                                                });
                                                             }
                                                         });
                                                     });
                                             });
                                     }
+                                } else {
+                                    ctx.data_mut(|d| {
+                                        d.remove::<(String, bool)>(egui::Id::new(
+                                            "last_rendered_status_banner",
+                                        ));
+                                    });
                                 }
 
                                 if self.storage.projects.is_empty()
