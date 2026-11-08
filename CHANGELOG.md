@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.12.2] - 2026-11-08
+
+### Fixed
+- **Deleted Record Resurrection via Lingering Old Process & Persistent Tombstones (Brief 010):**
+  - Resolved root cause where an old `v0.12.0`/`v0.12.1` process lingered after an in-app update and performed a full-table rewrite from stale memory at exit/sync, resurrecting previously deleted records.
+  - Implemented persistent tombstones (`deleted_deployment_ids`) stored in the SQLite `metadata` table. Startup load (`load_or_default`), periodic sync (`sync_from_app_directory`), and drop-in imports (`merge_deployments`) now automatically reject and immediately purge any resurrected tombstoned records from SQLite.
+- **Multi-Process Detection & Parent Update-Restart Synchronization:**
+  - Added running process enumeration by image name (`appload.exe`/`shiply.exe`) via Windows Toolhelp32 snapshots with strict sandbox isolation (`APPLOAD_SANDBOX_ROOT`).
+  - Added parent process identification (`th32ParentProcessID`) and `--wait-for-pid <PID>` CLI handshake.
+  - On update restart (parent process or `--wait-for-pid`), AppLoad waits up to **90 seconds** for the previous process to completely exit before opening the database, preventing dual writers and premature exit when the old process flushes state.
+  - Added a native waiting splash window displayed if waiting exceeds 2 seconds (`"Finishing update — waiting for the previous AppLoad window to close…"`), and a clear modal dialog if the 90-second timeout expires (`"Another AppLoad is still running. Close it and start AppLoad again."`).
+  - Genuine second launches (non-parent instance) retain a fast 5-second wait, focusing the existing window and exiting cleanly.
+
 ## [0.12.1] - 2026-11-08
 
 ### Fixed

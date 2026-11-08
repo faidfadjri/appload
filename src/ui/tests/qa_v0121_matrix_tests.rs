@@ -861,8 +861,8 @@ fn test_qa_area_05_06_07_08_history_secrets_overview_and_ui_regressions() {
 fn test_qa_area_09_and_10_lifecycle_version_0121_and_update_simulation() {
     let sandbox = crate::paths::TestSandbox::new();
 
-    // 1. Package version must be 0.12.1
-    assert_eq!(env!("CARGO_PKG_VERSION"), "0.12.1");
+    // 1. Package version must be 0.12.2
+    assert_eq!(env!("CARGO_PKG_VERSION"), "0.12.2");
 
     // 2. Sandbox single-instance mutex is independent from production `Local\AppLoad.SingleInstance`
     let sb_mutex = resolve_mutex_name();
